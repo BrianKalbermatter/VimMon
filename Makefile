@@ -2,7 +2,7 @@
 # Uso: make NombreArchivo (sin extensión)
 
 CC = clang
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -I./include
 LIBS = -lraylib -lGL -lm -lpthread -ldl
 SRC_DIR = src
 BIN_DIR = bin

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-int main(){
+int areaTrapecio(){
     float base_Mayor;
     float base_Menor;
     float altura;
