@@ -4,6 +4,11 @@
 // Que pasa si no coloco el include guarde... Puede que se ejecute varias veces dentro del main el .header
 #pragma once
 
+void* espera_ingresar_nuevamente(void* arg){
+    while
+    return NULL;
+}
+
 int strcmp_h(){
     /* strcmp (cadena1, cadena2)
      * Compara 2 cadenas de texto caracter a caracter, es case-sensitive(sensible a mayusculas y minusculas). Cuando se encuentra una diferencia, esta funcion devuelve un valor entero correspondiente a la diferencia de valor decimal segun el codigo ASCII. El cual corresponde a la siguiente tabla.
@@ -29,10 +34,13 @@ int strcmp_h(){
         if(strcmp(clave_secreta, usuario_digito)==0){
         printf("\n Bienvenido al sistema");
         break;
-        }else{
+        }if else{
             intento_restantes--;
             printf("Clave secreta incorrecta, le quedan: %i intentos:", intento_restantes);
             
+        }else{
+            puts("Haz quedado bloqueado!, espera 30 min. Luego vuelve a intentarlo");
+            espera_ingresar_nuevamente();
         }
     }while(intento_restantes > 0);
 
