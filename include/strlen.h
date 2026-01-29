@@ -8,11 +8,11 @@
 
 int strlen_h(){
     // La dimension del array es 200, pero la cadena puede ser menor
-    char array[200];
+    char array[200] = "";
     printf("Escribe cualquier cosa\n");
     fflush(stdin);
-    scanf("%s", &array);
-    printf("\n La longitud de la cadena digitada es: %i", strlen(array));
+    scanf("%s", array);
+    printf("\n La longitud de la cadena digitada es: %zu", strlen(array));
     return 0;
 }
 #endif
