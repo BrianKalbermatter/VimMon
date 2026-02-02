@@ -4,9 +4,9 @@
 
 // Funciones 
 #include "strcat.h"
-#include "strcmp.h"
+#include "../include/strcmp.h"
 #include "strlen.h"
-
+#include "../include/strlwr.h"
 int main(){
     strcat_h();
     strcmp_h();
