@@ -18,8 +18,9 @@ char nombre(char *str){
 
 #include "strupr.h"
 #include "strlwr.h"
+#include "strcmp.h"
 // La tarea la hare mas complicada, voy a crear un condicional en el que puedas elegir entre si o no con minusculas y si le pasas en mayus, no va a importar... Llamara a las funciones que ya tengo creada...
-
+// La funcion strcmp (string compare) compara el contenido de dos cadenas!
 void conditionaldeFuntions();
 
 
@@ -40,10 +41,14 @@ int suma(int num1, int num2){
 void conditionaldeFuntions(char *str){
     char option[10] = " ";
     puts("Dime una opcion: SI o NO? \n");
-    char fgets(char *option, int n, FILE *option);
-    if (){
-
+    fgets(option,sizeof(option), stdin);
+    strupr(option);
+    if (strcmp(option, "SI")==0){
+        
+    }else if(strcmp(option, "NO")==0){
+        printf("Haz elegido la opcion No!");
     }
+
 }
 
 

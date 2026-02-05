@@ -1,12 +1,18 @@
 #include <stdio.h>
 #include <string.h>
-
+#include <unistd.h>
 // Que pasa si no coloco el include guarde... Puede que se ejecute varias veces dentro del main el .header
 #pragma once
 
-void* espera_ingresar_nuevamente(void* arg){
-    while
-    return NULL;
+void espera_ingresar_nuevamente(){
+    int seg = 1800; // 30 Minutos
+    while (seg > 0){
+        printf("\rTiempo restante %d segundos", seg);
+        sleep(1);
+        seg--;
+
+    }
+    printf("\nPuedes volver a intentar...\n");
 }
 
 int strcmp_h(){
@@ -34,7 +40,7 @@ int strcmp_h(){
         if(strcmp(clave_secreta, usuario_digito)==0){
         printf("\n Bienvenido al sistema");
         break;
-        }if else{
+        }else if(strcmp(clave_secreta, usuario_digito)>=0){
             intento_restantes--;
             printf("Clave secreta incorrecta, le quedan: %i intentos:", intento_restantes);
             
