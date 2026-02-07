@@ -31,5 +31,15 @@ Riesgos reales de la app tal como está:
   # Crear túnel
   ngrok http 3000
 
-  Te da una URL pública tipo https://xxxx.ngrok-free.app que podés compartir. Mientras tengas Docker y
-   ngrok corriendo, cualquiera puede entrar.
+Te da una URL pública tipo https://xxxx.ngrok-free.app que podés compartir. Mientras tengas Docker y ngrok corriendo, cualquiera puede entrar.
+
+
+
+
+
+
+
+
+- Crear un script con sintaxis de la catedra tambien para verificar por sintaxis para ver si se la a escrito bien, ser super fino en la sintaxis. Por lo tanto el editor de antilez puede servir para terminarlo y colocarlo, para usarlo como editor propio...
+- Sistema de niveles, arreglarlo...
+

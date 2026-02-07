@@ -1,10 +1,21 @@
 #!/bin/bash
+# Con esto le dice al sistema que use bash para ejecutar este script
 # ============================================
 #  AED Game - Sistema de niveles por ejercicio
 # ============================================
 
 # Obtiene la ruta de donde esta el script
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Con el $0 es el nombre del scritp, dirname saca el directorio, cd ... && pwd lo convierte en ruta absoluta. Esto sirve para que funcione sin importar desde donde lo ejecutes!
+# Pregunta: Que significa que sea ruta absoluta?
+# Desglose de lo que hace esta variable SCRIPT_DIR="$" asignacion de la variable que va a contener 
+
+
+
+
+
+
+
 NIVELES_DIR="$SCRIPT_DIR/niveles"
 SOLUCIONES_DIR="$SCRIPT_DIR/soluciones"
 PROGRESO_FILE="$SCRIPT_DIR/.progreso"

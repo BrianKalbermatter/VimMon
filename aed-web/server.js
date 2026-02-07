@@ -36,6 +36,34 @@ app.get('/api/mis-pastes', autenticar, async (req, res) => {
 });
 app.use('/api/panel', panelRoutes);
 
+// Niveles con progreso (autenticado)
+app.get('/api/niveles-progreso', autenticar, async (req, res) => {
+  try {
+    const { rows: niveles } = await pool.query('SELECT * FROM niveles ORDER BY numero');
+    // Niveles aprobados por el usuario
+    const { rows: aprobados } = await pool.query(
+      `SELECT DISTINCT nivel_id FROM pastes WHERE user_id = $1 AND estado = 'aprobado'`,
+      [req.user.id]
+    );
+    const aprobadosSet = new Set(aprobados.map(r => r.nivel_id));
+
+    const resultado = niveles.map((n, i) => {
+      const aprobado = aprobadosSet.has(n.id);
+      // Nivel 1 siempre desbloqueado; nivel N desbloqueado si nivel N-1 aprobado
+      let desbloqueado = i === 0;
+      if (i > 0) {
+        desbloqueado = aprobadosSet.has(niveles[i - 1].id);
+      }
+      return { ...n, desbloqueado, aprobado };
+    });
+
+    res.json(resultado);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // Niveles API
 app.get('/api/niveles', async (req, res) => {
   try {

@@ -3,47 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AED - Niveles</title>
+  <title>AED - IDE Pseudocodigo</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
+<body class="ide-body">
   <header>
     <h1>AED Pseudocodigo</h1>
     <nav id="nav-links"></nav>
   </header>
 
-  <div class="container">
-    <h2 style="margin-bottom:1rem;">Niveles</h2>
-    <div id="alert-box"></div>
-    <div id="niveles-list"></div>
+  <div id="alert-box" style="padding:0 1rem;"></div>
 
-    <!-- Modal para escribir pseudocodigo -->
-    <div id="editor-section" class="hidden">
-      <div class="card">
-        <h2 id="editor-titulo"></h2>
-        <div id="editor-enunciado" style="white-space:pre-wrap; margin-bottom:1rem; color:#94a3b8;"></div>
-        <button class="btn btn-sm" style="margin-bottom:1rem; background:#334155; color:#fef08a;" onclick="togglePista()">Ver pista</button>
-        <div id="editor-pista" class="hidden" style="margin-bottom:1rem; padding:0.5rem; background:#172554; border-radius:4px; color:#fef08a;"></div>
-        <div class="form-group">
-          <label>Tu pseudocodigo</label>
-          <textarea id="editor-content" placeholder="Escribi tu pseudocodigo aca..."></textarea>
-        </div>
-        <button class="btn btn-primary" onclick="enviarPaste()">Enviar</button>
-        <button class="btn" style="background:#475569; color:#e2e8f0; margin-left:0.5rem;" onclick="cerrarEditor()">Cancelar</button>
+  <!-- Vista 1: Selector de niveles -->
+  <div id="vista-niveles" class="container">
+    <h2 style="margin-bottom:1.5rem;">Niveles</h2>
+    <div id="niveles-grid" class="niveles-grid"></div>
+  </div>
+
+  <!-- Vista 2: IDE -->
+  <div id="vista-ide" class="ide-container hidden">
+    <!-- Panel izquierdo: consigna -->
+    <div class="panel-izquierdo" id="panel-izquierdo">
+      <button class="btn btn-sm" style="margin-bottom:1rem; background:#334155; color:#94a3b8;" onclick="volverANiveles()">← Volver a niveles</button>
+      <h2 id="editor-titulo"></h2>
+      <div id="editor-enunciado" class="enunciado"></div>
+      <button class="btn btn-sm pista-btn hidden" id="pista-btn" onclick="togglePista()">Ver pista</button>
+      <div id="editor-pista" class="pista-content hidden"></div>
+      <div class="entregas-section">
+        <h3>Mis entregas de este nivel</h3>
+        <div id="entregas-nivel"></div>
       </div>
     </div>
 
-    <!-- Mis entregas -->
-    <h2 style="margin-top:2rem; margin-bottom:1rem;">Mis entregas</h2>
-    <div id="mis-entregas"></div>
+    <!-- Panel derecho: editor -->
+    <div class="panel-derecho" id="panel-derecho">
+      <div class="editor-toolbar">
+        <span class="nivel-info" id="editor-nivel-info"></span>
+        <button class="btn btn-primary btn-sm" id="btn-enviar" onclick="enviarPaste()" disabled>Enviar</button>
+      </div>
+      <div class="editor-wrapper">
+        <div class="line-numbers" id="line-numbers"><span class="line-num">1</span></div>
+        <textarea id="editor-content" placeholder="Escribi tu pseudocodigo aca..."></textarea>
+      </div>
+      <div id="error-summary" class="hidden"></div>
+    </div>
   </div>
 
   <script src="/js/app.js"></script>
   <script>
     requireAuth();
     updateNav();
-    cargarNiveles();
-    cargarMisEntregas();
+    initIDE();
   </script>
 </body>
 </html>

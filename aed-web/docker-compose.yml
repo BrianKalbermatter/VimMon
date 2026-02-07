@@ -1,4 +1,4 @@
-version: '3.8'
+name: aed-pseudocodigo
 
 services:
   db:
@@ -20,6 +20,9 @@ services:
       - db
     ports:
       - "${PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://aed:aed_secret@db:5432/aed_db}
       JWT_SECRET: ${JWT_SECRET:-cambiar_en_produccion}
