@@ -43,3 +43,25 @@ Te da una URL pública tipo https://xxxx.ngrok-free.app que podés compartir. Mi
 - Crear un script con sintaxis de la catedra tambien para verificar por sintaxis para ver si se la a escrito bien, ser super fino en la sintaxis. Por lo tanto el editor de antilez puede servir para terminarlo y colocarlo, para usarlo como editor propio...
 - Sistema de niveles, arreglarlo...
 
+
+# Register a los Profes: 
+
+PROFE_EMAIL=tumail@gmail.com
+
+  La clave se envía solo a ese email. Nadie más la recibe.
+
+  Entonces el flujo es:
+
+  1. Vos recibís la clave en tu mail cada 15 min
+  2. Cuando querés que alguien sea profe, le pasás la clave por privado (WhatsApp, en persona, etc.)
+  3. Esa persona tiene 15 min para usarla, después ya no sirve
+
+  Un alumno no puede "fingir" ser profe porque:
+  - No tiene acceso a tu email
+  - La clave cambia cada 15 min
+  - Si pone una clave incorrecta le dice "Clave incorrecta o expirada"
+
+  Básicamente vos sos el único que controla quién puede ser profe, porque vos decidís a quién le compartís la clave.
+
+
+Deshacer lo de clave en register porque lo puedo manejar de mi backend despues para que pueda darle admin o normal user

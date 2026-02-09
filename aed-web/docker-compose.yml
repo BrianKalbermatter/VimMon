@@ -25,8 +25,13 @@ services:
       - /app/node_modules
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://aed:aed_secret@db:5432/aed_db}
-      JWT_SECRET: ${JWT_SECRET:-cambiar_en_produccion}
+      JWT_SECRET: ${JWT_SECRET:-solo-para-desarrollo-local}
       PORT: 3000
+      PROFE_EMAIL: ${PROFE_EMAIL:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
 
 volumes:
   pgdata:

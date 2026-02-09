@@ -3,6 +3,7 @@ const path = require('path');
 
 const pool = require('./db/pool');
 const { autenticar } = require('./middleware/auth');
+const { iniciarRotacion } = require('./claveProfe');
 const authRoutes = require('./routes/auth');
 const pastesRoutes = require('./routes/pastes');
 const panelRoutes = require('./routes/panel');
@@ -82,4 +83,5 @@ app.get('/panel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pan
 
 app.listen(PORT, () => {
   console.log(`AED Web corriendo en http://localhost:${PORT}`);
+  iniciarRotacion();
 });

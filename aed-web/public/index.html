@@ -55,10 +55,14 @@
         </div>
         <div class="form-group">
           <label>Rol</label>
-          <select id="reg-role">
+          <select id="reg-role" onchange="toggleClaveProfe()">
             <option value="alumno">Alumno</option>
             <option value="profe">Profesor</option>
           </select>
+        </div>
+        <div id="clave-profe-group" class="form-group hidden">
+          <label>Clave de profesor</label>
+          <input type="password" id="reg-clave-profe" placeholder="Ingresa la clave de acceso">
         </div>
         <button class="btn btn-primary" onclick="register()">Crear cuenta</button>
       </div>

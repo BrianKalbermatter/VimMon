@@ -47,6 +47,18 @@ function logout() {
   window.location.href = '/';
 }
 
+// Toggle campo clave profe (index.html)
+function toggleClaveProfe() {
+  const role = document.getElementById('reg-role');
+  const grupo = document.getElementById('clave-profe-group');
+  if (!role || !grupo) return;
+  if (role.value === 'profe') {
+    grupo.classList.remove('hidden');
+  } else {
+    grupo.classList.add('hidden');
+  }
+}
+
 // Tabs (index.html)
 function showTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -91,13 +103,15 @@ async function register() {
   const password = document.getElementById('reg-pass').value;
   const seccion = document.getElementById('reg-seccion').value;
   const role = document.getElementById('reg-role').value;
+  const claveProfeInput = document.getElementById('reg-clave-profe');
+  const clave_profe = claveProfeInput ? claveProfeInput.value : '';
   const alertBox = document.getElementById('auth-alert');
 
   try {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nombre, seccion, role })
+      body: JSON.stringify({ email, password, nombre, seccion, role, clave_profe })
     });
     const data = await res.json();
     if (!res.ok) {
