@@ -1,0 +1,74 @@
+[
+  {
+    "numero": 1,
+    "titulo": "Precio con inflacion",
+    "enunciado": "Escribir un programa en pseudocodigo que, dados:\n- C: costo actual del producto\n- R: tasa de inflacion anual (en decimal, ej: 0.04)\n- A: anio actual\n- N: anio futuro\n\nCalcule el precio futuro P usando la formula:\n  P = C * (1 + R) ^ (N - A)\n\nEjemplo: Si C=100, R=0.04, A=2024, N=2027\nEntonces P = 100 * 1.04^3 = 112.4864",
+    "pista": "Recorda que R se expresa en decimal (4% = 0.04).\nUsa una variable auxiliar para (N - A) que\nrepresenta la cantidad de anios.\nLa potencia se puede expresar como\nP <- C * (1 + R) ^ anios",
+    "casos_prueba": [
+      {
+        "datos": "C=100, R=0.04, A=2024, N=2027",
+        "pregunta": "Cual es el valor de P?",
+        "esperado": "112.4864",
+        "tolerancia": "0.01"
+      },
+      {
+        "datos": "C=250, R=0.10, A=2024, N=2026",
+        "pregunta": "Cual es el valor de P?",
+        "esperado": "302.50",
+        "tolerancia": "0.01"
+      }
+    ]
+  },
+  {
+    "numero": 2,
+    "titulo": "Discriminante de ecuacion cuadratica",
+    "enunciado": "Escribir un programa en pseudocodigo que, dados los\ncoeficientes a, b y c de una ecuacion cuadratica\n  ax^2 + bx + c = 0\n\nCalcule el discriminante D = b^2 - 4*a*c\ny determine:\n- Si D > 0: dos raices reales distintas\n- Si D = 0: una raiz real doble\n- Si D < 0: no tiene raices reales\n\nMostrar el valor de D y el mensaje correspondiente.",
+    "pista": "El discriminante es D <- b^2 - 4*a*c\nRecorda usar una estructura SI/SINO para\nlos tres casos.\nPrimero calcula D, luego evalua su signo.",
+    "casos_prueba": [
+      {
+        "datos": "a=1, b=5, c=6",
+        "pregunta": "Cual es el valor del discriminante D?",
+        "esperado": "1",
+        "tolerancia": "0.001"
+      },
+      {
+        "datos": "a=1, b=2, c=1",
+        "pregunta": "Cual es el valor del discriminante D?",
+        "esperado": "0",
+        "tolerancia": "0.001"
+      },
+      {
+        "datos": "a=2, b=1, c=3",
+        "pregunta": "Cual es el valor del discriminante D?",
+        "esperado": "-23",
+        "tolerancia": "0.001"
+      }
+    ]
+  },
+  {
+    "numero": 3,
+    "titulo": "Precio PC + Impresora",
+    "enunciado": "Una empresa vende PCs e impresoras.\n\nPrecios base:\n- PC: $500\n- Impresora: $200\n\nDescuentos por cantidad de PCs:\n- 1 a 4: sin descuento\n- 5 a 9: 5% de descuento\n- 10 o mas: 10% de descuento\n\nSi compra al menos 1 PC, la impresora tiene\nun 50% de descuento.\n\nDados: cantidad de PCs (cp) y cantidad de\nimpresoras (ci), calcular el total a pagar.",
+    "pista": "Calcula primero el subtotal de PCs aplicando\nel descuento segun la cantidad.\nLuego calcula el subtotal de impresoras:\nsi cp >= 1, precio impresora = 200 * 0.50 = 100\nsino precio impresora = 200.\nTotal = subtotal_pc + subtotal_imp",
+    "casos_prueba": [
+      {
+        "datos": "cp=3, ci=2",
+        "pregunta": "Cual es el total a pagar?",
+        "esperado": "1700",
+        "tolerancia": "0.01"
+      },
+      {
+        "datos": "cp=6, ci=1",
+        "pregunta": "Cual es el total a pagar?",
+        "esperado": "2950",
+        "tolerancia": "0.01"
+      },
+      {
+        "datos": "cp=0, ci=3",
+        "pregunta": "Cual es el total a pagar?",
+        "esperado": "600",
+        "tolerancia": "0.01"
+      }
+    ]
+  }
+]

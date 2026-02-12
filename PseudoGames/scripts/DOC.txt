@@ -1,0 +1,338 @@
+================================================================================
+                    DOCUMENTACION DE DESARROLLO - BIM EDITOR
+                    Editor de texto tipo Vim en Bash puro
+================================================================================
+
+Proyecto:       BIM (Bash Interactive Monitor)
+Ubicacion:      ~/VimMon/PseudoGames/scripts/editorBim/bim.sh
+Autor:          [Tu nombre]
+Fecha:          2026-02-12
+Lenguaje:       Bash puro (sin dependencias externas)
+
+================================================================================
+                            DESCRIPCION GENERAL
+================================================================================
+
+BIM es un editor de texto interactivo construido desde cero en Bash, inspirado
+en Vim. El objetivo del proyecto es aprender los fundamentos de como funciona
+un editor de texto a nivel de terminal: lectura de teclas, control de pantalla,
+manejo de buffers de texto y navegacion.
+
+El editor forma parte del proyecto PseudoGames, un juego educativo sobre
+Algoritmos y Estructuras de Datos.
+
+================================================================================
+                         TECNOLOGIAS Y CONCEPTOS
+================================================================================
+
+- Bash scripting (arrays, aritmetica, condicionales, loops)
+- Terminal en modo raw (stty raw -echo)
+- Codigos de escape ANSI (posicionamiento, colores, estilos)
+- Lectura de teclas byte a byte (read -rsn1)
+- Secuencias de escape de teclado (flechas, ESC)
+- Colores RGB en terminal (true color)
+
+================================================================================
+                       REGISTRO DE DESARROLLO POR DIA
+================================================================================
+
+
+--- DIA 1: Terminal en modo raw + lectura de teclas ----------------------------
+
+Objetivo: Tomar control total del terminal y leer teclas individuales.
+
+Conceptos aprendidos:
+  - stty raw -echo: Pone el terminal en modo raw. Las teclas llegan una por
+    una sin esperar Enter. El flag -echo evita que se muestren en pantalla.
+  - stty sane: Restaura el terminal a su modo normal. Fundamental para no
+    dejar la terminal rota si el script crashea.
+  - trap cleanup EXIT: Asegura que la funcion cleanup() se ejecute siempre
+    al salir del script, sin importar como termine (normal, error, Ctrl+C).
+  - read -rsn1 char: Lee exactamente 1 byte del teclado.
+      -r: No interpreta backslashes
+      -s: Silencioso (no hace echo)
+      -n1: Lee 1 solo caracter
+
+Problema resuelto - Distinguir ESC de flechas:
+  Las teclas de flecha envian 3 bytes en secuencia rapida:
+    ESC (byte 27) + [ + letra (A=arriba, B=abajo, C=derecha, D=izquierda)
+
+  Cuando el usuario presiona ESC solo, llega unicamente 1 byte.
+
+  Solucion: Despues de detectar ESC ($'\e'), se leen 2 bytes mas con un
+  timeout de 50ms (read -rsn2 -t 0.05 rest):
+    - Si llegan bytes -> es una flecha (se evalua rest: [A, [B, [C, [D)
+    - Si no llegan (timeout) -> fue ESC solo
+
+  Error corregido: Inicialmente el read -rsn2 se ejecutaba SIEMPRE despues
+  de cada tecla, causando que teclas normales (letras, numeros) se trabaran
+  esperando 2 bytes que nunca llegaban. Se movio DENTRO del if de ESC.
+
+Codigo clave:
+  if [[ "$char" == $'\e' ]]; then
+      read -rsn2 -t 0.05 rest
+      if [[ "$rest" == "[A" ]]; then
+          # Flecha arriba
+      fi
+  fi
+
+Resultado: Script que detecta correctamente flechas, ESC solo, letras
+normales y la tecla q para salir.
+
+
+--- DIA 2: Dibujar en pantalla con codigos ANSI --------------------------------
+
+Objetivo: Controlar que se muestra en pantalla y donde.
+
+Conceptos aprendidos:
+  - Codigos de escape ANSI:
+      \e[2J    -> Limpia toda la pantalla
+      \e[H     -> Mueve el cursor a la posicion 1,1 (arriba-izquierda)
+      \e[F;CH  -> Mueve el cursor a fila F, columna C
+      \e[7m    -> Texto invertido (fondo y letra intercambian colores)
+      \e[0m    -> Resetea todos los estilos y colores
+
+  - Variables de entorno del terminal:
+      FILAS=$(tput lines)  -> Cantidad de filas de la terminal
+      COLS=$(tput cols)    -> Cantidad de columnas de la terminal
+      Nota: Se guardan ANTES de stty raw porque tput puede fallar en modo raw.
+
+  - Concepto de Game Loop:
+      El editor redibuja TODA la pantalla en cada ciclo del loop.
+      No se puede hacer printf y olvidarse: al limpiar pantalla se borra todo.
+      Solucion: guardar estado en variables y redibujar en cada iteracion.
+
+      Patron: estado -> dibujar -> leer -> actualizar estado -> repetir
+
+  - Comillas simples vs dobles en Bash:
+      'texto'  -> Literal, no expande variables ni escapes
+      "texto"  -> Expande $variables y \escapes
+      Ejemplo: printf '${VAR}' imprime literal "${VAR}"
+               printf "${VAR}" imprime el valor de la variable
+
+Barra de estado:
+  Se dibuja en la ultima fila del terminal usando posicionamiento ANSI.
+  Se usa texto invertido (\e[7m) y padding con %-${COLS}s para que
+  la barra ocupe toda la linea de lado a lado.
+
+  printf "\e[${FILAS};1H${BARRA_BG}${FG}%-${COLS}s${RESET}" ' Editor - BIM | NORMAL'
+
+Colores Gruvbox:
+  Para que el editor se vea igual en cualquier PC, los colores se definen
+  dentro del script usando colores RGB verdaderos (true color):
+
+    \e[38;2;R;G;Bm  -> Color de texto (foreground)
+    \e[48;2;R;G;Bm  -> Color de fondo (background)
+
+  Paleta Gruvbox implementada:
+    BG (fondo oscuro):    RGB(40, 40, 40)
+    FG (texto normal):    RGB(235, 219, 178)
+    Amarillo (titulos):   RGB(250, 189, 47)
+    Barra BG (gris):      RGB(80, 73, 69)
+
+  Se guardan en variables para reutilizar:
+    BG='\e[48;2;40;40;40m'
+    FG='\e[38;2;235;219;178m'
+    AMARILLO='\e[38;2;250;189;47m'
+    BARRA_BG='\e[48;2;80;73;69m'
+    RESET='\e[0m'
+
+Optimizacion - Evitar parpadeo:
+  Limpiar con \e[2J en cada ciclo causa parpadeo visible.
+  Solucion: usar solo \e[H (mover cursor al inicio) y redibujar encima.
+  Se hace un unico \e[2J\e[H antes de entrar al loop.
+
+Pantalla de inicio:
+  El editor muestra un logo ASCII art de BIM al iniciar y espera a que
+  el usuario presione cualquier tecla antes de entrar al editor.
+
+Resultado: Pantalla con fondo Gruvbox, barra de estado invertida en la
+ultima fila, y transicion limpia desde el logo de inicio.
+
+
+--- DIA 3: Buffer de texto + abrir archivos -----------------------------------
+
+Objetivo: Cargar un archivo en memoria y mostrarlo en pantalla.
+
+Conceptos aprendidos:
+  - Arrays en Bash:
+      declare -a buffer        -> Declara un array
+      buffer[0]="primera"      -> Asigna valor a posicion 0
+      ${buffer[$i]}            -> Accede al elemento en posicion i
+      ${#buffer[@]}            -> Cantidad total de elementos
+
+  - mapfile (readarray):
+      mapfile -t buffer < "$1"
+      Carga el archivo linea por linea en el array buffer.
+      -t: Elimina el newline (\n) de cada linea.
+      $1: Primer argumento del script (nombre del archivo).
+
+  - Argumentos del script:
+      ./bim.sh archivo.txt  ->  $1 vale "archivo.txt"
+
+  - chmod +x: Agrega permiso de ejecucion a un archivo.
+      Sin este permiso, Linux no permite ejecutar con ./bim.sh
+      Alternativa: bash bim.sh (ejecuta bash directamente)
+
+Dibujar el archivo:
+  Se recorre el array con un for y se dibuja cada linea en su fila:
+
+  for ((i=0; i<${#buffer[@]}; i++)); do
+      printf "\e[$((i+1));1H %3d %s" "$((i+1))" "${buffer[$i]}"
+  done
+
+  - \e[$((i+1));1H -> Posiciona cursor en fila i+1, columna 1
+  - %3d -> Numero de linea con 3 digitos de ancho (alineado)
+  - %s  -> Contenido de la linea
+  - $((i+1)) -> Aritmetica: i empieza en 0 pero las filas desde 1
+
+Resultado: El editor abre un archivo pasado como argumento y lo muestra
+en pantalla con numeros de linea alineados a la izquierda.
+
+
+--- DIA 4: Modo NORMAL - Navegacion -------------------------------------------
+
+Objetivo: Moverse por el archivo con las teclas de flecha.
+
+Conceptos aprendidos:
+  - Variables de posicion del cursor:
+      cursor_row=0  -> Fila actual en el buffer (vertical, arriba/abajo)
+      cursor_col=0  -> Columna actual (horizontal, izquierda/derecha)
+
+  - Grilla de texto:
+             col 0  col 1  col 2  col 3
+    row 0  ->  h      o      l      a
+    row 1  ->  m      u      n      d
+    row 2  ->  t      e      s      t
+
+    row = fila (arriba/abajo)
+    col = columna (izquierda/derecha)
+
+  - Aritmetica en Bash:
+      $((cursor_row - 1))  -> Resta 1
+      $((cursor_row + 1))  -> Suma 1
+
+Movimiento con flechas:
+  Flecha Arriba  ([A) -> cursor_row=$((cursor_row - 1))
+  Flecha Abajo   ([B) -> cursor_row=$((cursor_row + 1))
+  Flecha Derecha ([C) -> cursor_col=$((cursor_col + 1))
+  Flecha Izquierda([D)-> cursor_col=$((cursor_col - 1))
+
+Limites de borde (el cursor no se sale del texto):
+  Arriba:    if ((cursor_row < 0)); then cursor_row=0; fi
+  Abajo:     if ((cursor_row > ${#buffer[@]} - 1)); then
+                 cursor_row=$((${#buffer[@]} - 1)); fi
+  Izquierda: if ((cursor_col < 0)); then cursor_col=0; fi
+  Derecha:   if ((cursor_col > ${#buffer[$cursor_row]})); then
+                 cursor_col=${#buffer[$cursor_row]}; fi
+
+  Nota: El limite de derecha depende del largo de la LINEA ACTUAL,
+  no de un valor fijo. ${#buffer[$cursor_row]} da el largo de la
+  linea donde esta el cursor.
+
+Posicionamiento del cursor:
+  printf "\e[$((cursor_row+1));$((cursor_col+5))H"
+
+  - cursor_row+1: Porque las filas ANSI empiezan en 1, el array en 0
+  - cursor_col+5: Offset por los numeros de linea (" 1  " ocupa ~5 cols)
+
+  IMPORTANTE: Este printf debe ser lo ULTIMO antes del read, despues de
+  dibujar la barra de estado. Si se pone antes de la barra, la barra
+  mueve el cursor a la ultima fila y se pierde la posicion.
+
+Orden correcto de dibujo:
+  1. Limpiar pantalla (solo \e[H, sin \e[2J para evitar parpadeo)
+  2. Dibujar lineas del buffer con numeros de linea
+  3. Dibujar barra de estado en la ultima fila
+  4. Hacer cursor visible (\e[?25h)
+  5. Posicionar cursor en cursor_row, cursor_col
+  6. Leer tecla (read -rsn1)
+
+Resultado: El cursor se mueve libremente por el archivo con las flechas,
+respetando los limites del texto. No se sale por arriba, abajo, izquierda
+ni derecha.
+
+
+================================================================================
+                         ESTRUCTURA ACTUAL DEL ARCHIVO
+================================================================================
+
+bim.sh
+  |
+  |-- Logo ASCII de BIM + espera tecla (pantalla de inicio)
+  |
+  |-- cleanup()              Restaura terminal con stty sane
+  |-- Variables de cursor    cursor_row, cursor_col
+  |-- mapfile                Carga archivo en buffer[]
+  |-- FILAS, COLS            Tamano del terminal
+  |-- trap cleanup EXIT      Asegura limpieza al salir
+  |-- stty raw -echo         Modo raw
+  |-- Clear inicial          \e[2J\e[H (una sola vez)
+  |-- Variables de color     BG, FG, AMARILLO, BARRA_BG, RESET
+  |
+  |-- LOOP PRINCIPAL --------
+  |   |-- Setear colores (BG, FG)
+  |   |-- Mover cursor al inicio (\e[H)
+  |   |-- Dibujar buffer con numeros de linea (for)
+  |   |-- Dibujar barra de estado (ultima fila, invertida)
+  |   |-- Hacer cursor visible (\e[?25h)
+  |   |-- Posicionar cursor (cursor_row, cursor_col)
+  |   |-- Leer tecla (read -rsn1)
+  |   |-- Procesar tecla:
+  |   |   |-- ESC -> leer 2 bytes mas
+  |   |   |   |-- [A -> mover arriba
+  |   |   |   |-- [B -> mover abajo
+  |   |   |   |-- [C -> mover derecha
+  |   |   |   |-- [D -> mover izquierda
+  |   |   |   |-- nada -> ESC solo
+  |   |   |-- q -> salir
+  |   |-- Repetir
+  |
+  |-- FIN -------------------
+
+
+================================================================================
+                          EJECUCION
+================================================================================
+
+Requisitos:
+  - Terminal con soporte true color (RGB)
+  - Bash 4.0 o superior (por mapfile)
+
+Uso:
+  chmod +x bim.sh              # Solo la primera vez
+  ./bim.sh archivo.txt         # Abrir un archivo
+
+  O sin chmod:
+  bash bim.sh archivo.txt
+
+Controles actuales:
+  Flechas       -> Mover cursor por el archivo
+  q             -> Salir del editor
+  ESC           -> (Reservado para futuro cambio de modo)
+
+
+================================================================================
+                        PROXIMOS PASOS (PENDIENTES)
+================================================================================
+
+Dia 5 - Etapa 5: Modo INSERT
+  - Tecla i entra a modo INSERT, ESC vuelve a NORMAL
+  - Insertar caracteres en la posicion del cursor
+  - Backspace para borrar
+  - Enter para partir linea
+  - a, o, O como entradas alternativas
+
+Dia 6 - Etapa 6: Modo COMMAND + Guardar/Salir
+  - : entra a modo COMMAND
+  - Implementar :w (guardar), :q (salir), :wq, :q!
+  - dd (borrar linea), x (borrar caracter)
+  - Dirty flag (trackear si el archivo fue modificado)
+
+Dia 7 - Etapa 7: Busqueda y Syntax Highlighting
+  - /patron para buscar texto
+  - Resaltar keywords de Bash
+  - Colorear strings y comentarios
+  - Undo basico
+
+================================================================================

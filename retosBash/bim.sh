@@ -40,27 +40,29 @@ trap cleanup EXIT
 stty raw -echo # Esto pone en modo raw la terminal!
 
 while true; do
-    # read -rsn1 char
+    read -rsn1 char  #<--- Siempre se lee primero!
+    read -rsn2 rest  
     # Si es 'q', salir
     # si no, mostrar el codigo del caracter!
     # printf '%d \r\n' "'$char"
-    if [[ "$char" == "[A" ]]; then
+    if [[ "$rest" == "[A" ]]; then
         #Lo que hace el -rsn2 lee solo dos bytes nomas y sino es -rsn1, da igual
         #Lo que hace el -t es que hace un timeout como un sleep
-        read -rsn2 -t 0.05 rest
+        
         printf 'Flecha Arriba\r\n'
     elif [[ "$rest" == "[B" ]]; then
-        read -rsn2 -t 0.05 rest
+        
         printf 'Flecha Abajo\r\n'
     elif [[ "$rest" == "[C" ]]; then
         printf 'Flecha Derecha\r\n'
     elif [[ "$rest" == "[D" ]]; then
         printf 'Flecha Izquierda\r\n'
     elif [[ "$char" == "q" ]]; then
-        read -rsn1 -t 0.05 rest
         break
-    else 
+    else
+        
         printf 'ESC\r\n'
+        read -rsn1 -t 0.05 rest
     fi
 done
 
