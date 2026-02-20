@@ -1,9 +1,0 @@
-ACCION ES
-
-AMBIENTE
-    // Declarar variables aqui
-
-PROCESO
-    // Escribir pseudocodigo aqui
-
-FIN_ACCION
