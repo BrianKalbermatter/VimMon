@@ -312,16 +312,85 @@ Controles actuales:
   ESC           -> (Reservado para futuro cambio de modo)
 
 
+--- DIA 5: Modo INSERT - Editar texto [EN PROGRESO] --------------------------
+
+Objetivo: Poder escribir y modificar texto. Cambiar entre modos NORMAL e INSERT.
+
+Reestructuracion del codigo:
+  Se reorganizo todo el codigo en funciones separadas:
+  - modeNormal()  -> logica de navegacion y teclas en modo NORMAL
+  - modeInsert()  -> logica de escritura en modo INSERT
+  - loopStart()   -> contiene el while principal (game loop)
+  - Se elimino Inicializator(), solo se llama loopStart al final
+
+Conceptos aprendidos:
+  - Variable de modo (patron de estado):
+      modo="NORMAL"   -> UNA sola variable que cambia de valor
+      NO hacer: modoN="NORMAL" y modoI="INSERT" (dos variables separadas)
+      Porque: las dos serian siempre verdaderas al mismo tiempo.
+      Es como un semaforo: una luz que cambia, no dos luces fijas.
+
+  - Funciones en Bash:
+      nombre() { }  -> No hay tipos (int, void, char). Todo es igual.
+      Se llaman sin parentesis: modeNormal (no modeNormal())
+      Acceden a variables globales directamente (modo, cursor_row, etc.)
+      Deben definirse ANTES de donde se usan (Bash lee de arriba a abajo)
+
+  - break desde funciones:
+      break solo funciona DENTRO del while directamente.
+      Desde una funcion llamada por el while, no funciona.
+      Solucion: usar variable quit=1 y chequear en el loop:
+        if [[ "$quit" == 1 ]]; then break; fi
+
+  - Nombres de variables:
+      No usar "exit" como nombre de variable, es un comando de Bash.
+      Usar nombres como "quit" o "salir" en su lugar.
+
+  - Comentarios en Bash:
+      # esto es comentario
+      <- esto NO es comentario (causa error)
+      // esto tampoco (eso es C/JavaScript)
+
+Estado actual - Tarea 1 [CASI LISTO]:
+  - modo="NORMAL" funciona como unica variable de estado
+  - i cambia a INSERT, la barra muestra el modo
+  - q activa quit=1 para salir
+  - Flechas funcionan en modo NORMAL
+
+  BUGS PENDIENTES (arreglar al retomar):
+  1. modeInsert() le falta "read -rsn1 char" al inicio.
+     Sin esto, nunca lee tecla en INSERT y el editor se congela en loop infinito.
+     Agregar: read -rsn1 char como primera linea de modeInsert()
+  2. Linea 71: printf '\e[2J\e[H'  <- limpia...
+     Cambiar <- por # (comentario valido en Bash)
+
+Estructura actual del codigo:
+  modeNormal()    -> read char, ESC+flechas, "i"->INSERT, "q"->quit
+  modeInsert()    -> (falta read), ESC->NORMAL
+  loopStart()     -> while: dibujar, barra "$modo", if modo llamar funcion, break si quit
+
+Tareas pendientes del dia 5:
+  Tarea 2: Insertar caracteres en la posicion del cursor
+    Concepto: "${linea:0:col}${char}${linea:col}"
+    Tomar linea, partir en posicion del cursor, meter caracter, avanzar col
+
+  Tarea 3: Backspace para borrar
+    Concepto: "${linea:0:col-1}${linea:col}"
+    Detectar backspace: $'\x7f' o $'\b'
+
+  Tarea 4: Enter para partir linea
+    Partir linea actual en dos, insertar nueva linea en array
+    cursor_row + 1, cursor_col = 0
+
+  Tarea 5: a, o, O como entradas alternativas
+    a: INSERT con cursor +1 (append)
+    o: nueva linea abajo, entrar INSERT
+    O: nueva linea arriba, entrar INSERT
+
+
 ================================================================================
                         PROXIMOS PASOS (PENDIENTES)
 ================================================================================
-
-Dia 5 - Etapa 5: Modo INSERT
-  - Tecla i entra a modo INSERT, ESC vuelve a NORMAL
-  - Insertar caracteres en la posicion del cursor
-  - Backspace para borrar
-  - Enter para partir linea
-  - a, o, O como entradas alternativas
 
 Dia 6 - Etapa 6: Modo COMMAND + Guardar/Salir
   - : entra a modo COMMAND
@@ -334,5 +403,18 @@ Dia 7 - Etapa 7: Busqueda y Syntax Highlighting
   - Resaltar keywords de Bash
   - Colorear strings y comentarios
   - Undo basico
+
+
+================================================================================
+                     LECCIONES / ERRORES COMUNES
+================================================================================
+
+1. No crear dos variables para representar un estado. Usar UNA que cambie.
+2. Cada if necesita su fi. Contar que coincidan.
+3. elif va ANTES del fi, no despues.
+4. Funciones vacias dan error en Bash. Poner : (noop) si esta vacia.
+5. Toda funcion que espera input del usuario necesita su propio read.
+6. No usar "exit" como nombre de variable (es un comando de Bash).
+7. Comillas simples '' no expanden variables. Usar "" para expandir.
 
 ================================================================================
