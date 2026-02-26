@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # raw -> no espera Enter para enviar input, cada tecla llega inmediato.
 # -echo -> no muestra lo que escibis en pantalla (controlo lo que se va a mostrar)
 
@@ -46,11 +45,23 @@ cleanup() {
 #VARIABLES
 cursor_row=0 #en que linea del buffer estas (empieza en 0)
 cursor_col=0 # en que columna estas (empieza en 0)
+modo="NORMAL" # Es para iniciar en Normal!
 
 
+
+# Esta funcion lo que hace es lee un archivo y mete cada linea en una posicion de un array
+# $1 es el primer argumento que le pasas al script en el que estas analizando el archivo... como por ejemplo /bin.sh archivoPrueba.txt
+# -t quita el \n salto de linea del final de cada linea.
+# buffer es el array donde se guardan
+#   Si tu archivo tiene:
+#  hola
+#  mundo
+#  chau
+# Después de mapfile, el array queda:
+#  buffer[0] = "hola"
+#  buffer[1] = "mundo"
+#  buffer[2] = "chau"
 mapfile -t buffer < "$1"
-
-
 
 
 FILAS=$(tput lines)
@@ -74,91 +85,132 @@ FG='\e[38;2;235;219;178m'
 AMARILLO='\e[38;2;250;189;47m'
 BARRA_BG='\e[48;2;80;73;69m'
 RESET='\e[0m'
-#---------------LOOP----------------
-while true; do
-    printf "${BG}"    # Fondo gruvbox
-    printf "${FG}" # Texto gruvbox
-
-    # Este printf() limpia la pantalla y pone el cursor arriba
-    printf "${CLEAN_SCREEN}"
-    # - \e[2J -> Borra todo
-    # - \e[H -> Cursor a posicion 1,1
-    
-    #Empieza el SHOW!
-    #Imprime un mensaje
-    #printf "${AMARILLO}==> %s${FG}" "$mensaje"
-    # En un for en bash necesita el formato completo con (()) y las tres partes: inicio, condicion, incremento
-    #Se empieza en la linea 0 del array(cada linea de un archivo de codigo o de texto o de lo que sea es un array, una lista de cosas, caracteres, numeros, etc.)
-    # i<${#buffer[@]} : Mientras i sea menor que la cantidad de lineas
-    
-    for ((i=0; i<${#buffer[@]}; i++)); do
-        #$((i+1)) te da el número de línea (porque i arranca en 0 pero las líneas se muestran desde 1).
-        printf "\e[$((i+1));1H %3d %s" "$((i+1))" "${buffer[$i]}"
-    done
 
 
-
-
-
-
-    #Para un string y lo imprima '' y el "" para comando, ejemplo:
-    # El %-${COLS}s le dice a printf: "imprimi este string y rellenalo con espacios hasta ocupar $COLS caracteres". Asi la barra invertida cubre toda la linea.
-    printf "\e[${FILAS};1H${BARRA_BG}${FG}%-${COLS}s${RESET}" ' Editor - BIM | NORMAL' # ir a la ultima fila
-    
-    #Esto fuerza al cursor a ser visible. Algunas terminales ocultan cuando dibujas mucho...
-    printf '\e[?25h'
-
-    printf "\e[$((cursor_row+1));$((cursor_col+5))H"
-    #Porque +5? Porque las primeras columnas las ocupan los numeros de linea (1). Ajusta ese numero segun cuanto espacio le diste a los numeros.
-    
-
-
-
+# Funcion de modoNormal
+# Aca va a ir la logica de movimiento del cursor, i, q.
+modeNormal() {
     #LEER TECLA
-    read -rsn1 char 
+    read -rsn1 char
+
     # read -rsn2 rest  
     # Si es 'q', salir
     # si no, mostrar el codigo del caracter!
     # printf '%d \r\n' "'$char"
-
-    
-    
-    if [[ "$char" == $'\e' ]]; then
+##############################################
+    if [[ "$char" == $'\e' ]];
+    then
         read -rsn2 -t 0.05 rest
-        
-        # Arriba
-        if [[ "$rest" == "[A" ]]; then
-            #Lo que hace el -rsn2 lee solo dos bytes nomas y sino es -rsn1, da igual
-            #Lo que hace el -t es que hace un timeout como un sleep
-            cursor_row=$((cursor_row - 1))
-            if ((cursor_row < 0)); then cursor_row=0; fi
-        
-        # Abajo
-        elif [[ "$rest" == "[B" ]]; then 
-            cursor_row=$((cursor_row + 1))
-            if ((cursor_row > ${#buffer[@]} - 1)); then cursor_row=$((${#buffer[@]} - 1)); fi
-        
-        # Derecha
-        elif [[ "$rest" == "[C" ]]; then
-            cursor_col=$((cursor_col + 1))
-            if ((cursor_col > ${#buffer[$cursor_row]})); then cursor_col=${#buffer[$cursor_row]}; fi
-        
-        # Izquierda
-        elif [[ "$rest" == "[D" ]]; then
-            cursor_col=$((cursor_col - 1))
-            if ((cursor_col < 0)); then cursor_col=0; fi
+##############################################
+        # Flecha Arriba
+        if [[ "$rest" == "[A" ]]; 
+        then
+        #Lo que hace el -rsn2 lee solo dos bytes nomas y sino es -rsn1, da igual
+        #Lo que hace el -t es que hace un timeout como un sleep
+        cursor_row=$((cursor_row - 1))
+        if ((cursor_row < 0)); 
+        then 
+            cursor_row=0; 
+        fi 
+##############################################
+            # Flecha Abajo
+            elif [[ "$rest" == "[B" ]]; 
+            then
+                cursor_row=$((cursor_row + 1))
+                if ((cursor_row > ${#buffer[@]} - 1)); 
+                then
+                    cursor_row=$((${#buffer[@]} - 1)); 
+                fi
+##############################################
+            # Flecha Derecha
+            elif [[ "$rest" == "[C" ]];
+            then
+                cursor_col=$((cursor_col + 1))
+                if ((cursor_col > ${#buffer[$cursor_row]})); 
+                then 
+                    cursor_col=${#buffer[$cursor_row]}; 
+                fi
+##############################################
+            # Flecha Izquierda
+            elif [[ "$rest" == "[D" ]]; 
+            then
+                cursor_col=$((cursor_col - 1))
+                if ((cursor_col < 0)); 
+                then 
+                    cursor_col=0; 
+                fi
+            fi
+##############################################
+    elif [[ "$char" == "i" ]]; 
+    then
+         modo="INSERT"
+    elif [[ "$char" == "q" ]];
+    then
+        quit=1
+    fi
+}
 
-        elif [[ "$rest" == "q" ]]; then
-            mensaje='Presionaste q!'
 
-        else
-            mensaje='ESC!'
+
+# Funcion de modoInsert
+# Aca va ESC para volver, y despues escribir texto
+modeInsert() {
+    read -rsn1 char
+    if [[ "$char" == $'\e' ]]; then
+        modo="NORMAL"
+    fi
+}
+
+
+
+# Funcion LOOP El Inicio
+loopStart() {
+    #---------------LOOP----------------
+    while true; do
+        printf "${BG}"    # Fondo gruvbox
+        printf "${FG}" # Texto gruvbox
+        
+        # Este printf() limpia la pantalla y pone el cursor arriba
+        printf "${CLEAN_SCREEN}"
+        # - \e[2J -> Borra todo
+        # - \e[H -> Cursor a posicion 1,1
+        #Empieza el SHOW!
+        #Imprime un mensaje
+        #printf "${AMARILLO}==> %s${FG}" "$mensaje"
+        # En un for en bash necesita el formato completo con (()) y las tres partes: inicio, condicion, incremento
+        # Se empieza en la linea 0 del array(cada linea de un archivo de codigo o de texto o de lo que sea es un 
+        # array, una lista de cosas, caracteres, numeros, etc.)
+        # i<${#buffer[@]} : Mientras i sea menor que la cantidad de lineas
+        
+        for ((i=0; i<${#buffer[@]}; i++)); do
+            #$((i+1)) te da el número de línea (porque i arranca en 0 pero las líneas se muestran desde 1).
+            printf "\e[$((i+1));1H %3d %s" "$((i+1))" "${buffer[$i]}"
+        done
+        
+        #Para un string y lo imprima '' y el "" para comando, ejemplo:
+        # El %-${COLS}s le dice a printf: "imprimi este string y rellenalo con espacios hasta ocupar $COLS caracteres". 
+        # Asi la barra invertida cubre toda la linea.
+        printf "\e[${FILAS};1H${BARRA_BG}${FG}%-${COLS}s${RESET}"  " | $modo | " # ir a la ultima fila
+        # Esto fuerza al cursor a ser visible. Algunas terminales ocultan cuando dibujas mucho...
+        printf '\e[?25h'
+        printf "\e[$((cursor_row+1));$((cursor_col+5))H"
+        # Porque +5? Porque las primeras columnas las ocupan los numeros de linea (1). Ajusta ese numero segun cuanto 
+        # espacio le diste a los numeros.
+        #############################################################################################################
+        if [[ "$modo" == NORMAL ]];
+        then
+            modeNormal
+        elif [[ "$modo" == "INSERT" ]];
+        then
+            modeInsert
         fi
-    elif [[ "$char" == "q" ]]; then
-        printf "\e[2J\e["
-        mensaje='F(Saliendo)'
-        break
-        
-   fi
-done
+        if [[ "$quit" == 1 ]];
+        then
+            break
+        fi
+    done
+}
+
+# Solo llama al loopStart porque es donde esta toda la logica y luego llama a las diferentes funciones dentro
+loopStart
 
