@@ -190,7 +190,7 @@ Resultado: El editor abre un archivo pasado como argumento y lo muestra
 en pantalla con numeros de linea alineados a la izquierda.
 
 
---- DIA 4: Modo NORMAL - Navegacion -------------------------------------------
+--- DIA 4 + 5: Modo NORMAL y modo INSERT --------------------------------------
 
 Objetivo: Moverse por el archivo con las teclas de flecha.
 
@@ -251,6 +251,66 @@ Orden correcto de dibujo:
 Resultado: El cursor se mueve libremente por el archivo con las flechas,
 respetando los limites del texto. No se sale por arriba, abajo, izquierda
 ni derecha.
+
+
+--- DIA 5: Modo INSERT - Editar texto -----------------------------------------
+
+Objetivo: Poder escribir y modificar el contenido del archivo en memoria.
+
+Conceptos aprendidos:
+  - Variable de modo:
+      modo="NORMAL"   ->  El editor arranca en modo NORMAL
+      modo="INSERT"   ->  Se activa con la tecla i
+
+  - Separacion de logica en funciones:
+      modeNormal()    ->  Maneja flechas, i, q
+      modeInsert()    ->  Maneja escritura, backspace, enter, ESC
+      loopStart()     ->  El loop principal que llama a cada funcion segun el modo
+
+  - Substring en Bash (la clave de todo INSERT mode):
+      ${var:inicio}         -> Desde 'inicio' hasta el final
+      ${var:inicio:largo}   -> Desde 'inicio' tomando 'largo' caracteres
+      Ejemplo:
+        texto="hola mundo"
+        ${texto:0:4}  -> "hola"
+        ${texto:5}    -> "mundo"
+
+Insertar un caracter en el cursor:
+  buffer[$cursor_row]="${buffer[$cursor_row]:0:$cursor_col}${char}${buffer[$cursor_row]:$cursor_col}"
+  cursor_col=$((cursor_col + 1))
+
+  Logica: todo lo de antes del cursor + el char nuevo + todo lo de despues
+
+Backspace - borrar caracter anterior:
+  Codigo del backspace: $'\x7f'
+  buffer[$cursor_row]="${buffer[$cursor_row]:0:$((cursor_col-1))}${buffer[$cursor_row]:$cursor_col}"
+  cursor_col=$((cursor_col - 1))
+
+  Importante: validar que cursor_col > 0 antes de borrar para no salirse.
+
+Enter - partir una linea en dos:
+  local antes="${buffer[$cursor_row]:0:$cursor_col}"     # lo que queda en la linea actual
+  local despues="${buffer[$cursor_row]:$cursor_col}"     # lo que pasa a la linea nueva
+  buffer[$cursor_row]="$antes"
+  buffer=(${buffer[@]:0:$((cursor_row+1))} "$despues" ${buffer[@]:$((cursor_row+1))})
+  cursor_row=$((cursor_row + 1))
+  cursor_col=0
+
+  Logica del array:
+    - ${buffer[@]:0:N}  -> las primeras N lineas
+    - "$despues"        -> la linea nueva insertada en el medio
+    - ${buffer[@]:N}    -> el resto de las lineas (se corren para abajo)
+
+Recuperacion de trabajo perdido:
+  Durante esta etapa el trabajo se perdio por no commitear.
+  Se recupero usando git cat-file blob sobre objetos huerfanos del repo.
+  Un blob en git es el contenido puro de un archivo sin nombre ni ruta.
+  Git guarda blobs aunque no esten referenciados por ningun commit.
+  Leccion: commitear seguido aunque sea trabajo a medias (WIP).
+
+Resultado: El editor permite entrar a modo INSERT con i, escribir texto,
+borrar con backspace, partir lineas con enter y volver a NORMAL con ESC.
+La barra de estado muestra el modo actual.
 
 
 ================================================================================
@@ -316,12 +376,11 @@ Controles actuales:
                         PROXIMOS PASOS (PENDIENTES)
 ================================================================================
 
-Dia 5 - Etapa 5: Modo INSERT
-  - Tecla i entra a modo INSERT, ESC vuelve a NORMAL
-  - Insertar caracteres en la posicion del cursor
-  - Backspace para borrar
-  - Enter para partir linea
-  - a, o, O como entradas alternativas
+Dia 5 - Etapa 5: Modo INSERT  [COMPLETADO]
+  - Tecla i entra a modo INSERT, ESC vuelve a NORMAL  ✓
+  - Insertar caracteres en la posicion del cursor      (pendiente escribir)
+  - Backspace para borrar                              (pendiente escribir)
+  - Enter para partir linea                            (pendiente escribir)
 
 Dia 6 - Etapa 6: Modo COMMAND + Guardar/Salir
   - : entra a modo COMMAND

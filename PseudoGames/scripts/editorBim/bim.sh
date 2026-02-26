@@ -158,9 +158,71 @@ modeInsert() {
     read -rsn1 char
     if [[ "$char" == $'\e' ]]; then
         modo="NORMAL"
+    # backspace:
+    elif [[ "$char" == $'\x7f' ]]; then
+        if (( cursor_col > 0 )); then
+            buffer[$cursor_row]= "${buffer[$cursor_row]:0:$((cursor_col-1))}${buffer[$cursor_row]:$cursor_col}"
+                cursor_col=$((cursor_col - 1))
+        fi
+    # enter:    
+    elif [[ "$char" == $'\r' ]]; then
+        local antes="${buffer[$cursor_row]:0:$cursor_col}"
+        local despues="${buffer[$cursor_row]:$cursor_col}"
+        buffer[$cursor_row]="$antes"
+        buffer=(${buffer[@]:0:$((cursor_row+1))} "$despues" ${buffer[@]:$((cursor_row+1))})
+        cursor_row=$((cursor_row + 1))
+        cursor_col=0
+    else
+        buffer[$cursor_row]="${buffer[$cursor_row]:0:$cursor_col}${char}
+  ${buffer[$cursor_row]:$cursor_col}"
+      cursor_col=$((cursor_col + 1))
+        
     fi
 }
-
+#El buffer como un array de líneas:
+#
+#  buffer[0] = "hola mundo"
+#  buffer[1] = "chau"
+#  buffer[2] = "adios"
+#
+#  Cuando apretás Enter en el medio de "hola mundo" con el cursor en la
+#   posición 4:
+#
+#  "hola| mundo"
+#        ↑ cursor_col=4
+#
+#  Necesitás convertir una línea en dos:
+#  buffer[0] = "hola"
+#  buffer[1] = " mundo"   ← línea nueva insertada
+#  buffer[2] = "chau"     ← se corrió para abajo
+#  buffer[3] = "adios"    ← se corrió para abajo
+#
+#  ---
+#  Paso a paso del código:
+#
+#  local antes="${buffer[$cursor_row]:0:$cursor_col}"
+#  Agarra todo lo que está antes del cursor. En el ejemplo: "hola"
+#
+#  local despues="${buffer[$cursor_row]:$cursor_col}"
+#  Agarra todo lo que está después del cursor. En el ejemplo: " mundo"
+#
+#  buffer[$cursor_row]="$antes"
+#  La línea actual queda solo con la parte de antes: "hola"
+#
+#  buffer=(${buffer[@]:0:$((cursor_row+1))} "$despues"
+#  ${buffer[@]:$((cursor_row+1))})
+#  Esta es la parte más difícil. La desglosamos:
+#
+#  - ${buffer[@]:0:$((cursor_row+1))} → las líneas desde el principio
+#  hasta la línea actual (incluida)
+#  - "$despues" → la línea nueva que estás insertando
+#  - ${buffer[@]:$((cursor_row+1))} → las líneas que vienen después
+#
+#  Es como partir el array en dos y meter "$despues" en el medio.
+#
+#  cursor_row=$((cursor_row + 1))
+#  cursor_col=0
+#  El cursor baja a la línea nueva, columna 0.
 
 
 # Funcion LOOP El Inicio
