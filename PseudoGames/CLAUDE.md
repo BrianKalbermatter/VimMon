@@ -23,7 +23,91 @@
   │
   ├── data/
   │   ├── niveles.json              ← ya lo tenés
-  │   ├── wiki.json                 ← contenido de tu wiki personal
+  │   ├── wiki.json                 ← contenido de tu wiki personal (estilo vimtutor)
+  │   │                                Estructura:
+  │   │                                {
+  │   │                                  "titulo": "AED Wiki",
+  │   │                                  "capitulos": [
+  │   │                                    {
+  │   │                                      "id": 1,
+  │   │                                      "titulo": "Estructuras Lineales",
+  │   │                                      "temas": [
+  │   │                                        {
+  │   │                                          "id": "arrays",
+  │   │                                          "titulo": "Arrays",
+  │   │                                          "descripcion": "...",
+  │   │                                          "sintaxis": "...",
+  │   │                                          "ejemplo": "..."
+  │   │                                        }
+  │   │                                      ]
+  │   │                                    }
+  │   │                                  ]
+  │   │                                }
+  │   │                                Pantalla: documento largo continuo scrolleable,
+  │   │                                buscador con / como vim, secciones con separadores
+  │   ├── stdlib.json               ← libreria estandar de pseudocodigo
+  │   │                                Funciones ya hechas reutilizables en niveles/proyectos
+  │   │                                Idea: el jugador puede usar estas funciones como
+  │   │                                "imports" en su pseudocodigo. Ejemplo:
+  │   │                                {
+  │   │                                  "libreria": "PseudoSTD",
+  │   │                                  "version": "1.0",
+  │   │                                  "funciones": [
+  │   │                                    {
+  │   │                                      "id": "sumar",
+  │   │                                      "firma": "sumar(a, b)",
+  │   │                                      "descripcion": "Retorna la suma de a y b",
+  │   │                                      "ejemplo": "resultado = sumar(3, 5)  -> 8"
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "id": "mostrar",
+  │   │                                      "firma": "mostrar(texto)",
+  │   │                                      "descripcion": "Imprime texto en consola",
+  │   │                                      "ejemplo": "mostrar('hola mundo')"
+  │   │                                    }
+  │   │                                  ]
+  │   │                                }
+  │   │                                Futuro: con suficientes funciones se podria hacer
+  │   │                                una calculadora, manejo de pilas, ordenamiento, etc.
+  │   │                                todo en pseudocodigo puro usando la libreria.
+  │   ├── sintaxis.json             ← reglas de syntax highlighting para pseudocodigo
+  │   │                                Define categorias de palabras y su color ANSI.
+  │   │                                En C: al dibujar cada linea del editor, se compara
+  │   │                                cada palabra contra este JSON y se le aplica color.
+  │   │                                {
+  │   │                                  "categorias": [
+  │   │                                    {
+  │   │                                      "nombre": "keywords",
+  │   │                                      "color": "amarillo",
+  │   │                                      "palabras": ["si","sino","mientras","para","retornar","funcion"]
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "nombre": "tipos",
+  │   │                                      "color": "azul",
+  │   │                                      "palabras": ["entero","real","texto","booleano"]
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "nombre": "funciones_std",
+  │   │                                      "color": "verde",
+  │   │                                      "palabras": ["mostrar","sumar","push","pop"]
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "nombre": "numeros",
+  │   │                                      "color": "cyan",
+  │   │                                      "patron": "[0-9]+"
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "nombre": "strings",
+  │   │                                      "color": "naranja",
+  │   │                                      "patron": "\".*\""
+  │   │                                    },
+  │   │                                    {
+  │   │                                      "nombre": "comentarios",
+  │   │                                      "color": "gris",
+  │   │                                      "patron": "#"
+  │   │                                    }
+  │   │                                  ]
+  │   │                                }
   │   ├── recompensas.json          ← definición de logros/rewards
   │   └── bosses.json               ← config de bosses y sus retos
   │
