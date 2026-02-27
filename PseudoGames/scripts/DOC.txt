@@ -382,13 +382,67 @@ Dia 5 - Etapa 5: Modo INSERT  [COMPLETADO]
   - Backspace para borrar                              (pendiente escribir)
   - Enter para partir linea                            (pendiente escribir)
 
-Dia 6 - Etapa 6: Modo COMMAND + Guardar/Salir
+Dia 6 - Etapa 6: Refactor - Modularizacion del proyecto  [EN CURSO]
+  - bim.sh crece a 300+ lineas, se decide separar en archivos por responsabilidad
+  - Concepto: source ./archivo.sh carga funciones en el mismo proceso (variables compartidas)
+  - Diferencia con bash archivo.sh: ese abre proceso nuevo, variables separadas, no sirve
+  - Nueva estructura de archivos:
+      editorBim/
+      ├── bim.sh      <- entry point: variables globales + source de todo
+      ├── keys.sh     <- readKey(): detecta que tecla se presiono, setea $KEY
+      ├── modes.sh    <- modeNormal(), modeInsert(): reaccionan al $KEY
+      ├── loop.sh     <- loopStart(): el game loop principal
+      └── render.sh   <- todo el dibujado ANSI en pantalla
+
+  Como funciona readKey():
+    - Solo lee la tecla y setea la variable global $KEY
+    - No sabe ni le importa en que modo esta el editor
+    - Resultados posibles:
+        KEY="UP" / "DOWN" / "LEFT" / "RIGHT"
+        KEY="ESC" / "ENTER" / "BACKSPACE"
+        KEY="a"  <- cualquier letra o numero normal
+
+  Como usan $KEY cada modo:
+    modeNormal()  llama readKey(), despues reacciona:
+        KEY="UP"        -> mover cursor arriba
+        KEY="DOWN"      -> mover cursor abajo
+        KEY="LEFT"      -> mover cursor izquierda
+        KEY="RIGHT"     -> mover cursor derecha
+        KEY="i"         -> modo="INSERT"
+        KEY="q"         -> quit=1
+
+    modeInsert()  llama readKey(), despues reacciona:
+        KEY="ESC"       -> modo="NORMAL"
+        KEY="BACKSPACE" -> borrar caracter anterior
+        KEY="ENTER"     -> partir linea en dos
+        KEY="UP/DOWN/LEFT/RIGHT" -> mover cursor (igual que NORMAL)
+        cualquier letra -> insertar en el buffer
+
+  Logica de readKey() para detectar flechas:
+    read -rsn1 char
+    si char == ESC:
+        read -rsn2 -t 0.05 rest   <- espera 50ms mas bytes
+        si rest == "[A" -> KEY="UP"
+        si rest == "[B" -> KEY="DOWN"
+        si rest == "[C" -> KEY="RIGHT"
+        si rest == "[D" -> KEY="LEFT"
+        si no llegan bytes (timeout) -> KEY="ESC"
+    si char == \x7f -> KEY="BACKSPACE"
+    si char == \r   -> KEY="ENTER"
+    sino            -> KEY="$char"
+
+  Bug corregido: flechas en INSERT mode salian a NORMAL porque ESC de la
+    secuencia de flecha era capturado como ESC solo. readKey() lo resuelve.
+  Bug corregido: caracteres fantasma al borrar con backspace. Fix: agregar
+    \e[K al printf de cada linea para limpiar hasta el final de la linea.
+
+Dia 7 - Etapa 7: Modo COMMAND + Guardar/Salir
   - : entra a modo COMMAND
   - Implementar :w (guardar), :q (salir), :wq, :q!
   - dd (borrar linea), x (borrar caracter)
   - Dirty flag (trackear si el archivo fue modificado)
 
-Dia 7 - Etapa 7: Busqueda y Syntax Highlighting
+Dia 8 - Etapa 8: Busqueda y Syntax Highlighting
   - /patron para buscar texto
   - Resaltar keywords de Bash
   - Colorear strings y comentarios

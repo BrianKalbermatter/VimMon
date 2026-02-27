@@ -152,77 +152,133 @@ modeNormal() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Funcion de modoInsert
 # Aca va ESC para volver, y despues escribir texto
 modeInsert() {
     read -rsn1 char
+    echo "TECLA: char=[$char] char=[$(printf '%d' "'$char")]" >> /tmp/bim_debug.log
     if [[ "$char" == $'\e' ]]; then
         modo="NORMAL"
     # backspace:
     elif [[ "$char" == $'\x7f' ]]; then
         if (( cursor_col > 0 )); then
-            buffer[$cursor_row]= "${buffer[$cursor_row]:0:$((cursor_col-1))}${buffer[$cursor_row]:$cursor_col}"
+            buffer[$cursor_row]="${buffer[$cursor_row]:0:$((cursor_col-1))}${buffer[$cursor_row]:$cursor_col}"
                 cursor_col=$((cursor_col - 1))
         fi
     # enter:    
     elif [[ "$char" == $'\r' ]]; then
+        #El buffer como un array de líneas:
+        #
+        #  buffer[0] = "hola mundo"
+        #  buffer[1] = "chau"
+        #  buffer[2] = "adios"
+        #
+        #  Cuando apretás Enter en el medio de "hola mundo" con el cursor en la
+        #   posición 4:
+        #
+        #  "hola| mundo"
+        #        ↑ cursor_col=4
+        #
+        #  Necesitás convertir una línea en dos:
+        #  buffer[0] = "hola"
+        #  buffer[1] = " mundo"   ← línea nueva insertada
+        #  buffer[2] = "chau"     ← se corrió para abajo
+        #  buffer[3] = "adios"    ← se corrió para abajo
+        # Teniendo en cuenta esto: 
+        #       El buffer es un array definido que se carga con mapfile, por ejemplo selecciono un archivo.txt cualquiera y lo que hace eso es que cada linea dentro de ese archivo se guarde.
+
         local antes="${buffer[$cursor_row]:0:$cursor_col}"
+        # Agarra todo lo que esta antes del cursor. En el ejemplo: "hola". Lo guarda buffer
+
         local despues="${buffer[$cursor_row]:$cursor_col}"
+        # Agarra todo lo que esta despues del cursor. En el ejemplo: "mundo". Lo guarda en el buffer
+
         buffer[$cursor_row]="$antes"
+        # La linea actual queda solo con la parte de antes: "hola"
+
         buffer=(${buffer[@]:0:$((cursor_row+1))} "$despues" ${buffer[@]:$((cursor_row+1))})
-        cursor_row=$((cursor_row + 1))
-        cursor_col=0
+        # Imaginá que cursor_row=0 y el buffer tiene:
+
+        # buffer[0] = "hola"    ← ya modificado en el paso anterior
+        # buffer[1] = "chau"
+        # buffer[2] = "adios"
+
+        # La línea arma un nuevo array en 3 pedazos:
+
+        # ${buffer[@]:0:$((cursor_row+1))}   →  buffer[0]="hola"          (desde 0, toma 1 elemento)
+        # "$despues"                         →  " mundo"                   (la línea nueva)
+        # ${buffer[@]:$((cursor_row+1))}     →  buffer[1]="chau", buffer[2]="adios"  (el resto)
+
+        # Resultado:
+        # buffer[0] = "hola"
+        # buffer[1] = " mundo"   ← insertada
+        # buffer[2] = "chau"     ← se corrió
+        # buffer[3] = "adios"    ← se corrió
+
+        cursor_row=$((cursor_row + 1)) # El cursor baja a la linea nueva.
+        cursor_col=0 # El cursor va al principio de esa linea
     else
-        buffer[$cursor_row]="${buffer[$cursor_row]:0:$cursor_col}${char}
-  ${buffer[$cursor_row]:$cursor_col}"
-      cursor_col=$((cursor_col + 1))
+
+        # El cursor está en la posición 7 (cursor_col=7).
+        # Apretás la tecla "X":
+        # antes  = "hola a"          → ${buffer[$cursor_row]:0:7}
+        # char   = "X"
+        # despues = " como estas?"   → ${buffer[$cursor_row]:7}
+        # Resultado:
+        # "hola aX como estas?"
+        # Y el cursor se mueve a cursor_col=8, justo después de la X.
+        # ---
+        # Eso es todo lo que hace ese else. Simple pero elegante.
+        buffer[$cursor_row]="${buffer[$cursor_row]:0:$cursor_col}${char}${buffer[$cursor_row]:$cursor_col}"
+        cursor_col=$((cursor_col + 1))
         
     fi
 }
-#El buffer como un array de líneas:
-#
-#  buffer[0] = "hola mundo"
-#  buffer[1] = "chau"
-#  buffer[2] = "adios"
-#
-#  Cuando apretás Enter en el medio de "hola mundo" con el cursor en la
-#   posición 4:
-#
-#  "hola| mundo"
-#        ↑ cursor_col=4
-#
-#  Necesitás convertir una línea en dos:
-#  buffer[0] = "hola"
-#  buffer[1] = " mundo"   ← línea nueva insertada
-#  buffer[2] = "chau"     ← se corrió para abajo
-#  buffer[3] = "adios"    ← se corrió para abajo
-#
-#  ---
-#  Paso a paso del código:
-#
-#  local antes="${buffer[$cursor_row]:0:$cursor_col}"
-#  Agarra todo lo que está antes del cursor. En el ejemplo: "hola"
-#
-#  local despues="${buffer[$cursor_row]:$cursor_col}"
-#  Agarra todo lo que está después del cursor. En el ejemplo: " mundo"
-#
-#  buffer[$cursor_row]="$antes"
-#  La línea actual queda solo con la parte de antes: "hola"
-#
-#  buffer=(${buffer[@]:0:$((cursor_row+1))} "$despues"
-#  ${buffer[@]:$((cursor_row+1))})
-#  Esta es la parte más difícil. La desglosamos:
-#
-#  - ${buffer[@]:0:$((cursor_row+1))} → las líneas desde el principio
-#  hasta la línea actual (incluida)
-#  - "$despues" → la línea nueva que estás insertando
-#  - ${buffer[@]:$((cursor_row+1))} → las líneas que vienen después
-#
-#  Es como partir el array en dos y meter "$despues" en el medio.
-#
-#  cursor_row=$((cursor_row + 1))
-#  cursor_col=0
-#  El cursor baja a la línea nueva, columna 0.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Funcion LOOP El Inicio

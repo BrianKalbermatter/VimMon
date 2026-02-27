@@ -10,7 +10,7 @@
 #define PAIR_ORANGE   6
 #define PAIR_GRAY     7
 
-void ui_init_colors(void);
-void mostrar_menu_principal(void);
+void ui_init_colors(void); // Configura los colores
+void mostrar_menu_principal(void); // Dibuja el menu
 
 #endif
