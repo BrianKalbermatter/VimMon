@@ -716,3 +716,115 @@ opendir retorna NULL:
   existe o no se tiene permiso. Sin verificacion -> segfault al usar dir.
 
 ================================================================================
+
+================================================================================
+                    SESION 2026-03-07: screenDoc - WIKI NAVEGABLE
+                    Lectura de archivos, deteccion de capitulos, indice
+================================================================================
+
+--- HERRAMIENTAS DE I/O APRENDIDAS ---
+
+fopen(path, modo):
+  Abre un archivo. Modo "r" = lectura. Devuelve NULL si no lo encuentra.
+  SIEMPRE verificar despues: if (f == NULL) return 0;
+
+fgets(buffer, tamanio, archivo):
+  Lee una linea del archivo y la guarda en buffer.
+  Para cuando encuentra \n o llega al tamanio maximo.
+  Devuelve NULL cuando no quedan mas lineas (fin de archivo).
+  Guarda el \n al final de cada linea - hay que sacarlo:
+
+    int len = strlen(lineas[total_lineas]);
+    if (len > 0 && lineas[total_lineas][len - 1] == '\n')
+        lineas[total_lineas][len - 1] = '\0';
+
+fclose(archivo):
+  Siempre cerrar el archivo cuando terminas de leerlo.
+
+strncmp(a, b, n):
+  Compara los primeros n caracteres de a con b.
+  Devuelve 0 si son iguales. No true/false - 0 es igual.
+
+  if (strncmp(lineas[i], "CAPITULO", 8) == 0) {
+      // esta linea empieza con "CAPITULO"
+  }
+
+strncpy(destino, origen, n):
+  Copia hasta n caracteres de origen a destino.
+  Version segura de strcpy - no se pasa del array.
+
+
+--- ARRAY BIDIMENSIONAL PARA LEER ARCHIVO ---
+
+  static char lineas[3200][512];
+  //           filas (lineas)  columnas (chars por linea)
+
+  static: evita que 1.6MB en el stack revienten el programa.
+  Sin static -> segmentation fault porque el stack tiene limite (~8MB).
+  Con static -> vive en el data segment, sin ese limite.
+
+
+--- SCREENOC: ESTRUCTURA DE LA FUNCION ---
+
+Carga el archivo:
+  FILE *f = fopen("data/wiki.txt", "r");
+  if (f == NULL) return 0;
+  while (fgets(lineas[total_lineas], 512, f) != NULL)
+      total_lineas++;
+  fclose(f);
+
+Detecta capitulos:
+  for (int i = 0; i < total_lineas; i++) {
+      if (strncmp(lineas[i], "CAPITULO", 8) == 0) {
+          strncpy(capitulos[total_capitulos].titulo, lineas[i], 255);
+          capitulos[total_capitulos].linea_inicio = i;
+          total_capitulos++;
+      }
+  }
+
+Navegacion:
+  SDLK_UP / SDLK_DOWN    -> cambia capitulo_sel (indice)
+  SDLK_PAGEUP / PAGEDOWN -> cambia scroll (contenido)
+  Al cambiar capitulo: scroll = 0 (vuelve al inicio del capitulo)
+
+Dibujar contenido del capitulo seleccionado:
+  int linea_desde = capitulos[capitulo_sel].linea_inicio;
+  int linea_hasta = (capitulo_sel + 1 < total_capitulos)
+                    ? capitulos[capitulo_sel + 1].linea_inicio
+                    : total_lineas;
+
+  Logica: desde el inicio del capitulo hasta el inicio del proximo.
+  El ultimo capitulo llega hasta el final del archivo (total_lineas).
+
+
+--- CALIDAD DE TEXTO SDL2 ---
+
+TTF_RenderText_Solid(fuente, texto, color):
+  Renderizado basico. Sin anti-aliasing. Letras pixeladas/serradas.
+
+TTF_RenderText_Blended(fuente, texto, color):
+  Renderizado con anti-aliasing. Letras suavizadas, mejor calidad.
+  Usar siempre Blended para texto que el usuario va a leer.
+
+  Cambio en dibujadoTexto() en ui.c:
+    antes:  SDL_Surface *sup = TTF_RenderText_Solid(fuente, texto, blanco);
+    ahora:  SDL_Surface *sup = TTF_RenderText_Blended(fuente, texto, blanco);
+
+
+--- LECCION DEL DIA: ARCHIVOS NO COMMITEADOS ---
+
+wiki.txt fue borrado por make clean porque estaba en SRC del Makefile.
+Como no estaba commiteado en git (untracked), se perdio.
+Fue recuperado desde los logs de sesion de Claude Code en:
+  /root/.claude/projects/-root-VimMon-PseudoGames/*.jsonl
+
+Leccion: commitear todo archivo de datos importante inmediatamente.
+  git add data/wiki.txt
+  git commit -m "wiki: agregar contenido"
+
+El .gitignore fue creado para ignorar binarios:
+  *.o
+  aed
+  saves/
+
+================================================================================

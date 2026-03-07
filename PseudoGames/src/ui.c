@@ -17,7 +17,7 @@ dibujadoTexto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x
     //  Si ponés un número fijo te puede quedar cortado o con espacio de más. Usando
     //  sup->w el rectángulo del texto se ajusta exacto a lo que mide ese string.
     //  SDL_Surface *sup apunta a una estructura que SDL crea en memoria con la imagen del texto ya renderizada. 
-    SDL_Surface *sup = TTF_RenderText_Solid(fuente, texto, blanco);
+    SDL_Surface *sup = TTF_RenderText_Blended(fuente, texto, blanco);
     SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, sup);
     SDL_Rect pos_txt = {x + 10, y + 12, sup->w, sup->h};
     SDL_RenderCopy(renderer, tex, NULL, &pos_txt);
