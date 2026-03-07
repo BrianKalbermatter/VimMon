@@ -2,6 +2,7 @@
 #include <string.h>
 #include "cJSON.h"
 #include "niveles.h"
+#include <stdlib.h>
 
 static Nivel niveles[MAX_NIVELES];
 static int num_niveles = 0;

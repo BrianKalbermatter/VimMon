@@ -1,8 +1,8 @@
 CC = clang
 CFLAGS = -Wall -Wextra -I src
-LDFLAGS = -lncurses
-SRC = src/main.c src/ui.c
-# src/ui.c src/niveles.c src/progreso.c src/editor.c src/cJSON.c
+LDFLAGS = -lSDL2 -lSDL2_ttf
+# Solo archivos .c
+SRC = src/main.c src/ui.c src/niveles.c src/progreso.c src/cJSON.c 
 OBJ = $(SRC:.c=.o)
 TARGET = aed
 

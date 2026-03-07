@@ -1,0 +1,36 @@
+{
+    "categorias": [
+      {
+        "nombre": "keywords",
+        "color": "rosa",
+        "palabras": ["HACER", "ABRIR", "CERRAR", "ARCHIVO", "REGISTRO" ,"SI", "FIN_SI", "SINO", "MIENTRAS", "FIN_MIENTRAS", "PARA", "FIN_PARA", "RETORNAR", "FUNCION", "FIN_FUNCION", "SEGUN", "PROCEDIMIENTO", "FIN_PROCEDIMIENTO", "ACCION", "ES", "FIN_ACCION", "PROCESO", "AMBIENTE"]
+      },
+      {
+        "nombre": "tipos",
+        "color": "azul",
+        "palabras": ["ENTERO", "REAL", "CARACTER", "BOOLEANO", "SECUENCIA_DE_CARACTERES", "SECUENCIA_DE_ENTEROS", "ARREGLO", "CONSTANTE", "VAR", "DE"]
+      },
+      {
+         "nombre": "operadores",
+         "color": "verde",
+         "palabras": ["Y", "O", "NO", "*", "/"]
+      },
+      {
+         "nombre": "funciones secundarias precreadas",
+         "color": "amarillo",
+         "palabras": ["MOD", "RETURN", "TRUNC", "ABSO", "REDOND"]
+      },
+      {
+         "nombre": "comentario",
+         "color": "gris",
+         "palabras": ["//"]
+      },
+      {
+         "nombre": "inputs/outputs",
+         "color": "celeste",
+         "palabras": ["ESCRIBIR", "LEER"]
+      }
+      
+      
+    ]
+}

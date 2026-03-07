@@ -1,16 +1,11 @@
 #ifndef UI_H
 #define UI_H
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
-/* Gruvbox color pairs */
-#define PAIR_NORMAL   1
-#define PAIR_TITLE    2
-#define PAIR_GREEN    3
-#define PAIR_RED      4
-#define PAIR_YELLOW   5
-#define PAIR_ORANGE   6
-#define PAIR_GRAY     7
+// helpers de UI compartidos entre pantallas
+void dibujadoTexto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y);
 
-void ui_init_colors(void); // Configura los colores
-void mostrar_menu_principal(void); // Dibuja el menu
+void dibujadoTextoMultilinea(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y, int max_ancho);
 
 #endif

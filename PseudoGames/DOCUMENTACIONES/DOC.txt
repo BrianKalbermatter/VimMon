@@ -373,79 +373,346 @@ Controles actuales:
 
 
 ================================================================================
+                    MIGRACION A SDL2 + INTEGRACION PTY
+                    Fecha: 2026-03-04
+================================================================================
+
+--- DECISION ARQUITECTURAL ---
+
+Se decidio migrar el entorno grafico de ncurses a SDL2.
+
+Razon: ncurses corre en terminal (caracteres ASCII), SDL2 dibuja pixeles reales.
+Con SDL2 se pueden tener imagenes, fuentes TTF, colores RGB reales, sprites.
+
+Division del proyecto:
+  - C + SDL2  -> entorno grafico: paneles, UI, niveles, menus
+  - Bash      -> logica del editor (bim.sh), vive en un PTY embebido
+  - PTY       -> puente entre los dos mundos
+
+--- LO QUE SE REESCRIBIO ---
+
+main.c: completamente reescrito de ncurses a SDL2.
+  - SDL_Init(SDL_INIT_VIDEO)
+  - SDL_CreateWindow() con SDL_WINDOW_FULLSCREEN_DESKTOP
+  - SDL_CreateRenderer()
+  - SDL_GetWindowSize() para obtener resolucion real del monitor
+  - Game loop con SDL_PollEvent()
+  - Cierra con ESC o con la X de la ventana
+
+Makefile: LDFLAGS cambiado de -lncurses a -lSDL2 -lSDL2_ttf
+
+--- ESTRUCTURA VISUAL ACTUAL ---
+
+  [barra azul - titulo "PseudoGames" - ancho total - 30px alto]
+  [panel izquierdo gris XP | panel derecho oscuro editor]
+  [    consigna del nivel  |    bim.sh via PTY           ]
+
+Colores:
+  Barra titulo:    RGB(0, 78, 152)      <- azul Windows XP
+  Panel izquierdo: RGB(236, 233, 216)   <- gris XP clasico
+  Panel derecho:   RGB(30, 30, 30)      <- oscuro tipo editor
+  Linea divisoria: RGB(128, 128, 128)   <- gris medio
+
+--- INTEGRACION PTY (bim.sh embebido) ---
+
+Objetivo: mostrar bim.sh corriendo dentro del panel derecho de SDL2.
+No se usa xterm ni ventana externa - el output de bash se parsea y dibuja en SDL2.
+
+Tecnologia usada:
+  forkpty()  <- crea PTY + fork del proceso
+  execlp()   <- reemplaza proceso hijo con bash corriendo bim.sh
+  fcntl()    <- hace el fd no bloqueante para no congelar el game loop
+  read()     <- lee output de bim.sh cada frame
+
+Conceptos nuevos aprendidos:
+  - File descriptor: numero entero que representa una conexion abierta
+      0 = stdin, 1 = stdout, 2 = stderr
+      forkpty() devuelve un fd que es "el telefono de bash"
+  - PTY (Pseudo Terminal): terminal falsa bidireccional
+      write(fd_pty, ...) -> manda input a bash
+      read(fd_pty, ...)  -> recibe output de bash
+  - pid_t: tipo de dato para IDs de proceso (el DNI del proceso)
+      pid == 0  -> soy el proceso hijo
+      pid > 0   -> soy el padre, pid = DNI del hijo
+  - fflush(): fuerza a que printf vuelque su buffer interno a pantalla
+  - fcntl() O_NONBLOCK: el read() no bloquea si no hay datos disponibles
+  - fork(): divide el proceso en padre e hijo
+  - chdir(): cambia el directorio de trabajo (como cd en terminal)
+  - execlp(): reemplaza el proceso actual con otro programa
+
+Includes necesarios:
+  #include <pty.h>     <- forkpty()
+  #include <unistd.h>  <- execlp(), chdir(), read(), write()
+  #include <fcntl.h>   <- fcntl(), O_NONBLOCK
+
+Codigo del PTY en main.c:
+  struct winsize ws = {24, 80, 0, 0};
+  pid_t pid = forkpty(&fd_pty, NULL, NULL, &ws);
+  if (pid == 0) {
+      chdir("scripts/editorBim");
+      execlp("bash", "bash", "bim.sh", "archivoPrueba.txt", NULL);
+      exit(1);
+  }
+  fcntl(fd_pty, F_SETFL, O_NONBLOCK);
+
+  // dentro del game loop:
+  char buf[4096];   <- 4096 = potencia de 2, eficiente para el sistema
+  int n = read(fd_pty, buf, sizeof(buf) - 1);
+  if (n > 0) {
+      buf[n] = '\0';
+      // parsear y dibujar
+  }
+
+--- PARSER ANSI (EN PROGRESO) ---
+
+bim.sh manda texto con codigos ANSI mezclados. Hay que parsearlos para
+saber que color dibujar y donde posicionar cada caracter.
+
+Codigos ANSI que usa bim.sh (7 tipos):
+  \e[2J          -> limpiar pantalla
+  \e[H           -> cursor a posicion 1,1
+  \e[48;2;R;G;Bm -> color de fondo RGB
+  \e[38;2;R;G;Bm -> color de texto RGB
+  \e[0m          -> reset color
+  \e[ROW;COLH    -> mover cursor a fila/columna
+  \e[?25h        -> mostrar cursor
+
+Logica del parser:
+  char *p = buf;
+  while (*p != '\0') {
+      if (*p == 27) {        <- ESC = inicio de codigo ANSI
+          // saltar/parsear codigo
+          while (*p != 'm' && *p != '\0') p++;
+      } else {
+          // texto normal -> dibujar con SDL2_ttf
+      }
+      p++;
+  }
+
+Estado actual: el parser detecta ESC y salta los codigos.
+Proximo paso: extraer los valores RGB con sscanf() y pasarselos a SDL2.
+
+--- PENDIENTES SDL2 ---
+
+  1. Parser ANSI completo:
+     - Extraer R,G,B de \e[38;2;R;G;Bm con sscanf()
+     - Extraer ROW,COL de \e[ROW;COLH
+     - Detectar \e[2J para limpiar el panel
+     - Detectar \e[0m para resetear color
+
+  2. Renderizar texto en panel derecho:
+     - Mantener posicion x,y actual
+     - Por cada caracter de texto: TTF_RenderText_Solid + SDL_RenderCopy
+     - Avanzar x por el ancho del caracter
+     - En newline: x = panel_der.x, y += altura_fuente
+
+  3. Enviar input al PTY:
+     - Capturar SDL_KEYDOWN en el game loop
+     - Convertir SDL_Keysym a char
+     - write(fd_pty, &c, 1) para mandarlo a bim.sh
+
+  4. Reconectar los modulos C:
+     - Descomentar niveles.h, progreso.h en main.c
+     - Panel izquierdo: mostrar enunciado del nivel actual
+     - Conectar sistema de pantallas (menu, niveles, juego)
+
+  5. Sistema de soluciones del jugador:
+     - Carpeta: soluciones/
+     - Formato: nivel_1.txt, nivel_2.txt, etc. (pseudocodigo texto plano)
+     - El jugador escribe su solucion en bim.sh y se guarda ahi
+     - Despues de calificar aparece opcion [Ver mi solucion] en el menu
+     - C lo lee con fopen() y lo muestra en el panel izquierdo
+     - Sirve tambien para practicar AED escribiendo las soluciones a mano
+
+================================================================================
                         PROXIMOS PASOS (PENDIENTES)
 ================================================================================
 
-Dia 5 - Etapa 5: Modo INSERT  [COMPLETADO]
-  - Tecla i entra a modo INSERT, ESC vuelve a NORMAL  ✓
-  - Insertar caracteres en la posicion del cursor      (pendiente escribir)
-  - Backspace para borrar                              (pendiente escribir)
-  - Enter para partir linea                            (pendiente escribir)
+Dia 5 - Etapa 5: Modo INSERT  [COMPLETADO]  ✓
+Dia 6 - Etapa 6: Refactor - Modularizacion  [COMPLETADO]  ✓
+  keys.sh / modes.sh / loop.sh / render.sh separados y funcionando.
+  readKey() centraliza lectura de teclas, modos usan $KEY.
 
-Dia 6 - Etapa 6: Refactor - Modularizacion del proyecto  [EN CURSO]
-  - bim.sh crece a 300+ lineas, se decide separar en archivos por responsabilidad
-  - Concepto: source ./archivo.sh carga funciones en el mismo proceso (variables compartidas)
-  - Diferencia con bash archivo.sh: ese abre proceso nuevo, variables separadas, no sirve
-  - Nueva estructura de archivos:
-      editorBim/
-      ├── bim.sh      <- entry point: variables globales + source de todo
-      ├── keys.sh     <- readKey(): detecta que tecla se presiono, setea $KEY
-      ├── modes.sh    <- modeNormal(), modeInsert(): reaccionan al $KEY
-      ├── loop.sh     <- loopStart(): el game loop principal
-      └── render.sh   <- todo el dibujado ANSI en pantalla
+Dia 7 - Integracion PseudoGames + niveles  [COMPLETADO]  ✓
+  - Vision del proyecto documentada en ESTRUCTURA.md
+  - Font Cascadia Code en assets/fonts/
+  - sintaxis.json creado con keywords, tipos, operadores, funciones, I/O
+  - main.c: estado con variable screen (0=menu, 1=niveles, 2=jugando)
+  - ui.c: mostrar_menu_principal() y mostrar_niveles() funcionando
+  - niveles.json carga correctamente via cJSON (3 niveles disponibles)
+  - Patron de navegacion: loop dibuja segun screen, teclas cambian screen
 
-  Como funciona readKey():
-    - Solo lee la tecla y setea la variable global $KEY
-    - No sabe ni le importa en que modo esta el editor
-    - Resultados posibles:
-        KEY="UP" / "DOWN" / "LEFT" / "RIGHT"
-        KEY="ESC" / "ENTER" / "BACKSPACE"
-        KEY="a"  <- cualquier letra o numero normal
+--- PENDIENTES ---
 
-  Como usan $KEY cada modo:
-    modeNormal()  llama readKey(), despues reacciona:
-        KEY="UP"        -> mover cursor arriba
-        KEY="DOWN"      -> mover cursor abajo
-        KEY="LEFT"      -> mover cursor izquierda
-        KEY="RIGHT"     -> mover cursor derecha
-        KEY="i"         -> modo="INSERT"
-        KEY="q"         -> quit=1
+PseudoGames - Seleccion de nivel:
+  - Implementar mostrar_nivel(int numero) en ui.c con enunciado completo
+  - Agregar nivel_actual en main.c y handlers de teclas '1','2','3' en screen==1
+  - screen=2 -> pantalla de juego con bim integrado
 
-    modeInsert()  llama readKey(), despues reacciona:
-        KEY="ESC"       -> modo="NORMAL"
-        KEY="BACKSPACE" -> borrar caracter anterior
-        KEY="ENTER"     -> partir linea en dos
-        KEY="UP/DOWN/LEFT/RIGHT" -> mover cursor (igual que NORMAL)
-        cualquier letra -> insertar en el buffer
+PseudoGames - Editor Libre:
+  - Agregar [5] Editor Libre en menu (ui.c)
+  - Handler tecla '5' en main.c: system("cd scripts/editorBim && bash bim.sh archivo.bim")
 
-  Logica de readKey() para detectar flechas:
-    read -rsn1 char
-    si char == ESC:
-        read -rsn2 -t 0.05 rest   <- espera 50ms mas bytes
-        si rest == "[A" -> KEY="UP"
-        si rest == "[B" -> KEY="DOWN"
-        si rest == "[C" -> KEY="RIGHT"
-        si rest == "[D" -> KEY="LEFT"
-        si no llegan bytes (timeout) -> KEY="ESC"
-    si char == \x7f -> KEY="BACKSPACE"
-    si char == \r   -> KEY="ENTER"
-    sino            -> KEY="$char"
+PseudoGames - UI cartas de color para niveles:
+  - newwin(), box(), wbkgd() para cartas visuales
+  - Nuevos PAIR_CARD1/2/3 en ui.h con fondo de color
 
-  Bug corregido: flechas en INSERT mode salian a NORMAL porque ESC de la
-    secuencia de flecha era capturado como ESC solo. readKey() lo resuelve.
-  Bug corregido: caracteres fantasma al borrar con backspace. Fix: agregar
-    \e[K al printf de cada linea para limpiar hasta el final de la linea.
+Editor bim - Fixes pendientes:
+  - modeInsert: flechas para mover cursor en modo INSERT
+  - bim.sh: manejar $1 vacio (nuevo archivo, buffer vacio)
+  - render.sh: agregar \e[K al dibujar lineas (limpiar residuos al borrar)
+  - Modo COMMAND: :w, :q, :wq, :q!, dirty flag
+  - Syntax highlighting: colorear keywords del pseudocodigo en render.sh
 
-Dia 7 - Etapa 7: Modo COMMAND + Guardar/Salir
-  - : entra a modo COMMAND
-  - Implementar :w (guardar), :q (salir), :wq, :q!
-  - dd (borrar linea), x (borrar caracter)
-  - Dirty flag (trackear si el archivo fue modificado)
+================================================================================
+                    SESION 2026-03-05: SISTEMA DE PANTALLAS SDL2
+                    screenMenu, screenSoluciones, arquitectura de navegacion
+================================================================================
 
-Dia 8 - Etapa 8: Busqueda y Syntax Highlighting
-  - /patron para buscar texto
-  - Resaltar keywords de Bash
-  - Colorear strings y comentarios
-  - Undo basico
+--- ARQUITECTURA DE NAVEGACION ---
+
+Se rediseno main.c para separar responsabilidades:
+
+  main()              -> solo inicializa SDL y coordina pantallas
+  screenMenu()        -> menu principal con botones
+  screenLvLEditor()   -> pantalla de juego (paneles + editor)
+  screenSoluciones()  -> visor de soluciones guardadas
+  screenFreeEditor()  -> editor libre (esqueleto)
+  screenLvLs()        -> seleccion de nivel (esqueleto)
+  dibujadoTexto()     -> helper reutilizable para dibujar texto
+
+Patron de navegacion:
+  int opcion = screenMenu(renderer, fuente, ancho, alto);
+  switch (opcion) {
+      case 1: screenLvLEditor(...); break;
+      case 6: screenSoluciones(...); break;
+      ...
+  }
+
+Cada screenX() tiene su propio game loop interno. Cuando retorna,
+main() decide a que pantalla ir segun el valor devuelto.
+
+
+--- SCREENMENU() - MENU PRINCIPAL ---
+
+Firma: int screenMenu(SDL_Renderer*, TTF_Font*, int ancho, int alto)
+
+Botones (7 total):
+  1. Jugar
+  2. DOC
+  3. Pomodoro
+  4. Editor Libre
+  5. Seleccion de Nivel
+  6. Soluciones
+  7. Salir
+
+Retorna el numero del boton presionado (1-7) o 0 si cierra con ESC/X.
+
+Hover con mouse:
+  int mx, my;
+  SDL_GetMouseState(&mx, &my);
+  int hover = (mx >= btn_x && mx <= btn_x + btn_w &&
+               my >= btn_y && my <= btn_y + btn_h);
+  if (hover)
+      SDL_SetRenderDrawColor(renderer, 0, 120, 200, 255); // azul claro
+  else
+      SDL_SetRenderDrawColor(renderer, 0, 78, 152, 255);  // azul normal
+
+Click con mouse:
+  El click se detecta en el event handler (while SDL_PollEvent), NO en
+  el render. Usa evento.button.x / evento.button.y para la posicion.
+
+Centrado horizontal de botones:
+  int btn_w = 300;
+  int btn_x = (ancho - btn_w) / 2;  <- siempre centrado sin importar resolucion
+
+Posicion vertical de botones (formula):
+  int btn_y = (alto / 2) - 80 + (i * 70);  <- desde el centro, separados 70px
+
+
+--- DIBUJADOTEXTO() - HELPER REUTILIZABLE ---
+
+Firma: void dibujadoTexto(SDL_Renderer*, TTF_Font*, const char *texto, int x, int y)
+
+Dibuja cualquier texto en cualquier posicion. Se usa en todas las pantallas.
+
+  SDL_Surface *sup = TTF_RenderText_Solid(fuente, texto, blanco);
+  SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, sup);
+  SDL_Rect pos = {x + 10, y + 12, sup->w, sup->h};
+  SDL_RenderCopy(renderer, tex, NULL, &pos);
+  SDL_FreeSurface(sup);
+  SDL_DestroyTexture(tex);
+
+sup->w y sup->h: ancho y alto en pixeles del texto renderizado.
+Usando estos valores el rect se ajusta exacto al largo de cada string.
+
+Por que const char*:
+  Acepta tanto char* como literales de string "texto".
+  Sin const el compilador da warning con literales.
+
+
+--- SCREENSOLUCIONES() - VISOR DE SOLUCIONES ---
+
+Lee los archivos de solutions/ y muestra una tarjeta por cada uno.
+
+Leer directorio en C:
+  #include <dirent.h>
+
+  char *archivos[20];
+  int total = 0;
+
+  DIR *dir = opendir("solutions");
+  if (dir == NULL) return 0;
+
+  struct dirent *entrada;
+  while ((entrada = readdir(dir)) != NULL) {
+      if (entrada->d_name[0] == '.') continue;  // saltea . y ..
+      archivos[total] = strdup(entrada->d_name); // IMPORTANTE: strdup()
+      total++;
+  }
+  closedir(dir);
+
+Por que strdup() y no solo =:
+  entrada->d_name es un puntero a memoria interna de dirent.
+  Despues de closedir() esa memoria se libera.
+  strdup() hace una copia del string en heap nuevo que sigue viva.
+  Sin strdup() -> segmentation fault al intentar leer los nombres.
+
+Dibujar tarjetas:
+  for (int i = 0; i < total; i++) {
+      int card_y = 50 + (i * 80);
+      SDL_Rect card = {card_x, card_y, card_w, card_h};
+      SDL_RenderFillRect(renderer, &card);
+      dibujadoTexto(renderer, fuente, archivos[i], card_x, card_y);
+  }
+
+Boton Salir clickeable en esquina inferior izquierda:
+  SDL_Rect btn_salir = {10, alto - 50, 100, 35};
+  Click: cx >= 10 && cx <= 110 && cy >= alto-50 && cy <= alto-15 -> return 0
+
+
+--- CONCEPTOS CLAVE APRENDIDOS ---
+
+SDL_Surface* vs SDL_Texture*:
+  Surface: imagen en RAM (CPU)
+  Texture: imagen en GPU, lista para dibujar
+  Flujo: TTF_RenderText -> Surface -> CreateTextureFromSurface -> Texture -> RenderCopy
+
+Por que -> y no . en structs:
+  sup->w  equivale a  (*sup).w
+  Se usa -> cuando la variable es un puntero, . cuando es la struct directa.
+
+Variables dentro del for:
+  Las variables declaradas dentro de un for (como btn_y, i) solo existen
+  dentro de ese bloque. No se pueden usar afuera.
+
+Llaves en C - regla practica:
+  Cada { necesita su }. Para contar: abrir el archivo y contar { y }
+  en cada funcion - deben ser iguales. Las llaves dentro de /* */ no
+  cuentan para el compilador.
+
+opendir retorna NULL:
+  Siempre verificar despues de opendir. Si retorna NULL la carpeta no
+  existe o no se tiene permiso. Sin verificacion -> segfault al usar dir.
 
 ================================================================================
