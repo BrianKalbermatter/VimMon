@@ -1,0 +1,109 @@
+PAED - Documentacion del Compilador/Interprete
+================================================
+Lenguaje: .paed (pseudo + aed)
+Herramienta: paed (script bash sin extension, ejecutable)
+
+Que es paed?
+------------
+Es un interprete con fase de analisis previa.
+Primero analiza TODO el archivo buscando errores de sintaxis.
+Solo si no hay errores, ejecuta el codigo.
+Esto lo diferencia de un interprete comun (como python) que explota en runtime.
+
+Dos fases:
+  1. analizar()  - recorre el archivo completo, valida estructura
+  2. ejecutar()  - solo corre si analizar() no dio errores (return 0)
+
+
+Estructura valida de un archivo .paed
+--------------------------------------
+  ACCION nombre_algoritmo ES
+      AMBIENTE
+          variable: TIPO;
+      PROCESO
+          instrucciones
+  FIN_ACCION
+
+Tipos de datos:
+  ENTERO       numero entero
+  REAL         numero con decimales
+  BOOLEANO     Verdadero o Falso
+  AN(n)        texto de hasta n caracteres
+  N(n)         numero de hasta n cifras
+
+Operador de asignacion:  :=
+Comentarios:             //
+Entrada:                 LEER(variable)
+Salida:                  ESCRIBIR(variable)
+
+
+Lo avanzado hoy (2026-03-07)
+-----------------------------
+- Creada la estructura Compilador/
+    Compilador/
+    - paed         (el interprete)
+    - tests/       (archivos .paed de prueba)
+    - output/      (futuro: resultados)
+    - DOC.txt      (esta documentacion)
+
+- Creado tests/hola_mundo.paed (primer archivo de prueba)
+
+- paed tiene:
+    - Verificacion de argumento vacio         ([ -z ])
+    - Verificacion de archivo existente       ([ ! -f ])
+    - Verificacion de extension .paed         (${ARCHIVO##*.})
+    - while read linea con case para detectar palabras clave:
+        ACCION*ES, FIN_ACCION, AMBIENTE, PROCESO
+
+- Conceptos bash aprendidos hoy:
+    $1             primer argumento del script
+    [ -z ]         verifica si variable esta vacia
+    [ ! -f ]       verifica si archivo NO existe
+    ${VAR##*.}     extrae extension del nombre de archivo
+    return 1       devuelve error y para la funcion
+    $?             codigo de salida del ultimo comando
+    while read     leer archivo linea por linea
+    case/esac      comparar variable contra patrones
+    PATRON*)       el * matchea cualquier cosa despues
+
+
+Tareas pendientes
+------------------
+[ ] Agregar flags/contadores en analizar():
+      tiene_accion=0
+      tiene_fin=0
+      tiene_ambiente=0
+      tiene_proceso=0
+    Y verificar al final del while que todos sean 1.
+    Si falta alguno -> Error con mensaje claro.
+
+[ ] Detectar numero de linea del error
+    Agregar contador: linea_num=0, incrementar en cada iteracion
+    Imprimir: "Error linea $linea_num: falta FIN_ACCION"
+
+[ ] Verificar que AMBIENTE venga antes que PROCESO
+
+[ ] Verificar que PROCESO venga antes que FIN_ACCION
+
+[ ] Verificar declaraciones de variables en AMBIENTE
+    Formato esperado:  nombre: TIPO;
+
+[ ] Implementar ejecutar()
+    - Asignaciones  :=
+    - ESCRIBIR()
+    - LEER()
+
+[ ] Conectar paed al juego PseudoGames (desde C con system() o popen())
+
+
+Referencias bash
+-----------------
+  man bash     secciones: Variables, Conditionals, Loops, Functions
+  man sed      secciones: The s command
+  man awk      secciones: Pattern-Action, Fields
+
+  Guias online:
+  https://www.gnu.org/software/bash/manual/
+  https://tldp.org/LDP/abs/html/
+  https://www.gnu.org/software/sed/manual/sed.html
+  https://www.gnu.org/software/gawk/manual/

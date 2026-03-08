@@ -1,0 +1,7 @@
+ACCION hola_mundo ES
+    AMBIENTE
+        mensaje: AN(20);
+    PROCESO
+        mensaje := "Hola Mundo";
+        ESCRIBIR(mensaje);
+ FIN_ACCION

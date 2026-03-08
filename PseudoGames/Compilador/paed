@@ -1,0 +1,59 @@
+#!/bin/bash
+source ./flags.sh
+# paed - Interprete/Compilador del lenguaje .paed
+# Uso: ./paed nombreArchivo.paed
+
+ARCHIVO=$1
+
+analizar(){
+    echo "analizando..."
+    # Mi logica es que tiene que ir linea por linea verificando la sintaxis
+    if [ -z "$ARCHIVO" ]; # Verifica si es Verdadero, si la variable esta vacia (sin valor)
+    then
+        echo "Error: Esta vacio!"
+        return 1
+    fi
+
+    if [ ! -f "$ARCHIVO" ]; # Verifica si un archivo existe
+    then
+        echo "Error: no existe el archivo"
+        return 1
+    fi
+    
+    if [ ${ARCHIVO##*.} == "paed" ]
+    then
+        echo "Bien!, es extension paed"
+
+    else
+        echo "Mal!, no es extension paed"
+        return 1
+    fi
+    while read linea; do
+
+        case $linea in
+            # El * significa "cualquier cosa despues de ACCION", ACCION*)
+            # Nombre como llamaste al archivo.paed... tiene que ser igual. Para buena practica
+            ACCION*ES) echo "Es una accion" ;; 
+            FIN_ACCION) echo "Cerrar la accion" ;;
+            AMBIENTE) echo "Empieza el Ambiente" ;;
+            PROCESO) echo "Empieza el Proceso" ;;
+            *) ;;
+        esac
+    done < "$ARCHIVO"
+
+
+
+}
+
+ejecutar() {
+    echo "ejecutando..."
+    # Si el analizar funct dio el OK todo bien, puede ejecutar sino Error de sintaxis... basicamente lo que tendria que hacer es errores de sintaxis nomas... lo demas lo va haciendo el propio usuario. Funciones que necesita la va creando
+}
+
+# $1 = el archivo que le pasas como argumento
+analizar 
+if [ $? -eq 0 ]; 
+then
+    ejecutar
+fi
+

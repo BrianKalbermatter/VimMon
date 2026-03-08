@@ -2,7 +2,7 @@ CC = clang
 CFLAGS = -Wall -Wextra -I src
 LDFLAGS = -lSDL2 -lSDL2_ttf
 # Solo archivos .c
-SRC = src/main.c src/ui.c src/niveles.c src/progreso.c src/cJSON.c 
+SRC = src/main.c src/ui.c src/niveles.c src/progreso.c src/cJSON.c src/screenDOC.c src/screenMenu.c src/screenEditorLvl.c src/screenSoluction.c 
 OBJ = $(SRC:.c=.o)
 TARGET = aed
 
