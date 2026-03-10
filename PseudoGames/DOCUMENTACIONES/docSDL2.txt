@@ -27,6 +27,7 @@ INDICE
  20. Tarjetas de nivel y boton de reset
  21. Pomodoro global en background + cursor parpadeante
  22. Transiciones de pantalla: cambio de canal y encendido de tele
+ 23. Cross-compilacion para Windows y GitHub Actions
 
 
 ================================================================================
@@ -1403,6 +1404,195 @@ RESUMEN DE TIEMPOS
   Fase 2 (apertura vertical):  51 frames x 14ms = ~714ms
   Fase 3 (estabilizacion):     31 frames x 16ms = ~496ms
   TOTAL:                       ~1.56 segundos
+
+
+================================================================================
+23. CROSS-COMPILACION PARA WINDOWS Y GITHUB ACTIONS
+================================================================================
+
+PROBLEMA
+---------
+El juego corre en Linux. Para que corra en Windows hay que producir un .exe.
+Esto se hace desde Linux usando un cross-compilador — un compilador que corre
+en Linux pero genera codigo ejecutable para Windows.
+
+QUE ES CROSS-COMPILAR
+-----------------------
+Compilar normalmente: Linux genera codigo → corre en Linux.
+Cross-compilar:       Linux genera codigo → corre en Windows.
+
+El compilador usado es mingw-w64 (Minimalist GNU for Windows).
+El ejecutable que usa el compilador se llama:
+  x86_64-w64-mingw32-gcc
+  └─ x86_64   = arquitectura de 64 bits
+  └─ w64      = Windows 64-bit
+  └─ mingw32  = familia de herramientas MinGW
+  └─ gcc      = GNU C Compiler
+
+Instalacion en Arch/Manjaro (el sistema del proyecto):
+  pacman -S mingw-w64-gcc
+
+POR QUE pty.h NO EXISTE EN WINDOWS
+-------------------------------------
+pty.h es una libreria POSIX (Unix/Linux).
+Define forkpty(), que crea un pseudo-terminal (PTY).
+Un PTY es un par de descriptores de archivo que simulan una terminal real.
+Esto se usa para correr pomodoro.sh y bim.sh dentro del juego.
+
+Windows no tiene el concepto de PTY de Unix. Tiene su propia API de consola
+(ConPTY) pero es completamente diferente y no es compatible.
+
+Por eso, en vez de eliminar el codigo que usa pty.h, se lo envuelve con:
+  #ifndef _WIN32
+    // codigo que usa pty.h, forkpty, fork, exec, etc.
+  #else
+    // stub vacio o pantalla de "no disponible"
+  #endif
+
+_WIN32 es una macro que el compilador de Windows define automaticamente.
+Cuando se compila con mingw-w64, _WIN32 esta definido → el bloque Linux
+no se compila → no se busca pty.h → no hay error.
+Cuando se compila con clang en Linux, _WIN32 NO esta definido → el bloque
+Linux si se compila → todo funciona igual que antes.
+
+ARCHIVOS MODIFICADOS PARA COMPATIBILIDAD
+------------------------------------------
+  src/main.c
+    - Se removieron los includes de pty.h, unistd.h, fcntl.h, dirent.h
+      que main.c incluia pero no usaba directamente (herencia del codigo anterior).
+    - Se cambio la firma de main() de:
+        int main(void)
+      a:
+        int main(int argc, char *argv[])
+      porque SDL2 en Windows redefine main() internamente (SDL_main.h) y
+      necesita que reciba argc y argv. Sin esto el linker da error de
+      "conflicting types for SDL_main".
+
+  src/pomodoro_bg.c
+    Todo el codigo de forkpty, vt_process, vt_putchar, pom_init, pom_cleanup,
+    pom_send, pom_tick se envolvio en #ifndef _WIN32 ... #else ... #endif.
+    En Windows, las cuatro funciones publicas son stubs vacios:
+      void pom_init(void)    { }
+      void pom_cleanup(void) { }
+      void pom_send(...)     { }
+      void pom_tick(void)    { }
+
+  src/screenEditorLvl.c
+    Los includes de unistd.h, fcntl.h, pty.h, sys/wait.h se envolvieron en
+    #ifndef _WIN32.
+    La funcion screenLvLEditor se duplico con #ifdef _WIN32 ... #else ... #endif:
+      En Windows: muestra el titulo del nivel y "Editor no disponible en Windows"
+      En Linux:   todo el codigo con forkpty y bim.sh funciona igual
+
+  src/ui.c
+    Se agrego #include <stdio.h> que Windows requeria explicitamente
+    para snprintf() (en Linux estaba disponible a traves de otros headers).
+
+QUE FUNCIONA EN WINDOWS
+------------------------
+  Menu principal con lluvia de bits        SI
+  Transicion de encendido de tele          SI
+  Transicion de cambio de canal            SI
+  Seleccion de niveles con tarjetas        SI
+  Niveles bloqueados / completados         SI
+  Resetear progreso                        SI
+  Pantalla de documentacion (DOC)          SI
+  Pantalla de soluciones                   SI
+  Editor de nivel (bim.sh)                 NO (stub: muestra mensaje)
+  Pomodoro (pomodoro.sh)                   NO (stub: no hace nada)
+
+SDL2 Y SDL2_ttf PARA WINDOWS
+------------------------------
+SDL2 y SDL2_ttf proveen paquetes precompilados especificos para MinGW.
+Se descargan de GitHub Releases de cada libreria:
+  SDL2-devel-2.30.9-mingw.tar.gz
+  SDL2_ttf-devel-2.22.0-mingw.tar.gz
+
+Se extraen y se copian a la carpeta win-libs/ del proyecto:
+  win-libs/include/SDL2/   <- headers (.h) para compilar
+  win-libs/lib/            <- librerias de importacion (.dll.a) para linkear
+  win-libs/dll/            <- DLLs que van junto al .exe para ejecutar
+
+La carpeta win-libs/ esta en .gitignore — no se sube al repo porque
+son binarios de terceros. GitHub Actions los descarga en cada build.
+
+Las librerias de importacion (.dll.a):
+  libSDL2.dll.a     -> le dice al linker que al ejecutarse busque SDL2.dll
+  libSDL2main.a     -> provee la implementacion de WinMain que SDL2 requiere
+  libSDL2_ttf.dll.a -> le dice al linker que busque SDL2_ttf.dll
+
+Sin SDL2.dll y SDL2_ttf.dll en la misma carpeta que el .exe, Windows
+no puede ejecutar el programa (falta la libreria dinamica).
+
+FLAGS DE COMPILACION PARA WINDOWS
+-----------------------------------
+  -I win-libs/include   <- donde buscar los headers SDL2
+  -L win-libs/lib       <- donde buscar las librerias de importacion
+  -lmingw32             <- libreria base de MinGW (incluye WinMain)
+  -lSDL2main            <- adaptador main() de SDL2 para Windows
+  -lSDL2                <- la libreria SDL2
+  -lSDL2_ttf            <- la libreria SDL2_ttf
+  -lm                   <- matematica (sinf, etc.)
+  -mwindows             <- genera un ejecutable de ventana en vez de consola
+                           sin esto se abre una ventana de cmd negra atras
+
+TARGET EN EL MAKEFILE
+----------------------
+Se agrego el target `windows` al Makefile:
+  make          <- compila el binario Linux (aed)
+  make windows  <- cross-compila el ejecutable Windows (PseudoGames.exe)
+  make clean    <- borra todos los .o y binarios de ambas plataformas
+
+Los archivos objeto de Windows se llaman *.win.o para no chocar con
+los *.o de Linux cuando se usan ambos targets.
+
+GITHUB ACTIONS: BUILD AUTOMATICO
+----------------------------------
+Archivo: .github/workflows/build-windows.yml
+
+GitHub Actions es un sistema de CI/CD (Continuous Integration / Deployment).
+CI = cada vez que subis codigo, se ejecutan tareas automaticas en la nube.
+
+El workflow se activa en cada push a la rama aed_pseudo.
+Corre en una maquina virtual ubuntu-latest en los servidores de GitHub.
+
+Pasos del workflow:
+  1. checkout: descarga el codigo del repo
+  2. instala mingw-w64
+  3. descarga SDL2-devel mingw
+  4. descarga SDL2_ttf-devel mingw
+  5. prepara win-libs/ (mismo proceso que se hizo manualmente)
+  6. make windows → genera PseudoGames.exe
+  7. empaqueta en un .zip junto con las DLLs, assets, data y scripts
+  8. sube el .zip como GitHub Release con tag "latest"
+
+El tag "latest" siempre se sobreescribe → hay una sola Release que
+siempre contiene la version mas reciente del ejecutable.
+
+Eso es el "auto-update": no hay codigo dentro del juego que se actualice
+solo, sino que cada push automaticamente reemplaza el archivo descargable.
+El jugador descarga el .zip de la Release de GitHub cuando quiere la ultima version.
+
+COMO DESCARGAR EL .EXE
+------------------------
+  1. Ir a https://github.com/BrianKalbermatter/VimMon/releases
+  2. Descargar PseudoGames-Windows.zip
+  3. Extraer el zip (mantener la estructura de carpetas)
+  4. Ejecutar PseudoGames.exe — SDL2.dll y SDL2_ttf.dll deben estar
+     en la misma carpeta que el .exe
+
+FIRMA CORRECTA DE main() PARA SDL2 EN WINDOWS
+------------------------------------------------
+SDL2 en Windows redefine main() via una macro en SDL_main.h:
+  #define main SDL_main
+Esto hace que tu main() se llame SDL_main() internamente.
+SDL2 provee su propio WinMain() que inicializa Windows y llama SDL_main().
+Para que esto funcione, SDL_main debe tener la firma:
+  int SDL_main(int argc, char *argv[])
+Si main() esta declarado como main(void), el compilador dice
+"conflicting types for SDL_main" y falla el build.
+La solucion es siempre usar int main(int argc, char *argv[]).
+En Linux no hace diferencia — argc y argv simplemente se ignoran.
 
 
 ================================================================================
