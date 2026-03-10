@@ -1,0 +1,119 @@
+#!/bin/bash
+source ./flags.sh
+source ./validacion.sh
+# paed - Interprete/Compilador del lenguaje .paed
+# Uso: ./paed nombreArchivo.paed
+
+ARCHIVO=$1
+
+analizar(){
+    echo "analizando..."
+    # Mi logica es que tiene que ir linea por linea verificando la sintaxis
+    if [ -z "$ARCHIVO" ]; # Verifica si es Verdadero, si la variable esta vacia (sin valor)
+    then
+        echo "Error: Esta vacio!"
+        return 1
+    fi
+
+    if [ ! -f "$ARCHIVO" ]; # Verifica si un archivo existe
+    then
+        echo "Error: no existe el archivo"
+        return 1
+    fi
+    
+    if [ ${ARCHIVO##*.} == "paed" ]
+    then
+        echo "Bien!, es extension paed"
+
+    else
+        echo "Mal!, no es extension paed"
+        return 1
+    fi
+
+    linea_num=0
+    while read linea; do
+        set -- $linea #divide la linea en $1 $2 $3...
+        linea_num=$((linea_num + 1))
+        
+
+        #--------------------------------
+        # Primera palabra de la linea
+        #Este case le dice que existen estas variables
+
+        case $1 in 
+            ACCION) find_ACCION=1 ;;
+            #MIENTRAS
+            #FUNCION
+        esac
+        # Segunda palabra es una asignacion entonces para asignar a otra es la 2da ej: a:=b;
+        case $2 in
+            #*:=*) echo "$ARCHIVO:$linea_num: error: sintaxys ASIGNACION':='" ;;
+        esac
+
+        # $# es la cantidad de palabras en la linea para agarrar la ultima, necesitas eval
+        eval last=\$$#
+        # Todos los que van al final de las lineas
+        case $last in
+            ES) find_ES=1 ;;
+            HACER) find_HACER=1 ;;
+            ENTONCES) find_ENTONCES=1 ;;
+        esac
+        #--------------------------------
+
+        #Lineas que van solas en sintaxis en la misma linea
+        case $linea in
+            
+            AMBIENTE)
+                if [ $find_ACCION -eq 1 ] && [ $find_AMBIENTE -eq 0 ]; 
+                then
+                    find_AMBIENTE=1
+                else
+                    echo "$ARCHIVO:$linea_num: error: sintaxys AMBIENTE"
+                fi
+                ;;
+
+            PROCESO)
+                if [ $find_ACCION -eq 1 ] && [ $find_AMBIENTE -eq 1 ] && [ $find_PROCESO -eq 0 ];
+                then
+                    find_PROCESO=1
+                else
+                    echo "$ARCHIVO:$linea_num: error: sintaxys PROCESO"
+                fi
+                ;;
+            
+            FIN_ACCION)
+                if [ $find_ACCION -eq 1 ] && [ $find_FIN_ACCION -eq 0 ];
+                then
+                    find_FIN_ACCION=1
+                else
+                    echo "$ARCHIVO:$linea_num: error: sintaxys FIN_ACCION"
+                fi
+                ;;
+
+
+
+
+
+
+            
+            
+            # Faltan otros pero por ahora probare con estos!
+            
+        esac
+    done < "$ARCHIVO"
+
+    validacion_end
+}
+
+ejecutar() {
+    echo "ejecutando..."
+    # Si el analizar funct dio el OK todo bien, puede ejecutar sino Error de sintaxis... basicamente lo que tendria que hacer es errores de sintaxis nomas... lo demas lo va haciendo el propio usuario. Funciones que necesita la va creando
+}
+
+# $1 = el archivo que le pasas como argumento
+analizar 
+if [ $? -eq 0 ]; 
+then
+    ejecutar
+fi
+

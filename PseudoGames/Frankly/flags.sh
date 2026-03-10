@@ -1,0 +1,5 @@
+find_ACCION=0
+find_ES=0
+find_FIN_ACCION=0
+find_AMBIENTE=0
+find_PROCESO=0

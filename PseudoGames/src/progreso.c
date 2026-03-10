@@ -100,3 +100,8 @@ int nivel_desbloqueado(int numero) {
 int total_completados(void) {
     return n_completados;
 }
+
+int resetear_progreso(void) {
+    n_completados = 0;
+    return guardar_progreso(NULL);
+}

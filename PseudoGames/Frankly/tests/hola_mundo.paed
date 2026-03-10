@@ -4,4 +4,4 @@ ACCION hola_mundo ES
     PROCESO
         mensaje := "Hola Mundo";
         ESCRIBIR(mensaje);
- FIN_ACCION
+FIN_ACCION

@@ -5,8 +5,13 @@
 
 // helpers de UI compartidos entre pantallas
 void dibujadoTexto(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y);
+void dibujadoTextoColor(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y, SDL_Color color);
 
 void dibujadoTextoMultilinea(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y, int max_ancho);
+void dibujadoTextoMultilineaColor(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y, int max_ancho, SDL_Color color);
+
+void screen_transition(SDL_Renderer *renderer, int ancho, int alto);
+void screen_poweron(SDL_Renderer *renderer, int ancho, int alto);
 
 // declaraciones de pantallas
 int screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
@@ -14,4 +19,5 @@ int screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
 int screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
 int screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, int nivel_num);
 int screenSoluciones(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
+int screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
 #endif

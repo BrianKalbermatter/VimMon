@@ -7,5 +7,6 @@ int esta_completado(int numero);
 int marcar_completado(int numero);
 int nivel_desbloqueado(int numero);
 int total_completados(void);
+int resetear_progreso(void);
 
 #endif
