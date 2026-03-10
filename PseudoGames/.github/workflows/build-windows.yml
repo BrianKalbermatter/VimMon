@@ -4,6 +4,9 @@ on:
   push:
     branches: [ "aed_pseudo" ]
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: ubuntu-latest
@@ -34,10 +37,10 @@ jobs:
           mkdir -p PseudoGames/win-libs/dll
           cp -r /tmp/SDL2-2.30.9/x86_64-w64-mingw32/include/SDL2/* PseudoGames/win-libs/include/SDL2/
           cp -r /tmp/SDL2_ttf-2.22.0/x86_64-w64-mingw32/include/SDL2/* PseudoGames/win-libs/include/SDL2/
-          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/lib/libSDL2.dll.a PseudoGames/win-libs/lib/
-          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/lib/libSDL2main.a PseudoGames/win-libs/lib/
+          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/lib/libSDL2.dll.a     PseudoGames/win-libs/lib/
+          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/lib/libSDL2main.a     PseudoGames/win-libs/lib/
           cp /tmp/SDL2_ttf-2.22.0/x86_64-w64-mingw32/lib/libSDL2_ttf.dll.a PseudoGames/win-libs/lib/
-          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/bin/SDL2.dll PseudoGames/win-libs/dll/
+          cp /tmp/SDL2-2.30.9/x86_64-w64-mingw32/bin/SDL2.dll     PseudoGames/win-libs/dll/
           cp /tmp/SDL2_ttf-2.22.0/x86_64-w64-mingw32/bin/SDL2_ttf.dll PseudoGames/win-libs/dll/
 
       - name: Compilar PseudoGames.exe
@@ -46,20 +49,21 @@ jobs:
       - name: Empaquetar release
         run: |
           mkdir -p release
-          cp PseudoGames/PseudoGames.exe   release/
-          cp PseudoGames/win-libs/dll/*.dll release/
-          cp -r PseudoGames/assets          release/
-          cp -r PseudoGames/data            release/
-          cp -r PseudoGames/saves           release/  || true
-          cp -r PseudoGames/scripts         release/
+          cp PseudoGames/PseudoGames.exe        release/
+          cp PseudoGames/win-libs/dll/SDL2.dll        release/
+          cp PseudoGames/win-libs/dll/SDL2_ttf.dll    release/
+          cp -r PseudoGames/assets   release/
+          cp -r PseudoGames/data     release/
+          cp -r PseudoGames/scripts  release/
+          mkdir -p release/saves
           cd release && zip -r ../PseudoGames-Windows.zip .
 
-      - name: Subir Release a GitHub
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: "PseudoGames - ultima version"
-          files: PseudoGames-Windows.zip
-          make_latest: true
+      - name: Publicar Release
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          git push --delete origin latest 2>/dev/null || true
+          gh release create latest PseudoGames-Windows.zip \
+            --title "PseudoGames - ultima version" \
+            --notes "Build automatico. Extraer el zip y ejecutar PseudoGames.exe"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
