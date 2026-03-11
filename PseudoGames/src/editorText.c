@@ -230,8 +230,6 @@ render_highlighted(SDL_Renderer *renderer, TTF_Font *fuente,
 }
 
 /* ── helpers de archivo ───────────────────────────────────────────── */
-#ifndef _WIN32
-#include <unistd.h>
 #include <dirent.h>
 
 /* Escanea saves/ y llena lista[] con nombres sin extension .paed */
@@ -278,7 +276,11 @@ static int
 ejecutar_paed(const char *path, char out[][256], int max)
 {
     char cmd[256];
+#ifdef _WIN32
+    snprintf(cmd, sizeof(cmd), "cd Frankly && paed.exe \"../%s\" 2>&1", path);
+#else
     snprintf(cmd, sizeof(cmd), "cd Frankly && ./paed '../%s' 2>&1", path);
+#endif
     FILE *fp = popen(cmd, "r");
     if (!fp) { strncpy(out[0], "error: no se pudo ejecutar paed", 255); return 1; }
     int  n = 0;
@@ -291,7 +293,6 @@ ejecutar_paed(const char *path, char out[][256], int max)
     pclose(fp);
     return n > 0 ? n : 0;
 }
-#endif
 
 /* ── screenEditorText ─────────────────────────────────────────────────
  * Editor multi-linea completo. ESC/F10 para salir.
@@ -334,17 +335,14 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     int  dirty           = 0;   /* 1 = hay cambios sin guardar */
     int  confirm_salir   = 0;   /* 1 = mostrando dialogo "salir sin guardar?" */
 
-#ifndef _WIN32
     /* ── Lista de archivos guardados (para overlay F9) ────────────── */
 #define MAX_SAVES 50
     char saves_lista[MAX_SAVES][64];
     int  saves_n        = 0;
     int  saves_sel      = -1;   /* fila seleccionada con flechas */
     int  saves_offset   = 0;    /* scroll de la lista */
-#endif
 
     /* ── Cargar archivo existente (solo si tiene nombre fijo) ─────── */
-#ifndef _WIN32
     if (tiene_nombre_fijo) {
         char path[128];
         snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
@@ -363,7 +361,6 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             if (n_lines == 0) n_lines = 1;
         }
     }
-#endif
 
     /* ── Salida ───────────────────────────────────────────────────── */
 #define OUT_MAX 6
@@ -404,11 +401,8 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     }
                     if (k == SDLK_BACKSPACE && prompt_len > 0) {
                         prompt_buf[--prompt_len] = '\0';
-#ifndef _WIN32
                         saves_sel = -1; /* al editar texto, deseleccionar lista */
-#endif
                     }
-#ifndef _WIN32
                     /* Navegar lista con flechas */
                     if (k == SDLK_UP) {
                         if (saves_sel > 0) saves_sel--;
@@ -443,15 +437,12 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                             prompt_len = (int)strlen(prompt_buf);
                         } else { prompt_buf[0] = '\0'; prompt_len = 0; }
                     }
-#endif
                     if (k == SDLK_RETURN && prompt_len > 0) {
                         strncpy(nombre_arch, prompt_buf, sizeof(nombre_arch)-1);
                         nombre_arch[sizeof(nombre_arch)-1] = '\0';
-#ifndef _WIN32
                         char path[128];
                         snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                         guardar_archivo(buf, n_lines, path);
-#endif
                         dirty     = 0;
                         guardando = 0; prompt_len = 0; prompt_buf[0] = '\0';
                     }
@@ -543,11 +534,9 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 if (k == SDLK_F9) {
                     if (tiene_nombre_fijo) {
                         /* nombre fijo: sobreescribir directo */
-#ifndef _WIN32
                         char path[128];
                         snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                         guardar_archivo(buf, n_lines, path);
-#endif
                         dirty = 0;
                     } else {
                         /* nombre libre: abrir pantalla de guardado */
@@ -557,14 +546,11 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                         else
                             prompt_buf[0] = '\0';
                         prompt_len = (int)strlen(prompt_buf);
-#ifndef _WIN32
                         saves_n   = escanear_saves(saves_lista, MAX_SAVES);
                         saves_sel = -1; saves_offset = 0;
-#endif
                     }
                 }
 
-#ifndef _WIN32
                 /* F5: guardar y ejecutar */
                 if (k == SDLK_F5) {
                     char path[128];
@@ -572,11 +558,9 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     guardar_archivo(buf, n_lines, path);
                     n_out = ejecutar_paed(path, out_buf, OUT_MAX);
                 }
-#endif
             }
 
             /* Click en [X] de la lista de guardado */
-#ifndef _WIN32
             if (evento.type == SDL_MOUSEBUTTONDOWN && guardando &&
                 evento.button.button == SDL_BUTTON_LEFT) {
                 int mx = evento.button.x, my = evento.button.y;
@@ -605,7 +589,6 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     }
                 }
             }
-#endif
 
             if (evento.type == SDL_TEXTINPUT) {
                 if (guardando) {
@@ -672,7 +655,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             int y = 8 + i * line_h;
 
             /* Numero de linea alineado a la derecha del gutter */
-            char num[8];
+            char num[12];
             snprintf(num, sizeof(num), "%d", row + 1);
             int nw; TTF_SizeUTF8(fuente, num, &nw, NULL);
             SDL_Surface *sn = TTF_RenderUTF8_Blended(fuente, num, c_num);
@@ -818,7 +801,6 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             SDL_RenderDrawLine(renderer, bx + 10, ly, bx + bw - 10, ly);
             ly += 4;
 
-#ifndef _WIN32
             int vis_saves = (by + bh - ly - line_h - 20) / (line_h + 2);
             if (vis_saves < 1) vis_saves = 1;
 
@@ -849,7 +831,6 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 dibujadoTextoSimple(renderer, fuente, "X",
                                     btn_x.x + 8, fy, c_x);
             }
-#endif
 
             /* hint inferior */
             dibujadoTextoSimple(renderer, fuente,
