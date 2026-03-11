@@ -150,6 +150,7 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
     int foco            = 0;  // 0 = panel capítulos, 1 = panel derecho
 
     while (1) {
+        int clicked = 0, click_x = 0, click_y = 0;
 
         // --- Episodios del capítulo actual ---
         int ep_base  = -1;
@@ -211,8 +212,30 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 if (ep_count > 0 && episodio_sel >= ep_count) episodio_sel = ep_count - 1;
             }
 
-            if (evento.type == SDL_MOUSEWHEEL && vista == 1)
-                scroll -= evento.wheel.y * 3;
+            if (evento.type == SDL_MOUSEBUTTONDOWN &&
+                evento.button.button == SDL_BUTTON_LEFT) {
+                clicked = 1;
+                click_x = evento.button.x;
+                click_y = evento.button.y;
+            }
+
+            if (evento.type == SDL_MOUSEWHEEL) {
+                if (vista == 1) {
+                    scroll -= evento.wheel.y * 3;
+                } else {
+                    // rueda en panel izquierdo → cambiar capitulo
+                    if (click_x < panel_izq_w || evento.wheel.x != 0) {
+                        capitulo_sel -= evento.wheel.y;
+                        episodio_sel = 0; scroll = 0;
+                    } else {
+                        // rueda en panel derecho → cambiar episodio
+                        episodio_sel -= evento.wheel.y;
+                    }
+                    if (capitulo_sel < 0) capitulo_sel = 0;
+                    if (capitulo_sel >= total_capitulos) capitulo_sel = total_capitulos - 1;
+                    if (episodio_sel < 0) episodio_sel = 0;
+                }
+            }
         }
 
         if (scroll < 0) scroll = 0;
@@ -255,6 +278,17 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
             SDL_Color ci = sel ? (SDL_Color){210, 210, 255, 255} : (SDL_Color){110, 110, 160, 255};
             dibujadoTextoMultilineaColor(renderer, fuente, capitulos[i].titulo,
                                          6, item_y - 12, idx_max_w, ci);
+
+            // click en este capitulo
+            if (clicked && click_x >= 0 && click_x < panel_izq_w &&
+                click_y >= item_y - 2 && click_y < item_y + item_h + 6) {
+                capitulo_sel = i;
+                episodio_sel = 0;
+                scroll = 0;
+                foco = 0;
+                vista = 0;
+            }
+
             item_y += item_h + 8;
         }
 
@@ -313,6 +347,16 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 dibujadoTextoMultilineaColor(renderer, fuente, episodios[ei].titulo,
                                              contenido_x + 24, ey - 12,
                                              contenido_w - 40, c_ep);
+
+                // click en este episodio → abrirlo
+                if (clicked && click_x >= contenido_x && click_x < contenido_x + contenido_w &&
+                    click_y >= ey - 2 && click_y < ey + ep_h + 4) {
+                    episodio_sel = i;
+                    foco = 1;
+                    vista = 1;
+                    scroll = 0;
+                }
+
                 ey += ep_h + 6;
             }
 
@@ -366,6 +410,13 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 SDL_Rect thumb = {sb_x + 2, ty, scrollbar_w - 4, th};
                 SDL_SetRenderDrawColor(renderer, 90, 90, 170, 255);
                 SDL_RenderFillRect(renderer, &thumb);
+
+                // click en la scrollbar → saltar a esa posicion
+                if (clicked && click_x >= sb_x && click_x <= sb_x + scrollbar_w &&
+                    click_y >= 4 && click_y <= alto - 4 && max_scroll > 0) {
+                    float t = (float)(click_y - 4) / (alto - 8);
+                    scroll = (int)(t * max_scroll);
+                }
             }
 
             SDL_Color c_help = {60, 60, 90, 255};

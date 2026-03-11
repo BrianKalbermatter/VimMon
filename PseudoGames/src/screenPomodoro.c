@@ -1,9 +1,130 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <string.h>
+#include <stdio.h>
 #include "ui.h"
 #include "pomodoro_bg.h"
 
+#ifdef _WIN32
+// ── Pomodoro nativo SDL2 para Windows (sin bash/forkpty) ─────────────────
+int
+screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
+{
+    int TRABAJO_SEG  = 25 * 60;
+    int DESCANSO_SEG =  5 * 60;
+
+    int     fase     = 0;             // 0=TRABAJO  1=DESCANSO
+    int     segundos = TRABAJO_SEG;
+    int     pausado  = 0;
+    int     ciclos   = 0;
+    Uint32  ultimo   = SDL_GetTicks();
+
+    SDL_Color c_verde   = {  0, 220,  80, 255};
+    SDL_Color c_fondo   = {  0,  30,  10, 255};
+    SDL_Color c_amarillo= {220, 200,   0, 255};
+    SDL_Color c_gris    = {100, 100, 100, 255};
+
+    int corriendo = 1;
+    SDL_Event evento;
+
+    while (corriendo) {
+
+        // tick cada segundo si no esta pausado
+        Uint32 ahora = SDL_GetTicks();
+        if (!pausado && ahora - ultimo >= 1000) {
+            ultimo += 1000;
+            segundos--;
+            if (segundos < 0) {
+                fase = 1 - fase;
+                if (fase == 0) ciclos++;
+                segundos = (fase == 0) ? TRABAJO_SEG : DESCANSO_SEG;
+            }
+        }
+
+        while (SDL_PollEvent(&evento)) {
+            if (evento.type == SDL_QUIT) { corriendo = 0; break; }
+            if (evento.type == SDL_KEYDOWN) {
+                switch (evento.key.keysym.sym) {
+                    case SDLK_ESCAPE: corriendo = 0; break;
+                    case SDLK_p:
+                        pausado = !pausado;
+                        ultimo  = SDL_GetTicks();
+                        break;
+                    case SDLK_0:
+                        fase = 0; segundos = TRABAJO_SEG;
+                        pausado = 0; ciclos = 0;
+                        ultimo = SDL_GetTicks();
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        // --- render ---
+        SDL_SetRenderDrawColor(renderer, c_fondo.r, c_fondo.g, c_fondo.b, 255);
+        SDL_RenderClear(renderer);
+
+        // borde exterior
+        SDL_SetRenderDrawColor(renderer, 0, 180, 60, 255);
+        SDL_RenderDrawRect(renderer, &(SDL_Rect){5, 5, ancho-10, alto-10});
+
+        // barra de titulo
+        SDL_SetRenderDrawColor(renderer, 0, 60, 20, 255);
+        SDL_RenderFillRect(renderer, &(SDL_Rect){5, 5, ancho-10, 28});
+        dibujadoTexto(renderer, fuente,
+            "POMODORO   [ESC] volver  [p] pausa  [0] reiniciar", 15, 8);
+
+        int cx = ancho / 2;
+        int cy = alto  / 2;
+
+        // fase
+        const char *fase_txt = (fase == 0) ? "TRABAJO" : "DESCANSO";
+        SDL_Color   c_fase   = (fase == 0) ? c_verde : c_amarillo;
+        int fw; TTF_SizeUTF8(fuente, fase_txt, &fw, NULL);
+        dibujadoTextoColor(renderer, fuente, fase_txt,
+            cx - fw/2 - 10, cy - 90, c_fase);
+
+        // linea decorativa
+        SDL_SetRenderDrawColor(renderer, 0, 100, 40, 200);
+        SDL_RenderDrawLine(renderer, cx - 120, cy - 60, cx + 120, cy - 60);
+
+        // timer MM:SS
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%02d:%02d", segundos/60, segundos%60);
+        int tw; TTF_SizeUTF8(fuente, buf, &tw, NULL);
+        SDL_Color c_timer = pausado ? c_gris : c_verde;
+        dibujadoTextoColor(renderer, fuente, buf,
+            cx - tw/2 - 10, cy - 50, c_timer);
+
+        // ciclos completados
+        char cbuf[40];
+        snprintf(cbuf, sizeof(cbuf), "Ciclos completados: %d", ciclos);
+        int cw; TTF_SizeUTF8(fuente, cbuf, &cw, NULL);
+        dibujadoTextoColor(renderer, fuente, cbuf,
+            cx - cw/2 - 10, cy + 10, c_gris);
+
+        // cartel PAUSADO
+        if (pausado) {
+            const char *p_txt = "[ PAUSADO ]";
+            int pw; TTF_SizeUTF8(fuente, p_txt, &pw, NULL);
+            dibujadoTextoColor(renderer, fuente, p_txt,
+                cx - pw/2 - 10, cy + 40, c_amarillo);
+        }
+
+        // ayuda pie
+        const char *help = "[p] pausar   [0] reiniciar   [ESC] volver";
+        int hw; TTF_SizeUTF8(fuente, help, &hw, NULL);
+        dibujadoTextoColor(renderer, fuente, help,
+            cx - hw/2 - 10, alto - 50, c_gris);
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+    }
+    return 0;
+}
+
+#else
+// ── Linux/macOS: pomodoro via bash + PTY (proceso global) ────────────────
 int
 screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 {
@@ -110,3 +231,4 @@ screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
     return 0;
     // NO se mata el proceso — sigue corriendo en fondo
 }
+#endif // _WIN32
