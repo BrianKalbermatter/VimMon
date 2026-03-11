@@ -179,7 +179,10 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
 
         // --- Eventos ---
         while (SDL_PollEvent(&evento)) {
-            if (evento.type == SDL_QUIT) return 0;
+            if (evento.type == SDL_QUIT) {
+                SDL_RenderSetClipRect(renderer, NULL);
+                return 0;
+            }
 
             if (evento.type == SDL_KEYDOWN) {
                 SDL_Keycode k = evento.key.keysym.sym;
@@ -192,7 +195,10 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
 
                 } else if (foco == 0) {
                     // --- FOCO: panel capítulos ---
-                    if (k == SDLK_ESCAPE)              return 0;
+                    if (k == SDLK_ESCAPE) {
+                        SDL_RenderSetClipRect(renderer, NULL);
+                        return 0;
+                    }
                     else if (k == SDLK_UP)             { capitulo_sel--; episodio_sel = 0; scroll = 0; }
                     else if (k == SDLK_DOWN)           { capitulo_sel++; episodio_sel = 0; scroll = 0; }
                     else if (k == SDLK_RETURN || k == SDLK_RIGHT) { foco = 1; }

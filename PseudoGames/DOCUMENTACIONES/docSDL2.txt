@@ -28,6 +28,8 @@ INDICE
  21. Pomodoro global en background + cursor parpadeante
  22. Transiciones de pantalla: cambio de canal y encendido de tele
  23. Cross-compilacion para Windows y GitHub Actions
+ 24. Boton de configuracion y screenConfig
+ 25. Pantalla de feedback y contacto
 
 
 ================================================================================
@@ -1594,6 +1596,457 @@ Si main() esta declarado como main(void), el compilador dice
 La solucion es siempre usar int main(int argc, char *argv[]).
 En Linux no hace diferencia — argc y argv simplemente se ignoran.
 
+
+================================================================================
+24. BOTON DE CONFIGURACION Y screenConfig
+================================================================================
+
+DONDE VIVE
+-----------
+  src/screenMenu.c    <- boton engranaje dibujado en el menu
+  src/screenConfig.c  <- pantalla de configuracion (archivo nuevo)
+  src/ui.h            <- declaracion de screenConfig()
+  src/main.c          <- case 7 en el switch de opciones
+  Makefile            <- agregado src/screenConfig.c a SRC
+
+BOTON ENGRANAJE EN EL MENU (screenMenu.c)
+------------------------------------------
+Se dibuja al final del loop de render, despues de los botones principales.
+
+Posicion: esquina inferior derecha.
+  int gear_size = 48             <- cuadrado de 48x48 px
+  int gear_x    = ancho - 48 - 18   <- 18px del borde derecho
+  int gear_y    = alto  - 48 - 18   <- 18px del borde inferior
+
+Deteccion de hover:
+  gear_hover = (mx >= gear_x && mx <= gear_x + gear_size &&
+                my >= gear_y && my <= gear_y + gear_size)
+
+Render del boton:
+  Fondo: SDL_BLENDMODE_BLEND, RGB(30,30,30) normal / RGB(80,80,80) hover
+  Borde: RGB(100,100,100) normal / RGB(200,200,200) hover
+  Texto "cfg" centrado dentro del cuadrado usando TTF_SizeUTF8 para
+  calcular la posicion exacta igual que los botones del menu.
+
+Click: retorna 7 — un valor nuevo que no usaba ninguna opcion anterior.
+  (los botones del menu devuelven 1-6 y 0 para salir)
+
+En main.c se agrego:
+  case 7: screenConfig(renderer, fuente, ancho, alto, ventana); break;
+
+screenConfig recibe `ventana` como parametro adicional porque necesita
+llamar SDL_SetWindowFullscreen() que requiere el SDL_Window*.
+
+ESTRUCTURA DE OPCIONES (screenConfig.c)
+-----------------------------------------
+Se definio un struct local para representar cada opcion:
+
+  typedef struct {
+      const char *nombre;       <- nombre visible de la opcion
+      const char *valores[4];   <- array de posibles valores (strings)
+      int n_valores;            <- cuantos valores tiene
+      int seleccion;            <- indice del valor actualmente elegido
+  } OpcionConfig;
+
+Las opciones se guardan en un array local:
+  OpcionConfig opciones[] = {
+      { "Pantalla completa", {"Si", "No"},             2, 0 },
+      { "Velocidad lluvia",  {"Lenta","Normal","Rapida"}, 3, 1 },
+      { "Brillo",            {"Bajo","Normal","Alto"},    3, 1 },
+  };
+
+  int n_opciones = sizeof(opciones) / sizeof(opciones[0]);
+
+sizeof(opciones) / sizeof(opciones[0]) es la forma estandar en C de
+calcular cuantos elementos tiene un array cuando no lo sabes de memoria.
+  sizeof(opciones)      = bytes totales del array completo
+  sizeof(opciones[0])   = bytes de un solo elemento
+  division              = cantidad de elementos
+
+Asi si en el futuro agregas mas opciones al array, n_opciones
+se actualiza automaticamente sin tener que cambiar ningun numero.
+
+NAVEGACION CON TECLADO
+------------------------
+  SDLK_UP / SDLK_DOWN     <- mueve `seleccionada` (la fila activa)
+                              con wrap: si llega a -1 va al ultimo,
+                              si llega a n_opciones va al primero
+  SDLK_LEFT               <- retrocede en los valores de la opcion activa
+  SDLK_RIGHT / SDLK_RETURN <- avanza en los valores de la opcion activa
+  SDLK_ESCAPE             <- sale de la pantalla
+
+NAVEGACION CON MOUSE
+---------------------
+  Hover sobre una fila     <- cambia `seleccionada` a esa fila
+  Click en el boton "<"    <- retrocede el valor de esa opcion
+  Click en el boton ">"    <- avanza el valor de esa opcion
+
+Los botones < y > se detectan con rectangulos de click manuales,
+igual que los botones del menu.
+
+RENDER DE CADA OPCION
+----------------------
+Para cada fila i:
+  1. Si es la fila seleccionada o hay hover: dibuja un rect de fondo
+     mas claro detras de toda la fila para resaltarla
+  2. Nombre de la opcion a la izquierda del panel
+  3. A la derecha: "<" + valor actual centrado en 120px + ">"
+     El valor se centra usando:
+       TTF_SizeUTF8(fuente, val_actual, &vw, NULL)
+       x = vx + 30 + (120 - vw) / 2
+
+OPCION QUE FUNCIONA EN TIEMPO REAL: PANTALLA COMPLETA
+------------------------------------------------------
+  SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP)
+  <- activa pantalla completa
+
+  SDL_SetWindowFullscreen(ventana, 0)
+  <- vuelve a modo ventana
+
+Se aplica tanto al cambiar con teclado como al hacer click con mouse.
+Es la unica opcion que tiene efecto real por ahora.
+Las otras (velocidad lluvia, brillo) guardan el valor seleccionado
+en el struct pero todavia no estan conectadas a logica — estan listas
+para cuando se quiera implementar.
+
+PANEL CENTRAL
+--------------
+La pantalla de config dibuja un panel centrado sobre un fondo oscuro:
+  panel_w = 520, panel_h = 400
+  panel_x = (ancho - panel_w) / 2
+  panel_y = (alto  - panel_h) / 2
+
+Fondo del panel: SDL_BLENDMODE_BLEND, RGB(20,20,35) alpha 220
+Borde del panel: RGB(60,60,100) solido
+
+Titulo "Configuracion" arriba con linea divisoria debajo.
+Ayuda de controles en la ultima linea del panel.
+
+COMO AGREGAR MAS OPCIONES EN EL FUTURO
+----------------------------------------
+Solo hay que agregar una linea al array opciones[]:
+  { "Nueva opcion", {"valor1", "valor2"}, 2, 0 },
+
+n_opciones se recalcula solo con el sizeof.
+El render es automatico — el loop dibuja todas las opciones del array.
+Para que tenga efecto, agregar el codigo de aplicacion dentro del
+bloque donde se detecta el cambio (despues de SDLK_LEFT/RIGHT o click).
+
+
+================================================================================
+25. PANTALLA DE FEEDBACK Y CONTACTO
+================================================================================
+
+DONDE VIVE
+-----------
+  src/screenFeedback.c   <- pantalla de contacto (archivo nuevo)
+  src/screenConfig.c     <- boton "Feedback" agregado al panel de config
+  src/ui.h               <- declaracion de screenFeedback()
+  Makefile               <- agregado src/screenFeedback.c a SRC
+
+POR QUE GITHUB ISSUES Y NO WHATSAPP O MAIL PERSONAL
+-----------------------------------------------------
+GitHub Issues es la forma estandar de recibir reportes de bugs en software:
+  - El reporte queda registrado con fecha, descripcion y quien lo manda
+  - Se puede responder, cerrar y etiquetar (bug, sugerencia, etc.)
+  - Otros usuarios ven si su bug ya fue reportado — no se duplican
+  - Es gratis y el repo ya existe en GitHub
+
+WhatsApp: demasiado personal, no escala, no queda registro ordenado.
+Mail personal: mezcla mensajes del juego con lo personal.
+Mail dedicado: buena opcion secundaria para los que no tienen GitHub.
+
+CONTACTO CONFIGURADO
+---------------------
+  GitHub Issues: github.com/BrianKalbermatter/VimMon/issues
+  Mail:          ctejant@gmail.com
+
+DISEÑO: SIN CUADRADO, OVERLAY SEMITRANSPARENTE
+------------------------------------------------
+A diferencia de otras pantallas, screenFeedback no dibuja un panel/cuadrado.
+En su lugar dibuja un overlay negro semitransparente sobre TODA la pantalla:
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 190);
+  SDL_RenderFillRect(renderer, NULL);   <- NULL = toda la pantalla
+
+El alpha 190 (de 255) deja ver ligeramente lo que habia detras.
+El texto flota centrado sobre ese fondo oscuro — sin bordes ni marcos.
+
+CENTRADO HORIZONTAL DE CADA ELEMENTO
+--------------------------------------
+Cada texto se centra midiendo su ancho con TTF_SizeUTF8:
+
+  int tw; TTF_SizeUTF8(fuente, texto, &tw, NULL);
+  int x = cx - tw/2 - 10;   <- cx es ancho/2 (centro de pantalla)
+
+El -10 compensa el padding interno de dibujadoTextoColor (que agrega +10 al x).
+Asi cada linea queda perfectamente centrada sin importar su largo.
+
+LINK CLICKEABLE CON SDL_OpenURL
+---------------------------------
+SDL_OpenURL() es una funcion de SDL2 (disponible desde SDL 2.0.14) que
+abre una URL en el navegador por defecto del sistema operativo.
+
+  SDL_OpenURL("https://github.com/BrianKalbermatter/VimMon/issues");
+
+En Linux usa xdg-open internamente.
+En Windows usa ShellExecute internamente.
+El juego NO se pausa ni se cierra — el navegador abre en paralelo
+y el game loop sigue corriendo normalmente.
+
+DETECCION DE CLICK EN EL LINK
+-------------------------------
+El link no es un widget de SDL — es solo texto renderizado.
+Para detectar si el usuario hizo click encima se usa un SDL_Rect
+que se actualiza cada frame con la posicion y tamaño real del texto:
+
+  int tw, th;
+  TTF_SizeUTF8(fuente, URL_ISSUES, &tw, &th);
+  link_rect.x = lx + 10;   <- x real donde empieza el texto (con padding)
+  link_rect.y = cy + 12;
+  link_rect.w = tw;
+  link_rect.h = th;
+
+Luego al detectar click:
+  if (click_x >= link_rect.x && click_x <= link_rect.x + link_rect.w &&
+      click_y >= link_rect.y && click_y <= link_rect.y + link_rect.h)
+      SDL_OpenURL(URL_ISSUES);   <- abre el navegador, NO cierra el juego
+
+Si el click fue fuera del link → cierra la pantalla de feedback.
+
+SUBRAYADO DEL LINK
+-------------------
+SDL2 no tiene texto con subrayado nativo.
+Se dibuja manualmente con SDL_RenderDrawLine:
+
+  SDL_RenderDrawLine(renderer,
+      link_rect.x, link_rect.y + th + 1,        <- inicio: debajo del texto
+      link_rect.x + link_rect.w, link_rect.y + th + 1);  <- fin
+
+th es el alto del texto en pixeles — la linea queda exactamente 1px
+debajo de la ultima fila del texto.
+
+ESTADOS DEL LINK (hover / normal)
+-----------------------------------
+  Normal:  RGB(60, 160, 255)   <- azul medio
+  Hover:   RGB(120, 220, 255)  <- celeste claro
+
+Al hacer hover ademas aparece:
+  - Fondo suave semitransparente detras del link (alpha 30)
+  - Texto "click para abrir en el navegador" debajo del link
+
+La deteccion de hover usa SDL_GetMouseState(&mx, &my) cada frame
+y compara con link_rect igual que el click.
+
+LOGICA DE CIERRE
+-----------------
+  Click SOBRE el link  → SDL_OpenURL() pero NO cierra — el juego sigue
+  Click FUERA del link → corriendo = 0 → vuelve a screenConfig
+  ESC                  → corriendo = 0 → vuelve a screenConfig
+
+BOTON "FEEDBACK" EN screenConfig
+----------------------------------
+Boton pequeno en la esquina inferior derecha del panel de configuracion.
+
+  fb_w = 130, fb_h = 28
+  fb_x = panel_x + panel_w - 130 - 16
+  fb_y = panel_y + panel_h - 28  - 10
+
+Al hacer click llama screenFeedback() directamente desde el loop de
+screenConfig, sin pasar por main.c. Es una sub-pantalla interna.
+
+VERSION DEL JUEGO
+------------------
+  PseudoGames v0.1 - aed_pseudo
+
+Para actualizar la version: cambiar el string en src/screenFeedback.c.
+
+
+================================================================================
+SECCION 26 — ARANDELA (ENGRANAJE) DIBUJADA CON SDL2 PURO
+================================================================================
+
+OBJETIVO
+---------
+Reemplazar el boton de configuracion que mostraba el texto "cfg" por un
+engranaje real dibujado con primitivas SDL2, sin ninguna imagen externa.
+
+FUNCION: dibujarArandela()
+---------------------------
+Ubicacion: src/ui.c  |  Declaracion: src/ui.h
+
+  void dibujarArandela(SDL_Renderer *renderer,
+                       int cx, int cy,
+                       int radio,
+                       SDL_Color color,
+                       SDL_Color bg);
+
+Parametros:
+  cx, cy  → centro del engranaje en pantalla
+  radio   → radio exterior (punta de los dientes)
+  color   → color del metal (cambia en hover)
+  bg      → color del agujero central (debe coincidir con el fondo)
+
+COMO ESTA CONSTRUIDA
+---------------------
+La funcion dibuja en tres pasos con SDL_RenderDrawLine:
+
+  1. CUERPO CIRCULAR
+     Radio = radio * 0.64 (interior de los dientes).
+     Relleno con scanlines horizontales:
+       for y de -rb a +rb:
+         xw = sqrt(rb*rb - y*y)
+         SDL_RenderDrawLine(cx-xw, cy+y, cx+xw, cy+y)
+
+  2. DIENTES (8 piezas)
+     Cada diente es un trapecio con 4 esquinas:
+       - 2 puntos en el radio del cuerpo (r_body)
+       - 2 puntos en el radio exterior   (r_ext)
+     Los angulos de cada diente se calculan con:
+       ang = i * 2*PI / 8
+       a1 = ang - 0.25   (borde izquierdo del diente)
+       a2 = ang + 0.25   (borde derecho del diente)
+     El trapecio se rellena con fill_quad() — una funcion estatica
+     que hace scanlines sobre un cuadrilatero convexo de 4 puntos.
+
+  3. AGUJERO CENTRAL
+     Radio = radio * 0.22.
+     Se pinta con el color bg (el fondo detras del engranaje).
+     Mismo metodo de scanlines que el cuerpo.
+
+FUNCION AUXILIAR fill_quad()
+-----------------------------
+Estatica (solo visible en ui.c). Recibe SDL_Point p[4] y rellena el
+cuadrilatero convexo con scanlines horizontales. Para cada fila Y
+encuentra los dos extremos X buscando las intersecciones con cada arista.
+
+  for cada arista (p[k] -> p[k+1]):
+    si la fila Y cruza la arista → calcular x de interseccion
+    actualizar xmin y xmax
+  SDL_RenderDrawLine(xmin, y, xmax, y)
+
+No requiere SDL_gfx ni ninguna libreria externa.
+
+INTEGRACION EN screenMenu.c
+-----------------------------
+El hitbox del boton es el mismo cuadrado 48x48 de antes.
+El centro se calcula como:
+  gear_cx = gear_x + gear_size / 2
+  gear_cy = gear_y + gear_size / 2
+
+Se llama con radio = gear_size/2 - 2 (un poco de margen al borde).
+
+Colores:
+  Normal  → {120, 120, 160, 255}  (gris azulado)
+  Hover   → {220, 220, 255, 255}  (casi blanco)
+  Agujero → {10,  10,  14,  255}  (fondo oscuro del menu)
+
+El click sigue devolviendo opcion = 7 hacia main.c → screenConfig().
+
+CORRECCIONES RELACIONADAS EN screenConfig.c
+---------------------------------------------
+1. Espaciado entre opciones: i*80 → i*100, primer item en panel_y+80.
+   El highlight row_bg tambien crece: alto 52 → 62px.
+
+2. Boton Feedback movido FUERA del panel:
+     fb_x = (ancho - fb_w) / 2    (centrado horizontalmente)
+     fb_y = panel_y + panel_h + 18
+
+3. Texto "Feedback" centrado dentro del boton compensando el offset
+   interno de dibujadoTextoColor (+10x, +12y):
+     texto_x = fb_x + (fb_w - fbw) / 2 - 10
+     texto_y = fb_y + (fb_h - fbh) / 2 - 12
+
+CORRECCIONES EN screenFeedback.c
+----------------------------------
+  - Solo ESC cierra la pantalla (se elimino el cierre por click fuera del link).
+  - Texto del pie actualizado a "[ESC] para volver".
+  - Click en el link → SDL_OpenURL() y sigue en pantalla.
+  - Click en cualquier otro lugar → no hace nada.
+
+================================================================================
+SECCION 27 — POMODORO NATIVO EN WINDOWS + FIX CLIP RECT
+================================================================================
+
+PROBLEMA DETECTADO: TEXTO CORTADO AL SALIR DE SCREENDOC
+---------------------------------------------------------
+Causa: screenDOC activa SDL_RenderSetClipRect() para recortar el render
+de cada panel (izquierdo y derecho). Cuando el usuario presiona ESC con
+el foco en el panel de capitulos, la funcion hacia "return 0" directamente
+SIN resetear el clip rect.
+
+Ese clip rect quedaba activo en el renderer para la siguiente pantalla.
+El panel izquierdo tiene ancho 300px, entonces cualquier texto que se
+renderizara despues se cortaba a 300px de ancho. "POMODORO" en la barra
+del pomodoro se cortaba a ~4 caracteres visibles ("POMO").
+
+Fix aplicado en screenDOC.c:
+  Antes de cada "return 0" dentro del loop de eventos se agrega:
+    SDL_RenderSetClipRect(renderer, NULL);
+  Esto garantiza que al salir de screenDOC el clip quede siempre limpio.
+
+POMODORO EN WINDOWS — REDISENO VISUAL
+---------------------------------------
+Archivo: src/screenPomodoro.c  (bloque #ifdef _WIN32)
+
+La version anterior usaba la barra de titulo chica (28px) con dibujadoTexto()
+que agrega +10x y +12y internamente, haciendo que el texto fuera dificil de
+centrar y propenso a quedar cortado por el bug de clip rect.
+
+La nueva version:
+
+1. FUENTES GRANDES
+   TTF_OpenFont("assets/fonts/main.ttf", 34) → f_titulo  (para "POMODORO")
+   TTF_OpenFont("assets/fonts/main.ttf", 72) → f_timer   (para MM:SS)
+   Se abren al entrar a la pantalla y se cierran al salir.
+
+2. HELPER LOCAL pom_txt()
+   Renderiza texto directamente SIN el offset +10/+12 de dibujadoTextoColor:
+     SDL_Rect pos = {x, y, sup->w, sup->h};
+   Permite centrar con precision: x = cx - tw/2
+
+3. LAYOUT CENTRADO
+   - Marco exterior doble con SDL_RenderDrawRect
+   - Titulo "POMODORO" en f_titulo (34pt), centrado, con fondo semitransparente
+     y borde verde
+   - Fase "[ TRABAJO ]" / "[ DESCANSO ]" en fuente normal, centrada
+   - Separador horizontal con SDL_RenderDrawLine
+   - Timer MM:SS en f_timer (72pt), centrado, con sombra desplazada +2px
+   - Ciclos completados en fuente normal
+   - "** PAUSADO **" parpadeante (SDL_GetTicks()/500)%2 cuando esta pausado
+   - Ayuda en el pie centrada
+
+4. CONTROLES (sin cambios)
+   ESC → salir    p → pausar/reanudar    0 → reiniciar desde 0
+
+5. SDL_RenderSetClipRect(renderer, NULL) al inicio de cada frame
+   Como medida de seguridad adicional.
+
+SCREENDOC — SOPORTE DE MOUSE Y TECLADO
+----------------------------------------
+Archivo: src/screenDOC.c
+
+Antes: solo teclado (flechas, ENTER, ESC, PageUp/Down, rueda en contenido)
+Ahora: teclado + mouse funcionan simultaneamente
+
+Clicks agregados:
+  - Panel izquierdo (capitulos): click selecciona el capitulo
+  - Panel derecho esquema (episodios): click abre el episodio directamente
+    (episodio_sel = i, foco = 1, vista = 1, scroll = 0)
+  - Scrollbar (vista contenido): click en cualquier punto del track calcula
+    la posicion proporcional:
+      float t = (float)(click_y - 4) / (alto - 8);
+      scroll = (int)(t * max_scroll);
+
+Rueda del mouse ampliada:
+  - En vista contenido: scroll -= wheel.y * 3  (ya existia)
+  - En vista esquema, sobre panel izquierdo: cambia capitulo_sel
+  - En vista esquema, sobre panel derecho: cambia episodio_sel
+
+Deteccion de click: variable clicked/click_x/click_y reseteada cada frame,
+seteada en SDL_MOUSEBUTTONDOWN. La comprobacion se hace dentro del loop de
+render al dibujar cada item, comparando click_y contra el rango [ey-2, ey+h].
 
 ================================================================================
 FIN DE LA DOCUMENTACION

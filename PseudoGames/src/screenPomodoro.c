@@ -7,29 +7,50 @@
 
 #ifdef _WIN32
 // ── Pomodoro nativo SDL2 para Windows (sin bash/forkpty) ─────────────────
+
+/* renderiza texto directamente sin el offset +10/+12 de dibujadoTextoColor */
+static void
+pom_txt(SDL_Renderer *r, TTF_Font *f, const char *s, int x, int y, SDL_Color c)
+{
+    SDL_Surface *sup = TTF_RenderUTF8_Blended(f, s, c);
+    if (!sup) return;
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(r, sup);
+    SDL_Rect pos = {x, y, sup->w, sup->h};
+    SDL_RenderCopy(r, tex, NULL, &pos);
+    SDL_FreeSurface(sup);
+    SDL_DestroyTexture(tex);
+}
+
 int
 screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 {
+    // fuentes grandes para titulo y timer
+    TTF_Font *f_titulo = TTF_OpenFont("assets/fonts/main.ttf", 34);
+    TTF_Font *f_timer  = TTF_OpenFont("assets/fonts/main.ttf", 72);
+    TTF_Font *ft = f_titulo ? f_titulo : fuente;
+    TTF_Font *fr = f_timer  ? f_timer  : fuente;
+
     int TRABAJO_SEG  = 25 * 60;
     int DESCANSO_SEG =  5 * 60;
 
-    int     fase     = 0;             // 0=TRABAJO  1=DESCANSO
-    int     segundos = TRABAJO_SEG;
-    int     pausado  = 0;
-    int     ciclos   = 0;
-    Uint32  ultimo   = SDL_GetTicks();
+    int    fase     = 0;
+    int    segundos = TRABAJO_SEG;
+    int    pausado  = 0;
+    int    ciclos   = 0;
+    Uint32 ultimo   = SDL_GetTicks();
 
-    SDL_Color c_verde   = {  0, 220,  80, 255};
-    SDL_Color c_fondo   = {  0,  30,  10, 255};
-    SDL_Color c_amarillo= {220, 200,   0, 255};
-    SDL_Color c_gris    = {100, 100, 100, 255};
+    SDL_Color c_verde    = {  0, 220,  80, 255};
+    SDL_Color c_fondo    = {  0,  20,   8, 255};
+    SDL_Color c_amarillo = {220, 200,   0, 255};
+    SDL_Color c_gris     = { 90,  90,  90, 255};
+    SDL_Color c_borde    = {  0, 160,  50, 255};
 
     int corriendo = 1;
     SDL_Event evento;
 
     while (corriendo) {
 
-        // tick cada segundo si no esta pausado
+        // tick cada segundo
         Uint32 ahora = SDL_GetTicks();
         if (!pausado && ahora - ultimo >= 1000) {
             ultimo += 1000;
@@ -61,65 +82,90 @@ screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
         }
 
         // --- render ---
+        SDL_RenderSetClipRect(renderer, NULL);
         SDL_SetRenderDrawColor(renderer, c_fondo.r, c_fondo.g, c_fondo.b, 255);
         SDL_RenderClear(renderer);
-
-        // borde exterior
-        SDL_SetRenderDrawColor(renderer, 0, 180, 60, 255);
-        SDL_RenderDrawRect(renderer, &(SDL_Rect){5, 5, ancho-10, alto-10});
-
-        // barra de titulo
-        SDL_SetRenderDrawColor(renderer, 0, 60, 20, 255);
-        SDL_RenderFillRect(renderer, &(SDL_Rect){5, 5, ancho-10, 28});
-        dibujadoTexto(renderer, fuente,
-            "POMODORO   [ESC] volver  [p] pausa  [0] reiniciar", 15, 8);
 
         int cx = ancho / 2;
         int cy = alto  / 2;
 
-        // fase
-        const char *fase_txt = (fase == 0) ? "TRABAJO" : "DESCANSO";
-        SDL_Color   c_fase   = (fase == 0) ? c_verde : c_amarillo;
-        int fw; TTF_SizeUTF8(fuente, fase_txt, &fw, NULL);
-        dibujadoTextoColor(renderer, fuente, fase_txt,
-            cx - fw/2 - 10, cy - 90, c_fase);
+        // marco exterior doble
+        SDL_SetRenderDrawColor(renderer, c_borde.r, c_borde.g, c_borde.b, 255);
+        SDL_RenderDrawRect(renderer, &(SDL_Rect){4,  4,  ancho-8,  alto-8});
+        SDL_SetRenderDrawColor(renderer, 0, 80, 30, 255);
+        SDL_RenderDrawRect(renderer, &(SDL_Rect){8,  8,  ancho-16, alto-16});
 
-        // linea decorativa
-        SDL_SetRenderDrawColor(renderer, 0, 100, 40, 200);
-        SDL_RenderDrawLine(renderer, cx - 120, cy - 60, cx + 120, cy - 60);
+        // titulo "POMODORO" grande centrado arriba
+        {
+            const char *titulo = "POMODORO";
+            int tw, th;
+            TTF_SizeUTF8(ft, titulo, &tw, &th);
+            // fondo del titulo
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 60, 20, 200);
+            SDL_RenderFillRect(renderer, &(SDL_Rect){cx - tw/2 - 20, 20, tw + 40, th + 16});
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            SDL_SetRenderDrawColor(renderer, 0, 180, 60, 255);
+            SDL_RenderDrawRect(renderer, &(SDL_Rect){cx - tw/2 - 20, 20, tw + 40, th + 16});
+            // texto
+            pom_txt(renderer, ft, titulo, cx - tw/2, 28, c_verde);
+        }
 
-        // timer MM:SS
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%02d:%02d", segundos/60, segundos%60);
-        int tw; TTF_SizeUTF8(fuente, buf, &tw, NULL);
-        SDL_Color c_timer = pausado ? c_gris : c_verde;
-        dibujadoTextoColor(renderer, fuente, buf,
-            cx - tw/2 - 10, cy - 50, c_timer);
+        // fase: TRABAJO / DESCANSO
+        {
+            const char *fase_txt = (fase == 0) ? "[ TRABAJO ]" : "[ DESCANSO ]";
+            SDL_Color   c_fase   = (fase == 0) ? c_verde : c_amarillo;
+            int tw, th; TTF_SizeUTF8(fuente, fase_txt, &tw, &th);
+            pom_txt(renderer, fuente, fase_txt, cx - tw/2, cy - 110, c_fase);
+        }
 
-        // ciclos completados
-        char cbuf[40];
-        snprintf(cbuf, sizeof(cbuf), "Ciclos completados: %d", ciclos);
-        int cw; TTF_SizeUTF8(fuente, cbuf, &cw, NULL);
-        dibujadoTextoColor(renderer, fuente, cbuf,
-            cx - cw/2 - 10, cy + 10, c_gris);
+        // separador
+        SDL_SetRenderDrawColor(renderer, 0, 120, 40, 180);
+        SDL_RenderDrawLine(renderer, cx - 160, cy - 88, cx + 160, cy - 88);
 
-        // cartel PAUSADO
-        if (pausado) {
-            const char *p_txt = "[ PAUSADO ]";
-            int pw; TTF_SizeUTF8(fuente, p_txt, &pw, NULL);
-            dibujadoTextoColor(renderer, fuente, p_txt,
-                cx - pw/2 - 10, cy + 40, c_amarillo);
+        // timer MM:SS grande
+        {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%02d:%02d", segundos/60, segundos%60);
+            int tw, th; TTF_SizeUTF8(fr, buf, &tw, &th);
+            SDL_Color c_t = pausado ? c_gris : c_verde;
+            // sombra
+            pom_txt(renderer, fr, buf, cx - tw/2 + 2, cy - 72, (SDL_Color){0,60,20,255});
+            pom_txt(renderer, fr, buf, cx - tw/2,     cy - 74, c_t);
+        }
+
+        // separador inferior
+        SDL_SetRenderDrawColor(renderer, 0, 80, 30, 180);
+        SDL_RenderDrawLine(renderer, cx - 160, cy + 14, cx + 160, cy + 14);
+
+        // ciclos
+        {
+            char cbuf[40];
+            snprintf(cbuf, sizeof(cbuf), "Ciclos completados: %d", ciclos);
+            int tw, th; TTF_SizeUTF8(fuente, cbuf, &tw, &th);
+            pom_txt(renderer, fuente, cbuf, cx - tw/2, cy + 24, c_gris);
+        }
+
+        // cartel PAUSADO (parpadeante)
+        if (pausado && (SDL_GetTicks() / 500) % 2 == 0) {
+            const char *p_txt = "** PAUSADO **";
+            int tw, th; TTF_SizeUTF8(fuente, p_txt, &tw, &th);
+            pom_txt(renderer, fuente, p_txt, cx - tw/2, cy + 54, c_amarillo);
         }
 
         // ayuda pie
-        const char *help = "[p] pausar   [0] reiniciar   [ESC] volver";
-        int hw; TTF_SizeUTF8(fuente, help, &hw, NULL);
-        dibujadoTextoColor(renderer, fuente, help,
-            cx - hw/2 - 10, alto - 50, c_gris);
+        {
+            const char *help = "[p] pausar   [0] reiniciar   [ESC] volver";
+            int tw, th; TTF_SizeUTF8(fuente, help, &tw, &th);
+            pom_txt(renderer, fuente, help, cx - tw/2, alto - 38, c_gris);
+        }
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
+
+    if (f_titulo) TTF_CloseFont(f_titulo);
+    if (f_timer)  TTF_CloseFont(f_timer);
     return 0;
 }
 
