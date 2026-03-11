@@ -60,10 +60,10 @@ jobs:
 
       - name: Publicar Release
         run: |
-          gh release delete latest --yes 2>/dev/null || true
-          git push --delete origin latest 2>/dev/null || true
-          gh release create latest PseudoGames-Windows.zip \
-            --title "PseudoGames - ultima version" \
+          gh release delete v0.1 --yes 2>/dev/null || true
+          git push --delete origin v0.1 2>/dev/null || true
+          gh release create v0.1 PseudoGames-Windows.zip \
+            --title "PseudoGames v0.1" \
             --notes "Build automatico. Extraer el zip y ejecutar PseudoGames.exe"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
