@@ -2049,5 +2049,343 @@ seteada en SDL_MOUSEBUTTONDOWN. La comprobacion se hace dentro del loop de
 render al dibujar cada item, comparando click_y contra el rango [ey-2, ey+h].
 
 ================================================================================
+ 24. Editor de texto nativo en C - editorText.c
+================================================================================
+
+Contexto
+--------
+Se reemplazo el editor bim.sh (bash via forkpty/PTY) por un editor nativo en C
+usando SDL2 directamente. Mas simple, mas rapido, sin dependencias de bash.
+
+Archivos nuevos:
+  src/editorText.c   la implementacion completa
+  src/editorText.h   header con las dos funciones publicas
+
+Dos funciones publicas:
+
+  void drawEditorText(SDL_Renderer*, TTF_Font*, SDL_Rect area)
+    Dibuja el editor en un rect dado, sin loop propio.
+    Sirve para embeber el editor en cualquier pantalla (ej: panel derecho
+    de screenEditorLvl). Es una funcion "pasiva" - solo dibuja, no captura input.
+
+  int screenEditorText(SDL_Renderer*, TTF_Font*, int ancho, int alto)
+    Pantalla completa con su propio loop de eventos. Captura todo el teclado.
+    La usa screenFreeEditor() directamente:
+      return screenEditorText(renderer, fuente, ancho, alto);
+
+Layout de la pantalla
+---------------------
+  ┌─────────────────────────────────────────┐  edit_h = alto - out_h
+  │ gutter │ contenido del editor           │
+  │  50px  │                               │
+  │        │                               │
+  ├─────────────────────────────────────────┤  edit_h
+  │ SALIDA           [F5] ejecutar [F9] gua │  out_h = line_h * 6 + 24
+  │ > output de paed                       │
+  └─────────────────────────────────────────┘
+
+Gutter
+------
+  Ancho fijo GUTTER_W = 50px.
+  Fondo mas oscuro que el editor (#1d2021 vs #282828).
+  Numeros de linea alineados a la derecha: GUTTER_W - num_w - 8.
+  Separador: linea vertical de 1px en color #665c54.
+
+Buffer multi-linea
+------------------
+  static char buf[MAX_LINES][512];   // MAX_LINES = 500
+  int n_lines    = 1;
+  int cursor_row = 0;
+  int cursor_col = 0;
+  int offset_row = 0;   // primera linea visible (scroll)
+
+  Se usa static para evitar stack overflow (500 * 512 = 250KB en el stack).
+
+Operaciones de edicion
+----------------------
+  Insertar caracter (SDL_TEXTINPUT):
+    memmove(buf[row] + col + add, buf[row] + col, len - col + 1);
+    memcpy(buf[row] + col, texto, add);
+    // memmove primero porque los rangos se solapan
+
+  Borrar caracter (BACKSPACE, cursor_col > 0):
+    memmove(buf[row] + col - 1, buf[row] + col, len - col + 1);
+    cursor_col--;
+
+  ENTER - partir linea en cursor_col:
+    1. guardar todo lo que esta despues del cursor en `resto`
+    2. truncar la linea actual en cursor_col
+    3. shift hacia abajo de todas las lineas siguientes
+    4. buf[cursor_row + 1] = resto
+    5. n_lines++; cursor_row++; cursor_col = 0;
+
+  BACKSPACE al inicio de linea (cursor_col == 0, cursor_row > 0):
+    1. guardar prev_len = strlen(buf[cursor_row - 1])
+    2. strcat(buf[cursor_row - 1], buf[cursor_row])
+    3. shift hacia arriba de todas las lineas siguientes
+    4. n_lines--; cursor_row--; cursor_col = prev_len;
+
+Scroll
+------
+  vis_lines = (edit_h - 8) / line_h   // cuantas lineas entran en pantalla
+  Despues de cada movimiento de cursor:
+    if (cursor_row < offset_row) offset_row = cursor_row;
+    if (cursor_row >= offset_row + vis_lines)
+        offset_row = cursor_row - vis_lines + 1;
+  Al dibujar: iterar de 0 a vis_lines, usando row = offset_row + i.
+
+Flechas izquierda/derecha con wrap
+-----------------------------------
+  LEFT:  si col > 0: col--   /  sino: row--, col = fin de linea anterior
+  RIGHT: si col < len: col++ /  sino: row++, col = 0
+  Asi se puede navegar como en cualquier editor real.
+
+Flechas arriba/abajo
+--------------------
+  UP/DOWN mueven cursor_row y ajustan cursor_col si la nueva linea es
+  mas corta (no puede quedar mas alla del fin de la linea).
+
+Syntax highlighting
+-------------------
+  Funcion: render_highlighted(renderer, fuente, text, x, y)
+  Escanea el texto caracter por caracter, clasifica cada token y lo dibuja
+  con su color correspondiente usando TTF_RenderUTF8_Blended.
+
+  Categorias (de data/sintaxis.json, hardcodeadas en editorText.c):
+    KEYWORD   rosa    #fb4934  SI MIENTRAS ACCION FIN_ACCION PROCESO...
+    TIPO      azul    #458588  ENTERO REAL CARACTER VAR ARREGLO...
+    OPERADOR  verde   #b8bb26  Y O NO
+    FUNCION   amaril  #fabd2f  MOD TRUNC ABSO REDOND
+    COMENTAR  gris    #928374  // hasta fin de linea
+    IO        celest  #8ec07c  ESCRIBIR LEER
+    STRING    naranja #fe8019  "texto entre comillas"
+    NUMERO    purpura #d3869b  42 3.14
+    NORMAL    crema   #ebdbb2  variables y resto
+
+  Tokenizador:
+    - Espacios: avanza x sin dibujar (TTF_SizeUTF8(" ", &sw))
+    - //: toma el resto de la linea como un solo token gris
+    - "...": escanea hasta la " de cierre
+    - [0-9]: escanea digitos y punto decimal
+    - [a-zA-Z_]: escanea letras/digitos/guion_bajo, luego get_token_color()
+    - Resto (,:;()=): un caracter en color normal
+
+  El cursor se calcula sobre el string completo con TTF_SizeUTF8, que mide
+  pixeles reales sin importar los colores internos.
+
+Guardar archivo (F9)
+--------------------
+  Al presionar F9 se activa modo guardando = 1.
+  El teclado deja de escribir codigo y escribe el nombre del archivo.
+  Al presionar Enter:
+    guardar_archivo(buf, n_lines, "saves/<nombre>.paed")
+    que escribe cada linea del buffer con fprintf(f, "%s\n", buf[i]).
+
+  El nombre activo se muestra arriba a la derecha (dim, color gutter).
+  Por defecto en modo libre: "sin guardar" (nombre_arch vacio hasta F9).
+
+Ejecutar paed (F5)
+------------------
+  1. guardar_archivo() → saves/<nombre>.paed
+  2. ejecutar_paed("saves/<nombre>.paed", out_buf, OUT_MAX)
+     que hace: popen("cd Frankly && ./paed '../saves/<nombre>.paed' 2>&1", "r")
+     y lee linea por linea con fgets()
+  3. El output se muestra en el panel SALIDA
+
+  popen() abre un proceso como si fuera un archivo:
+    FILE *fp = popen(comando, "r");
+    fgets(buf, sizeof(buf), fp);   // lees su stdout igual que un archivo
+    pclose(fp);
+  2>&1 redirige stderr a stdout para capturar errores tambien.
+
+  paed necesita correr desde Frankly/ porque sourcea ./flags.sh.
+  Por eso el comando es "cd Frankly && ./paed '../<path>'"
+  y el path al archivo es relativo a la raiz del proyecto.
+
+Paleta de colores del editor
+-----------------------------
+  BG_R   40,  40,  40   #282828  fondo del editor
+  GT_R   29,  32,  33   #1d2021  fondo del gutter
+  LN_R  102,  92,  84   #665c54  numeros de linea
+  PH_R   80,  73,  69   #504945  placeholder
+  TX_R  235, 219, 178   #ebdbb2  texto normal / cursor
+
+================================================================================
+SECCION 25 — editorText: dirty flag, dialogo F10, guardar con lista, eliminar
+================================================================================
+
+dirty flag
+----------
+  Variable int dirty = 0 dentro de screenEditorText().
+  Se pone en 1 en cualquier modificacion del buffer:
+    - SDL_TEXTINPUT (caracter tipeable)
+    - BACKSPACE (col > 0 o merge de linea)
+    - ENTER (partir linea)
+  Se pone en 0 cuando se guarda exitosamente con F9.
+
+  Uso:
+    if (dirty) → hay cambios sin guardar desde el ultimo F9.
+
+Dialogo "Salir sin guardar?" (F10)
+------------------------------------
+  Al presionar F10:
+    si dirty == 0 → salir directamente
+    si dirty == 1 → confirm_salir = 1 (mostrar dialogo)
+
+  El dialogo bloquea toda la entrada normal del editor (se chequea primero
+  en el evento SDL_KEYDOWN antes de cualquier otra logica).
+
+    [S / Enter] → corriendo = 0 (salir igual)
+    [N / ESC]   → confirm_salir = 0 (cancelar, volver al editor)
+
+  Render del dialogo:
+    1. Fondo semitransparente sobre toda la pantalla:
+         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+         SDL_RenderFillRect(renderer, &sombra);
+         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    2. Caja centrada en el panel del editor (no en la pantalla completa
+       cuando hay consigna):
+         int bx = editor_x + (editor_w - bw) / 2;
+    3. Borde rojo gruvbox #fb4934, texto crema y gris.
+
+nombre_fijo — modo nivel vs modo libre
+----------------------------------------
+  screenEditorText() recibe const char *nombre_fijo.
+
+  Si nombre_fijo == NULL o "":  modo LIBRE
+    - nombre_arch empieza vacio
+    - La barra superior muestra "sin guardar"
+    - F9 abre la pantalla de guardado con lista de archivos
+    - Una vez guardado, la barra muestra "nombre.paed"
+
+  Si nombre_fijo != "":  modo NIVEL (ej. "nivel_3")
+    - nombre_arch = nombre_fijo al entrar
+    - Se carga saves/nivel_3.paed al inicio si existe:
+        FILE *f = fopen("saves/nivel_3.paed", "r");
+        fgets() linea por linea → llena buf[]
+    - F9 guarda directamente sin ningun overlay:
+        guardar_archivo(buf, n_lines, "saves/nivel_3.paed");
+        dirty = 0;
+    - Siempre sobreescribe el mismo archivo.
+
+cons_titulo / cons_texto — panel consigna
+------------------------------------------
+  screenEditorText() recibe tambien const char *cons_titulo y *cons_texto.
+
+  Si cons_titulo != NULL y no vacio → tiene_consigna = 1:
+    editor_x = ancho / 2    (el editor ocupa la mitad derecha)
+    editor_w = ancho / 2
+
+  Si cons_titulo == NULL:
+    editor_x = 0
+    editor_w = ancho         (editor ocupa toda la pantalla)
+
+  Panel izquierdo (solo cuando tiene_consigna):
+    - Fondo oscuro verde (10, 18, 10)
+    - Titulo con dibujadoTextoColor()
+    - Linea separadora horizontal
+    - Enunciado con dibujadoTextoMultilineaColor()
+    - Linea separadora vertical entre los dos paneles
+
+  Todas las coordenadas del editor se offsetean con editor_x:
+    gutter:    { editor_x, 0, GUTTER_W, edit_h }
+    clip:      { editor_x, 0, editor_w, edit_h }
+    text_x:    editor_x + GUTTER_W + 12
+    out area:  { editor_x, edit_h+2, editor_w, out_h-2 }
+    overlays:  centrados en editor_x + editor_w
+
+screenLvLEditor — uso del editor con consigna
+----------------------------------------------
+  Antes: usaba drawEditorText() (pasivo, sin teclado) en mitad derecha.
+  Ahora: llama screenEditorText() con nombre_fijo y cons_titulo/texto:
+
+    char nombre[32];
+    snprintf(nombre, sizeof(nombre), "nivel_%d", nivel_num);
+    screenEditorText(renderer, fuente, ancho, alto,
+                     nombre, n->titulo, n->enunciado);
+    marcar_completado(nivel_num);
+
+  Esto le da al jugador:
+    - Consigna visible a la izquierda siempre
+    - Editor completo con teclado a la derecha
+    - F9 guarda a saves/nivel_X.paed (sobreescribe, sin prompt)
+    - Al volver a entrar al nivel, carga el codigo guardado
+
+Pantalla de guardado (overlay F9 en modo libre)
+------------------------------------------------
+  Se muestra cuando guardando == 1 (solo en modo libre).
+
+  Estructura visual:
+    - Fondo semitransparente sobre toda la pantalla
+    - Caja centrada en el panel editor (editor_x + 20, ancho editor_w - 40)
+    - Cabecera "Guardar archivo" con linea separadora
+    - Campo de texto "Nombre:" con cursor parpadeante
+    - Subtitulo "Archivos guardados:" con lista de .paed de saves/
+    - Hint inferior: [↑↓] seleccionar   [Enter] guardar   [ESC] cancelar
+
+  Escaneo de archivos con opendir/readdir (dirent.h):
+    static int escanear_saves(char lista[][64], int max) {
+        DIR *d = opendir("saves");
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if termina en ".paed" → copiar nombre sin extension a lista[]
+        }
+        closedir(d);
+        // ordenar alfabeticamente con bubble sort
+    }
+  Se llama una vez al abrir el overlay (saves_n = escanear_saves(...)).
+
+  Navegacion con flechas:
+    UP/DOWN → saves_sel sube/baja
+    Al cambiar sel → prompt_buf = saves_lista[sel]  (prellenar el campo)
+    Scroll de lista: si sel < saves_offset → saves_offset = sel
+                     si sel >= saves_offset + 8 → saves_offset = sel - 7
+
+  Escribir a mano → saves_sel = -1 (se deselecciona la lista)
+
+  Enter:
+    strncpy(nombre_arch, prompt_buf, ...)
+    guardar_archivo(buf, n_lines, "saves/<nombre>.paed")
+    dirty = 0; guardando = 0;
+
+Boton [X] para eliminar archivos
+----------------------------------
+  Cada fila de la lista muestra un boton [X] rojo a la derecha:
+    SDL_Rect btn_x = { bx + bw - 36, fy - 2, 28, line_h + 4 };
+    fondo: (100, 15, 15)  borde: (200, 30, 30)  letra: #fb4934
+
+  Dos formas de eliminar:
+
+  1. Click con el mouse (SDL_MOUSEBUTTONDOWN):
+       Se recalcula el layout igual que en render para saber donde estan
+       los botones. Si mx,my cae dentro del SDL_Rect del boton:
+         remove("saves/<nombre>.paed");
+         saves_n = escanear_saves(...)   // refrescar lista
+
+  2. Teclado (SDLK_DELETE con saves_sel >= 0):
+         remove("saves/<saves_lista[saves_sel]>.paed");
+         saves_n = escanear_saves(...)
+         if (saves_sel >= saves_n) saves_sel = saves_n - 1;
+
+  En ambos casos:
+    - La lista se refresca al instante (escanear_saves de nuevo)
+    - Si el sel quedo fuera de rango, se ajusta al ultimo elemento
+    - Si la lista quedo vacia, prompt_buf queda vacio
+
+Llamadas actualizadas
+----------------------
+  screenEditorFree.c:
+    return screenEditorText(renderer, fuente, ancho, alto, NULL, NULL, NULL);
+
+  screenEditorLvl.c:
+    screenEditorText(renderer, fuente, ancho, alto, nombre, n->titulo, n->enunciado);
+
+  Firma completa en editorText.h:
+    int screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
+                         int ancho, int alto, const char *nombre_fijo,
+                         const char *cons_titulo, const char *cons_texto);
+
+================================================================================
 FIN DE LA DOCUMENTACION
 ================================================================================
