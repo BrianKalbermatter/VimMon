@@ -105,9 +105,54 @@ analizar(){
     validacion_end
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 ejecutar() {
     echo "ejecutando..."
+    en_proceso=0
+    declare -A variables
     # Si el analizar funct dio el OK todo bien, puede ejecutar sino Error de sintaxis... basicamente lo que tendria que hacer es errores de sintaxis nomas... lo demas lo va haciendo el propio usuario. Funciones que necesita la va creando
+    while read linea; do
+        set -- $linea
+        linea_num=$((linea_num + 1))
+        case $linea in
+            PROCESO) en_proceso=1 ;;
+            FIN_ACCION) en_proceso=0 ;;
+        esac
+       
+        if [[ $en_proceso -eq 1 ]];
+        then
+            case $2 in
+
+                :=) 
+                    valor="${@:3}"
+                    valor="${valor%;}"
+                    valor="${valor//\"/}"
+                    variables[$1]=$valor 
+                     ;;
+                "")
+            
+                nombre=${1#ESCRIBIR(}    # saca "ESCRIBIR(" del inicio → queda "mensaje);"
+                nombre=${nombre%)*}      # saca ")" y lo de después    → queda "mensaje"
+                echo ${variables[$nombre]}
+                ;;
+            esac
+        fi
+    done < "$ARCHIVO"
+
+
+
 }
 
 # $1 = el archivo que le pasas como argumento

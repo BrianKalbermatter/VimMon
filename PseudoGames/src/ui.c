@@ -4,6 +4,81 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+
+/* ── Rellena un cuadrilatero convexo con scanlines ── */
+static void
+fill_quad(SDL_Renderer *r, SDL_Point p[4])
+{
+    int miny = p[0].y, maxy = p[0].y;
+    for (int k = 1; k < 4; k++) {
+        if (p[k].y < miny) miny = p[k].y;
+        if (p[k].y > maxy) maxy = p[k].y;
+    }
+    for (int y = miny; y <= maxy; y++) {
+        int xmin = 99999, xmax = -99999;
+        for (int k = 0; k < 4; k++) {
+            int j  = (k + 1) % 4;
+            int y0 = p[k].y, y1 = p[j].y;
+            int x0 = p[k].x, x1 = p[j].x;
+            if ((y0 <= y && y < y1) || (y1 <= y && y < y0)) {
+                int x = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
+                if (x < xmin) xmin = x;
+                if (x > xmax) xmax = x;
+            }
+        }
+        if (xmin <= xmax)
+            SDL_RenderDrawLine(r, xmin, y, xmax, y);
+    }
+}
+
+/*
+ * dibujarArandela — dibuja un engranaje centrado en (cx, cy).
+ *   radio   : radio exterior (punta de los dientes)
+ *   color   : color del metal
+ *   bg      : color del agujero central (igual al fondo donde se dibuja)
+ */
+void
+dibujarArandela(SDL_Renderer *renderer, int cx, int cy, int radio,
+                SDL_Color color, SDL_Color bg)
+{
+    float r_ext  = (float)radio;
+    float r_body = r_ext * 0.64f;   /* cuerpo principal */
+    float r_hub  = r_ext * 0.22f;   /* agujero central  */
+    int   n      = 8;               /* numero de dientes */
+    float tooth  = 0.25f;           /* semi-ancho angular de cada diente */
+
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+    /* 1. Cuerpo circular relleno */
+    int rb = (int)r_body;
+    for (int y = -rb; y <= rb; y++) {
+        int xw = (int)sqrtf((float)(rb * rb - y * y));
+        SDL_RenderDrawLine(renderer, cx - xw, cy + y, cx + xw, cy + y);
+    }
+
+    /* 2. Dientes: trapecios proyectados hacia afuera */
+    for (int i = 0; i < n; i++) {
+        float ang = (float)i * 2.0f * (float)M_PI / (float)n;
+        float a1  = ang - tooth;
+        float a2  = ang + tooth;
+        SDL_Point pts[4] = {
+            { cx + (int)(r_body * cosf(a1)), cy + (int)(r_body * sinf(a1)) },
+            { cx + (int)(r_ext  * cosf(a1)), cy + (int)(r_ext  * sinf(a1)) },
+            { cx + (int)(r_ext  * cosf(a2)), cy + (int)(r_ext  * sinf(a2)) },
+            { cx + (int)(r_body * cosf(a2)), cy + (int)(r_body * sinf(a2)) },
+        };
+        fill_quad(renderer, pts);
+    }
+
+    /* 3. Agujero central en color de fondo */
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, bg.a);
+    int rh = (int)r_hub;
+    for (int y = -rh; y <= rh; y++) {
+        int xw = (int)sqrtf((float)(rh * rh - y * y));
+        SDL_RenderDrawLine(renderer, cx - xw, cy + y, cx + xw, cy + y);
+    }
+}
+
 void
 dibujadoTextoColor(SDL_Renderer *renderer, TTF_Font *fuente, const char *texto, int x, int y, SDL_Color color){
     SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente, texto, color);

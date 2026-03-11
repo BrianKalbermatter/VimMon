@@ -115,165 +115,41 @@ static void bim_process(const char *buf, int n) {
         }
     }
 }
-int
-screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
-    SDL_Event evento;
-    int total = total_niveles();
 
-    // --- layout de tarjetas ---
-    int cols    = 3;
-    int card_w  = 200;
-    int card_h  = 150;
-    int gap_x   = 30;
-    int gap_y   = 25;
-    int grid_w  = cols * card_w + (cols - 1) * gap_x;
-    int start_x = (ancho - grid_w) / 2;
-    int start_y = 80;
 
-    while (1) {
-        int clicked = 0, click_x = 0, click_y = 0;
+/* ------------------------------------------------------------------
+ * run_paed
+ * Ejecuta Frankly/paed sobre un .paed (ruta relativa a la raíz del
+ * proyecto) y llena out[][256] con las líneas de stdout+stderr.
+ * paed necesita correr desde Frankly/ porque usa "source ./flags.sh".
+ * ------------------------------------------------------------------ */
+#ifndef _WIN32
+static int
+run_paed(const char *savefile, char out[][256], int max_lines)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd),
+             "cd Frankly && ./paed '../%s' 2>&1", savefile);
 
-        pom_tick();
-
-        while (SDL_PollEvent(&evento)) {
-            if (evento.type == SDL_QUIT) return 0;
-            if (evento.type == SDL_KEYDOWN) {
-                switch (evento.key.keysym.sym) {
-                    case SDLK_ESCAPE: return 0;
-                    case SDLK_p: pom_send("p", 1); break;
-                    case SDLK_0: pom_send("0", 1); break;
-                    default: break;
-                }
-            }
-            if (evento.type == SDL_MOUSEBUTTONDOWN &&
-                evento.button.button == SDL_BUTTON_LEFT) {
-                clicked  = 1;
-                click_x  = evento.button.x;
-                click_y  = evento.button.y;
-            }
-        }
-
-        SDL_SetRenderDrawColor(renderer, 15, 15, 22, 255);
-        SDL_RenderClear(renderer);
-
-        int mx, my;
-        SDL_GetMouseState(&mx, &my);
-
-        // titulo de la pantalla
-        SDL_Color c_titulo = {180, 180, 200, 255};
-        dibujadoTextoColor(renderer, fuente, "Selecciona un nivel", 0, 18, c_titulo);
-
-        for (int i = 0; i < total; i++) {
-            Nivel *nv = obtener_nivel(i + 1);
-            if (!nv) continue;
-
-            int num         = i + 1;
-            int col         = i % cols;
-            int row         = i / cols;
-            int cx          = start_x + col * (card_w + gap_x);
-            int cy          = start_y + row * (card_h + gap_y);
-            int desbloqueado = nivel_desbloqueado(num);
-            int completado   = esta_completado(num);
-            int hover        = desbloqueado &&
-                               mx >= cx && mx <= cx + card_w &&
-                               my >= cy && my <= cy + card_h;
-
-            SDL_Rect card = {cx, cy, card_w, card_h};
-
-            // --- color de fondo segun estado ---
-            if (!desbloqueado) {
-                SDL_SetRenderDrawColor(renderer, 38, 38, 42, 255);
-            } else if (completado) {
-                SDL_SetRenderDrawColor(renderer,
-                    hover ? 10 : 8,
-                    hover ? 90 : 70,
-                    hover ? 45 : 35, 255);
-            } else {
-                SDL_SetRenderDrawColor(renderer,
-                    hover ? 25 : 18,
-                    hover ? 60 : 40,
-                    hover ? 120 : 90, 255);
-            }
-            SDL_RenderFillRect(renderer, &card);
-
-            // borde superior de color
-            SDL_Rect borde = {cx, cy, card_w, 4};
-            if (!desbloqueado)
-                SDL_SetRenderDrawColor(renderer, 70, 70, 75, 255);
-            else if (completado)
-                SDL_SetRenderDrawColor(renderer, 60, 220, 100, 255);
-            else
-                SDL_SetRenderDrawColor(renderer, 60, 130, 255, 255);
-            SDL_RenderFillRect(renderer, &borde);
-
-            // --- textos dentro de la tarjeta ---
-            SDL_Color c_num, c_titulo_card, c_pts;
-
-            if (!desbloqueado) {
-                c_num        = (SDL_Color){70,  70,  75,  255};
-                c_titulo_card= (SDL_Color){70,  70,  75,  255};
-                c_pts        = (SDL_Color){60,  60,  65,  255};
-            } else if (completado) {
-                c_num        = (SDL_Color){80,  220, 110, 255};
-                c_titulo_card= (SDL_Color){200, 255, 210, 255};
-                c_pts        = (SDL_Color){60,  180, 90,  255};
-            } else {
-                c_num        = (SDL_Color){100, 160, 255, 255};
-                c_titulo_card= (SDL_Color){220, 230, 255, 255};
-                c_pts        = (SDL_Color){80,  120, 200, 255};
-            }
-
-            // "Nivel N"
-            char str_num[32];
-            snprintf(str_num, sizeof(str_num), "Nivel %d", num);
-            dibujadoTextoColor(renderer, fuente, str_num, cx, cy + 8, c_num);
-
-            // nombre del nivel
-            dibujadoTextoColor(renderer, fuente, nv->titulo, cx, cy + 38, c_titulo_card);
-
-            // estado: OK o BLOQUEADO
-            if (completado)
-                dibujadoTextoColor(renderer, fuente, "[OK]", cx, cy + 68, c_num);
-            else if (!desbloqueado)
-                dibujadoTextoColor(renderer, fuente, "[BLOQUEADO]", cx, cy + 68, c_num);
-
-            // puntos
-            dibujadoTextoColor(renderer, fuente, "100 pts", cx, cy + card_h - 38, c_pts);
-
-            // click
-            if (desbloqueado && clicked &&
-                click_x >= cx && click_x <= cx + card_w &&
-                click_y >= cy && click_y <= cy + card_h)
-                return num;
-        }
-
-        // --- boton resetear progreso ---
-        int rows_used = (total + cols - 1) / cols;
-        int rbtn_w = 220, rbtn_h = 36;
-        int rbtn_x = (ancho - rbtn_w) / 2;
-        int rbtn_y = start_y + rows_used * (card_h + gap_y) + 10;
-        int rhover = mx >= rbtn_x && mx <= rbtn_x + rbtn_w &&
-                     my >= rbtn_y && my <= rbtn_y + rbtn_h;
-
-        SDL_SetRenderDrawColor(renderer,
-            rhover ? 160 : 100, rhover ? 20 : 12, rhover ? 20 : 12, 255);
-        SDL_Rect rbtn = {rbtn_x, rbtn_y, rbtn_w, rbtn_h};
-        SDL_RenderFillRect(renderer, &rbtn);
-        SDL_Color c_reset = {255, 160, 160, 255};
-        dibujadoTextoColor(renderer, fuente, "Resetear progreso", rbtn_x, rbtn_y, c_reset);
-
-        if (clicked &&
-            click_x >= rbtn_x && click_x <= rbtn_x + rbtn_w &&
-            click_y >= rbtn_y && click_y <= rbtn_y + rbtn_h)
-            resetear_progreso();
-
-        SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        strncpy(out[0], "error: no se pudo ejecutar paed", 255);
+        return 1;
     }
 
-    return 0;
+    int  n = 0;
+    char line[512];
+    while (n < max_lines && fgets(line, sizeof(line), fp)) {
+        int len = (int)strlen(line);
+        if (len > 0 && line[len - 1] == '\n') line[len - 1] = '\0';
+        strncpy(out[n], line, 255);
+        out[n][255] = '\0';
+        n++;
+    }
+    pclose(fp);
+    return n > 0 ? n : 0;
 }
-
+#endif /* _WIN32 */
 
 #ifdef _WIN32
 int
@@ -440,10 +316,13 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
 
     // --- Lanzar bim.sh en el panel derecho via forkpty ---
     // Calcular dimensiones del panel derecho en caracteres
-    int line_h  = TTF_FontHeight(fuente) + 1;
-    int char_w  = 9; // aproximacion para fuente monospace a 16pt
+    int line_h      = TTF_FontHeight(fuente) + 1;
+    int char_w      = 9;
+    int lvl_title_h = 28;          /* barra de título del editor derecho */
+    int lvl_con_h   = alto / 5;    /* panel Output abajo (~20%)          */
+    int lvl_edit_h  = alto - lvl_con_h; /* zona bim + título             */
     int bim_w   = (ancho / 2) / char_w;
-    int bim_h   = alto / line_h;
+    int bim_h   = (lvl_edit_h - lvl_title_h) / line_h;
     if (bim_w > BIM_COLS) bim_w = BIM_COLS;
     if (bim_h > BIM_ROWS) bim_h = BIM_ROWS;
 
@@ -477,6 +356,13 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
     int panel_x = ancho / 2;
     int panel_w = ancho / 2;
 
+    /* buffer dinámico del panel Output */
+#define LVL_MAX_OUT 14
+    char lvl_out[LVL_MAX_OUT][256];
+    int  n_lvl_out = 2;
+    strncpy(lvl_out[0], "listo — guardá con :w y ejecutá con F5", 255);
+    strncpy(lvl_out[1], "F5 ejecutar   F6 marcar completado   F10 salir", 255);
+
     while (corriendo) {
 
         pom_tick();  // mantener vivo el proceso de pomodoro en fondo
@@ -493,9 +379,17 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
                 SDL_Keycode k   = evento.key.keysym.sym;
                 SDL_Keymod  mod = SDL_GetModState();
 
-                // F5 = marcar nivel como completado y salir
-                if (k == SDLK_F5) { marcar_completado(nivel_num); corriendo = 0; break; }
-                // F10 = salir sin completar (ESC lo maneja bim para cambiar de modo)
+                // F5 = ejecutar paed sobre el archivo del nivel
+                if (k == SDLK_F5) {
+                    char savepath[128];
+                    snprintf(savepath, sizeof(savepath),
+                             "saves/nivel_%d.paed", nivel_num);
+                    n_lvl_out = run_paed(savepath, lvl_out, LVL_MAX_OUT);
+                    break;
+                }
+                // F6 = marcar nivel como completado y salir
+                if (k == SDLK_F6) { marcar_completado(nivel_num); corriendo = 0; break; }
+                // F10 = salir sin completar
                 if (k == SDLK_F10) { corriendo = 0; break; }
                 // Ctrl+P = pausar pomodoro global | Ctrl+0 = detener
                 if ((mod & KMOD_CTRL) && k == SDLK_p) { pom_send("p", 1); break; }
@@ -539,16 +433,16 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
         SDL_SetRenderDrawColor(renderer, 10, 18, 10, 255);
         SDL_RenderFillRect(renderer, &panel_izq);
 
-        // Panel derecho - bim
+        /* ── Panel derecho: fondo base ── */
         SDL_Rect panel_der = {panel_x, 0, panel_w, alto};
-        SDL_SetRenderDrawColor(renderer, 12, 12, 12, 255);
+        SDL_SetRenderDrawColor(renderer, 10, 14, 10, 255);
         SDL_RenderFillRect(renderer, &panel_der);
 
-        // Linea divisoria
+        /* línea divisoria izq / der */
         SDL_SetRenderDrawColor(renderer, 0, 100, 40, 255);
         SDL_RenderDrawLine(renderer, panel_x, 0, panel_x, alto);
 
-        // Consigna (panel izquierdo)
+        /* ── Consigna (panel izquierdo) ── */
         SDL_Color verde_titulo = {0, 230, 80, 255};
         dibujadoTextoColor(renderer, fuente, n->titulo, 10, 8, verde_titulo);
         SDL_SetRenderDrawColor(renderer, 0, 130, 50, 255);
@@ -556,19 +450,19 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
         SDL_Color verde_texto = {0, 190, 70, 255};
         dibujadoTextoMultilineaColor(renderer, fuente, n->enunciado,
                                      10, 44, panel_x - 30, verde_texto);
-
-        // Ayuda abajo a la izquierda
         SDL_Color c_help = {50, 90, 60, 255};
-        dibujadoTextoColor(renderer, fuente, "[F5] completar nivel   [F10] volver sin completar", 10, alto - 30, c_help);
+        dibujadoTextoColor(renderer, fuente,
+            "[F5] ejecutar   [F6] completar   [F10] volver", 10, alto - 30, c_help);
 
-        // Render del VT de bim.sh en panel derecho con clip
-        SDL_RenderSetClipRect(renderer, &panel_der);
+        /* ── Grilla bim (clip entre título y consola) ── */
+        SDL_Rect bim_clip_r = {panel_x, lvl_title_h,
+                               panel_w, lvl_edit_h - lvl_title_h};
+        SDL_RenderSetClipRect(renderer, &bim_clip_r);
 
         for (int row = 0; row < bim_h && row < BIM_ROWS; row++) {
-            int y = row * line_h;
-            if (y > alto) break;
+            int y = lvl_title_h + row * line_h;
+            if (y >= lvl_edit_h) break;
 
-            // trim espacios al final
             char linea[BIM_COLS + 1];
             memcpy(linea, bim_grid[row], BIM_COLS);
             linea[BIM_COLS] = '\0';
@@ -586,18 +480,83 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
             SDL_DestroyTexture(tex);
         }
 
-        // --- Cursor parpadeante verde en panel bim ---
+        /* cursor parpadeante */
         if ((SDL_GetTicks() / 500) % 2 == 0) {
             int cur_x = panel_x + 4 + bim_col * char_w;
-            int cur_y = bim_row * line_h;
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 0, 255, 80, 180);
-            SDL_Rect cur_rect = {cur_x, cur_y, char_w, line_h};
-            SDL_RenderFillRect(renderer, &cur_rect);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            int cur_y = lvl_title_h + bim_row * line_h;
+            if (cur_y >= lvl_title_h && cur_y < lvl_edit_h) {
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer, 0, 255, 80, 180);
+                SDL_Rect cur_rect = {cur_x, cur_y, char_w, line_h};
+                SDL_RenderFillRect(renderer, &cur_rect);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            }
+        }
+        SDL_RenderSetClipRect(renderer, NULL);
+
+        /* ── Barra de título del editor (encima del bim) ── */
+        SDL_Rect lvl_title_bar = {panel_x, 0, panel_w, lvl_title_h};
+        SDL_SetRenderDrawColor(renderer, 0, 55, 18, 255);
+        SDL_RenderFillRect(renderer, &lvl_title_bar);
+        SDL_SetRenderDrawColor(renderer, 0, 150, 50, 255);
+        SDL_RenderDrawLine(renderer, panel_x, lvl_title_h - 1,
+                           panel_x + panel_w, lvl_title_h - 1);
+        {
+            SDL_Color c_ted = {0, 235, 85, 255};
+            dibujadoTextoColor(renderer, fuente, "bimEditor", panel_x + 12, 6, c_ted);
+            char savename[64];
+            snprintf(savename, sizeof(savename), "nivel_%d.paed", nivel_num);
+            int hw; TTF_SizeUTF8(fuente, savename, &hw, NULL);
+            SDL_Color c_hint = {0, 100, 38, 255};
+            dibujadoTextoColor(renderer, fuente, savename,
+                               panel_x + panel_w - hw - 12, 6, c_hint);
         }
 
-        SDL_RenderSetClipRect(renderer, NULL);
+        /* ── Panel Output (bottom del panel derecho) ── */
+        {
+            const int CON_TH = 24;
+            SDL_Rect con_area = {panel_x, lvl_edit_h, panel_w, lvl_con_h};
+            SDL_SetRenderDrawColor(renderer, 6, 12, 6, 255);
+            SDL_RenderFillRect(renderer, &con_area);
+
+            /* separador */
+            SDL_SetRenderDrawColor(renderer, 0, 170, 55, 255);
+            SDL_RenderDrawLine(renderer, panel_x, lvl_edit_h,
+                               panel_x + panel_w, lvl_edit_h);
+            SDL_SetRenderDrawColor(renderer, 0, 70, 22, 255);
+            SDL_RenderDrawLine(renderer, panel_x, lvl_edit_h + 1,
+                               panel_x + panel_w, lvl_edit_h + 1);
+
+            /* barra de título Output */
+            SDL_Rect con_title = {panel_x, lvl_edit_h + 2, panel_w, CON_TH};
+            SDL_SetRenderDrawColor(renderer, 0, 38, 13, 255);
+            SDL_RenderFillRect(renderer, &con_title);
+            SDL_Color c_ct = {0, 155, 50, 255};
+            dibujadoTextoColor(renderer, fuente, "[ Output ]",
+                               panel_x + 10, lvl_edit_h + 4, c_ct);
+            SDL_SetRenderDrawColor(renderer, 0, 55, 18, 160);
+            SDL_RenderDrawLine(renderer, panel_x, lvl_edit_h + CON_TH + 2,
+                               panel_x + panel_w, lvl_edit_h + CON_TH + 2);
+
+            /* líneas de output con clip */
+            SDL_RenderSetClipRect(renderer, &con_area);
+            int con_y = lvl_edit_h + CON_TH + 6;
+            for (int mi = 0; mi < n_lvl_out; mi++) {
+                if (con_y + line_h > alto) break;
+                char mstr[300];
+                snprintf(mstr, sizeof(mstr), "> %s", lvl_out[mi]);
+                /* las 2 primeras líneas son info (más tenues),
+                   el resto es output real de paed (más brillante) */
+                SDL_Color c_msg = (mi < 2)
+                    ? (SDL_Color){0, 110, 38, 255}
+                    : (SDL_Color){0, 210, 75, 255};
+                dibujadoTextoColor(renderer, fuente, mstr,
+                                   panel_x + 10, con_y, c_msg);
+                con_y += line_h + 2;
+            }
+            /* sin cursor en el Output — el cursor vive solo en bimEditor */
+            SDL_RenderSetClipRect(renderer, NULL);
+        }
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
 
@@ -619,11 +578,4 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
 
 
 
-
-
-
-int
-screenFreeEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, int nivel_num){
-    return 0;
-}
 

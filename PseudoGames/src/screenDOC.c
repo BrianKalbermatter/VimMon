@@ -146,7 +146,8 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
     int contenido_x     = panel_izq_w + 1;
     int contenido_w     = ancho - panel_izq_w - scrollbar_w - 4;
     int alto_linea      = TTF_FontHeight(fuente) + 4;
-    int lineas_visibles = (alto - 20) / alto_linea;
+    int bar_h           = TTF_FontHeight(fuente) + 4;
+    int lineas_visibles = (alto - bar_h) / alto_linea;
     int foco            = 0;  // 0 = panel capítulos, 1 = panel derecho
 
     while (1) {
@@ -366,13 +367,7 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 ey += ep_h + 6;
             }
 
-            // Ayuda de controles
-            SDL_RenderSetClipRect(renderer, NULL);
-            SDL_Color c_help = {60, 60, 90, 255};
-            dibujadoTextoColor(renderer, fuente,
-                               foco==0 ? "[ENTER / →] entrar   [ESC] salir"
-                                       : "[↑↓] navegar   [ENTER] abrir   [← / ESC] volver",
-                               contenido_x + 6, alto - 36, c_help);
+            /* hints → se dibujan en la barra de abajo, ver al final del frame */
 
         } else {
             // ---- CONTENIDO del episodio ----
@@ -425,13 +420,35 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 }
             }
 
-            SDL_Color c_help = {60, 60, 90, 255};
-            dibujadoTextoColor(renderer, fuente,
-                               "[PageUp/Down / rueda] scroll   [ESC] volver al esquema",
-                               contenido_x + 6, alto - 36, c_help);
+            /* hint → barra de abajo */
         }
 
         SDL_RenderSetClipRect(renderer, NULL);
+
+        /* ── Barra de atajos fija abajo ── */
+        {
+            int by = alto - bar_h;
+            SDL_Rect bar = {0, by, ancho, bar_h};
+            SDL_SetRenderDrawColor(renderer, 15, 15, 28, 255);
+            SDL_RenderFillRect(renderer, &bar);
+            SDL_SetRenderDrawColor(renderer, 50, 50, 80, 255);
+            SDL_RenderDrawLine(renderer, 0, by, ancho, by);
+
+            const char *hint = (vista == 0)
+                ? (foco == 0 ? "[ENTER / →] entrar   [ESC] salir"
+                             : "[↑↓] navegar   [ENTER] abrir   [← / ESC] volver")
+                : "[PageUp/Down / rueda] scroll   [ESC] volver al esquema";
+
+            SDL_Color c_hint = {100, 100, 160, 255};
+            SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, hint, c_hint);
+            if (s) {
+                SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+                SDL_Rect r = {10, by + 2, s->w, s->h};
+                SDL_RenderCopy(renderer, t, NULL, &r);
+                SDL_FreeSurface(s); SDL_DestroyTexture(t);
+            }
+        }
+
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }

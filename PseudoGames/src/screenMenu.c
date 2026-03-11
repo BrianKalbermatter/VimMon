@@ -196,6 +196,27 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 return (i == 6) ? 0 : i + 1;
         }
 
+        // --- Boton engranaje: esquina inferior derecha ---
+        int gear_size = 48;
+        int gear_x    = ancho - gear_size - 18;
+        int gear_y    = alto  - gear_size - 18;
+        int gear_cx   = gear_x + gear_size / 2;
+        int gear_cy   = gear_y + gear_size / 2;
+        int gear_hover = (mx >= gear_x && mx <= gear_x + gear_size &&
+                          my >= gear_y && my <= gear_y + gear_size);
+
+        SDL_Color c_gear = gear_hover ? (SDL_Color){220, 220, 255, 255}
+                                      : (SDL_Color){120, 120, 160, 255};
+        // color del agujero: fondo oscuro del menu
+        SDL_Color c_hole = {10, 10, 14, 255};
+        dibujarArandela(renderer, gear_cx, gear_cy, gear_size / 2 - 2,
+                        c_gear, c_hole);
+
+        if (clicked &&
+            click_x >= gear_x && click_x <= gear_x + gear_size &&
+            click_y >= gear_y && click_y <= gear_y + gear_size)
+            return 7;  // opcion config
+
         SDL_RenderPresent(renderer);
         SDL_Delay(16); // ~60 fps
     }

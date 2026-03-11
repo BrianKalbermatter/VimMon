@@ -54,9 +54,10 @@ main(int argc, char *argv[]) {
                    }
             case 2: screenDoc(renderer, fuente, ancho, alto); break;
             case 3: screenPomodoro(renderer, fuente, ancho, alto); break;
-            case 4: break;
+            case 4: screenFreeEditor(renderer, fuente, ancho, alto, 0); break;
             case 5: screenLvLs(renderer, fuente, ancho, alto); break;
             case 6: screenSoluciones(renderer, fuente, ancho, alto); break;
+            case 7: screenConfig(renderer, fuente, ancho, alto, ventana); break;
         }
     }while (opcion != 0);
     
