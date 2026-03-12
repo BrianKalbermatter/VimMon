@@ -229,6 +229,91 @@ render_highlighted(SDL_Renderer *renderer, TTF_Font *fuente,
     }
 }
 
+/* ── Clipboard multi-linea ────────────────────────────────────────── */
+#define MAX_LINES 500
+#define CB_MAX 50
+static char cb_buf[CB_MAX][512];
+static int  cb_n = 0;
+
+/* Copia lineas [r0..r1] del buffer en cb_buf y en el portapapeles del sistema */
+static void
+editor_copiar(char buf[][512], int r0, int r1)
+{
+    if (r0 > r1) { int t = r0; r0 = r1; r1 = t; }
+    cb_n = 0;
+    char texto[CB_MAX * 513];
+    texto[0] = '\0';
+    for (int i = r0; i <= r1 && cb_n < CB_MAX; i++, cb_n++) {
+        strncpy(cb_buf[cb_n], buf[i], 511);
+        cb_buf[cb_n][511] = '\0';
+        strncat(texto, cb_buf[cb_n], sizeof(texto) - strlen(texto) - 2);
+        if (i < r1) strncat(texto, "\n", sizeof(texto) - strlen(texto) - 1);
+    }
+    SDL_SetClipboardText(texto);
+}
+
+/* Corta lineas [r0..r1]: las copia y las elimina del buffer */
+static void
+editor_cortar(char buf[][512], int *n_lines, int r0, int r1,
+              int *cursor_row, int *cursor_col)
+{
+    if (r0 > r1) { int t = r0; r0 = r1; r1 = t; }
+    editor_copiar(buf, r0, r1);
+    int count = r1 - r0 + 1;
+    for (int i = r0; i + count < *n_lines; i++)
+        memcpy(buf[i], buf[i + count], 512);
+    for (int i = *n_lines - count; i < *n_lines; i++)
+        buf[i][0] = '\0';
+    *n_lines -= count;
+    if (*n_lines < 1) { *n_lines = 1; buf[0][0] = '\0'; }
+    if (*cursor_row >= *n_lines) *cursor_row = *n_lines - 1;
+    *cursor_col = 0;
+}
+
+/* Pega cb_buf (o el portapapeles del sistema) despues de cursor_row */
+static void
+editor_pegar(char buf[][512], int *n_lines, int *cursor_row, int *cursor_col)
+{
+    /* Intentar leer desde portapapeles del sistema primero */
+    char *sys = SDL_GetClipboardText();
+    if (sys && sys[0] != '\0') {
+        static char tmp[CB_MAX][512];
+        int tn = 0;
+        char *p = sys;
+        while (*p && tn < CB_MAX) {
+            char *nl = strchr(p, '\n');
+            int len = nl ? (int)(nl - p) : (int)strlen(p);
+            if (len > 511) len = 511;
+            strncpy(tmp[tn], p, len);
+            tmp[tn][len] = '\0';
+            tn++;
+            if (!nl) break;
+            p = nl + 1;
+        }
+        SDL_free(sys);
+        if (tn > 0) {
+            cb_n = tn;
+            for (int i = 0; i < tn; i++) strncpy(cb_buf[i], tmp[i], 511);
+        }
+    } else {
+        if (sys) SDL_free(sys);
+    }
+
+    if (cb_n == 0) return;
+    if (*n_lines + cb_n > MAX_LINES) return;
+
+    int ins = *cursor_row + 1;
+    /* desplazar lineas existentes hacia abajo */
+    for (int i = *n_lines - 1; i >= ins; i--)
+        memcpy(buf[i + cb_n], buf[i], 512);
+    /* insertar las lineas del clipboard */
+    for (int i = 0; i < cb_n; i++)
+        strncpy(buf[ins + i], cb_buf[i], 511);
+    *n_lines  += cb_n;
+    *cursor_row = ins + cb_n - 1;
+    *cursor_col = (int)strlen(buf[*cursor_row]);
+}
+
 /* ── helpers de archivo ───────────────────────────────────────────── */
 #include <dirent.h>
 
@@ -297,7 +382,6 @@ ejecutar_paed(const char *path, char out[][256], int max)
 /* ── screenEditorText ─────────────────────────────────────────────────
  * Editor multi-linea completo. ESC/F10 para salir.
  * ─────────────────────────────────────────────────────────────────── */
-#define MAX_LINES 500
 
 int
 screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
@@ -306,6 +390,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
 {
     /* ── Buffer de lineas ─────────────────────────────────────────── */
     static char buf[MAX_LINES][512];
+    static char libre_ultimo[64] = "";  /* ultimo archivo guardado en modo libre */
     int  n_lines    = 1;
     int  cursor_row = 0;
     int  cursor_col = 0;
@@ -322,6 +407,24 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     int text_x    = editor_x + GUTTER_W + 12;
     int vis_lines = (edit_h - 8) / line_h;
 
+    /* Boton |> RUN (panel de salida, extremo derecho) */
+    int btn_run_w = 72;
+    SDL_Rect btn_run = { editor_x + editor_w - btn_run_w - 6, edit_h + 3, btn_run_w, line_h };
+
+    /* Boton menu ≡ (a la izquierda del RUN) */
+    int btn_menu_w = 30;
+    SDL_Rect btn_menu = { btn_run.x - btn_menu_w - 6, edit_h + 3, btn_menu_w, line_h };
+
+    /* Dropdown del mini menu */
+    int   mini_menu   = 0;
+    const char *menu_items[] = { "Volver al menu principal", "Guardar", "Cargar" };
+    int   mitem_h   = line_h + 6;
+    int   mdrop_w   = 260;
+    int   mdrop_h   = mitem_h * 3 + 6;
+    SDL_Rect mdrop  = { btn_menu.x + btn_menu_w - mdrop_w,
+                        edit_h - mdrop_h - 4,
+                        mdrop_w, mdrop_h };
+
     /* ── Guardar ──────────────────────────────────────────────────── */
     int tiene_nombre_fijo = (nombre_fijo && nombre_fijo[0] != '\0');
     char nombre_arch[64];
@@ -332,6 +435,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     char prompt_buf[64]  = "";
     int  prompt_len      = 0;
     int  guardando       = 0;
+    int  cargando        = 0;
     int  dirty           = 0;   /* 1 = hay cambios sin guardar */
     int  confirm_salir   = 0;   /* 1 = mostrando dialogo "salir sin guardar?" */
 
@@ -372,7 +476,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     SDL_Color c_ph     = { PH_R, 255 };
     SDL_Color c_out    = {   0, 210,  75, 255 };
     SDL_Color c_out_hd = {   0, 155,  50, 255 };
-    SDL_Color c_hint   = {  50,  90,  60, 255 };
+
 
     SDL_StartTextInput();
     SDL_Event evento;
@@ -445,6 +549,76 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                         guardar_archivo(buf, n_lines, path);
                         dirty     = 0;
                         guardando = 0; prompt_len = 0; prompt_buf[0] = '\0';
+                        /* recordar el nombre para auto-cargar la proxima vez */
+                        if (!tiene_nombre_fijo)
+                            strncpy(libre_ultimo, nombre_arch, sizeof(libre_ultimo)-1);
+                    }
+                    break;
+                }
+
+                /* ── Modo cargar archivo ───────────────────────────── */
+                if (cargando) {
+                    if (k == SDLK_ESCAPE) {
+                        cargando = 0; prompt_len = 0; prompt_buf[0] = '\0';
+                    }
+                    if (k == SDLK_BACKSPACE && prompt_len > 0) {
+                        prompt_buf[--prompt_len] = '\0';
+                        saves_sel = -1;
+                    }
+                    if (k == SDLK_UP) {
+                        if (saves_sel > 0) saves_sel--;
+                        else saves_sel = saves_n - 1;
+                        if (saves_sel >= 0) {
+                            strncpy(prompt_buf, saves_lista[saves_sel], sizeof(prompt_buf)-1);
+                            prompt_len = (int)strlen(prompt_buf);
+                        }
+                    }
+                    if (k == SDLK_DOWN) {
+                        if (saves_sel < saves_n - 1) saves_sel++;
+                        else saves_sel = 0;
+                        if (saves_sel >= 0) {
+                            strncpy(prompt_buf, saves_lista[saves_sel], sizeof(prompt_buf)-1);
+                            prompt_len = (int)strlen(prompt_buf);
+                        }
+                    }
+                    if (saves_sel >= 0) {
+                        if (saves_sel < saves_offset) saves_offset = saves_sel;
+                        if (saves_sel >= saves_offset + 8) saves_offset = saves_sel - 7;
+                    }
+                    if (k == SDLK_DELETE && saves_sel >= 0) {
+                        char path[128];
+                        snprintf(path, sizeof(path), "saves/%s.paed", saves_lista[saves_sel]);
+                        remove(path);
+                        saves_n = escanear_saves(saves_lista, MAX_SAVES);
+                        if (saves_sel >= saves_n) saves_sel = saves_n - 1;
+                        if (saves_sel >= 0) {
+                            strncpy(prompt_buf, saves_lista[saves_sel], sizeof(prompt_buf)-1);
+                            prompt_len = (int)strlen(prompt_buf);
+                        } else { prompt_buf[0] = '\0'; prompt_len = 0; }
+                    }
+                    if (k == SDLK_RETURN && prompt_len > 0) {
+                        char path[128];
+                        snprintf(path, sizeof(path), "saves/%s.paed", prompt_buf);
+                        FILE *fl = fopen(path, "r");
+                        if (fl) {
+                            memset(buf, 0, sizeof(buf));
+                            n_lines = 0;
+                            char linea[512];
+                            while (n_lines < MAX_LINES && fgets(linea, sizeof(linea), fl)) {
+                                int l = (int)strlen(linea);
+                                if (l > 0 && linea[l-1] == '\n') linea[l-1] = '\0';
+                                strncpy(buf[n_lines], linea, 511);
+                                buf[n_lines][511] = '\0';
+                                n_lines++;
+                            }
+                            fclose(fl);
+                            if (n_lines == 0) n_lines = 1;
+                            strncpy(nombre_arch, prompt_buf, sizeof(nombre_arch)-1);
+                            strncpy(libre_ultimo, prompt_buf, sizeof(libre_ultimo)-1);
+                            cursor_row = 0; cursor_col = 0; offset_row = 0;
+                            dirty = 0;
+                        }
+                        cargando = 0; prompt_len = 0; prompt_buf[0] = '\0';
                     }
                     break;
                 }
@@ -525,27 +699,42 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 if (k == SDLK_HOME) cursor_col = 0;
                 if (k == SDLK_END)  cursor_col = (int)strlen(buf[cursor_row]);
 
+                /* Ctrl+C: copiar linea actual */
+                if (k == SDLK_c && (evento.key.keysym.mod & KMOD_CTRL))
+                    editor_copiar(buf, cursor_row, cursor_row);
+
+                /* Ctrl+X: cortar linea actual */
+                if (k == SDLK_x && (evento.key.keysym.mod & KMOD_CTRL)) {
+                    editor_cortar(buf, &n_lines, cursor_row, cursor_row,
+                                  &cursor_row, &cursor_col);
+                    dirty = 1;
+                }
+
+                /* Ctrl+V: pegar (una o multiples lineas) */
+                if (k == SDLK_v && (evento.key.keysym.mod & KMOD_CTRL)) {
+                    editor_pegar(buf, &n_lines, &cursor_row, &cursor_col);
+                    dirty = 1;
+                }
+
                 /* Scroll: mantener cursor visible */
                 if (cursor_row < offset_row) offset_row = cursor_row;
                 if (cursor_row >= offset_row + vis_lines)
                     offset_row = cursor_row - vis_lines + 1;
 
-                /* F9: guardar */
+                /* F9: guardar
+                 * Si ya tiene nombre (fijo o dado antes): sobreescribe directo.
+                 * Si no tiene nombre todavia: abre el overlay para elegir uno. */
                 if (k == SDLK_F9) {
-                    if (tiene_nombre_fijo) {
-                        /* nombre fijo: sobreescribir directo */
+                    if (nombre_arch[0] != '\0') {
                         char path[128];
                         snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                         guardar_archivo(buf, n_lines, path);
                         dirty = 0;
                     } else {
-                        /* nombre libre: abrir pantalla de guardado */
+                        /* sin nombre aun: abrir overlay */
                         guardando  = 1;
-                        if (nombre_arch[0] != '\0')
-                            strncpy(prompt_buf, nombre_arch, sizeof(prompt_buf)-1);
-                        else
-                            prompt_buf[0] = '\0';
-                        prompt_len = (int)strlen(prompt_buf);
+                        prompt_buf[0] = '\0';
+                        prompt_len    = 0;
                         saves_n   = escanear_saves(saves_lista, MAX_SAVES);
                         saves_sel = -1; saves_offset = 0;
                     }
@@ -561,7 +750,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             }
 
             /* Click en [X] de la lista de guardado */
-            if (evento.type == SDL_MOUSEBUTTONDOWN && guardando &&
+            if (evento.type == SDL_MOUSEBUTTONDOWN && (guardando || cargando) &&
                 evento.button.button == SDL_BUTTON_LEFT) {
                 int mx = evento.button.x, my = evento.button.y;
                 /* recalcular layout del overlay (igual que en render) */
@@ -590,8 +779,60 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 }
             }
 
+            /* Click en boton |> ejecutar */
+            if (evento.type == SDL_MOUSEBUTTONDOWN && !guardando && !cargando &&
+                evento.button.button == SDL_BUTTON_LEFT) {
+                int mx = evento.button.x, my = evento.button.y;
+                if (mx >= btn_run.x && mx < btn_run.x + btn_run.w &&
+                    my >= btn_run.y && my < btn_run.y + btn_run.h) {
+                    char path[128];
+                    snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
+                    guardar_archivo(buf, n_lines, path);
+                    n_out = ejecutar_paed(path, out_buf, OUT_MAX);
+                }
+                /* Boton menu ≡: toggle dropdown */
+                else if (mx >= btn_menu.x && mx < btn_menu.x + btn_menu.w &&
+                         my >= btn_menu.y && my < btn_menu.y + btn_menu.h) {
+                    mini_menu = !mini_menu;
+                }
+                /* Click dentro del dropdown: ejecutar item */
+                else if (mini_menu &&
+                         mx >= mdrop.x && mx < mdrop.x + mdrop.w &&
+                         my >= mdrop.y && my < mdrop.y + mdrop.h) {
+                    int item = (my - mdrop.y - 3) / mitem_h;
+                    if (item == 0) {
+                        /* Volver al menu principal: igual que F10 */
+                        if (dirty) confirm_salir = 1;
+                        else       corriendo = 0;
+                    } else if (item == 1) {
+                        /* Guardar: abre overlay con nombre actual pre-cargado.
+                         * Siempre muestra el overlay para confirmar/cambiar nombre. */
+                        guardando = 1;
+                        if (nombre_arch[0] != '\0')
+                            strncpy(prompt_buf, nombre_arch, sizeof(prompt_buf)-1);
+                        else
+                            prompt_buf[0] = '\0';
+                        prompt_len = (int)strlen(prompt_buf);
+                        saves_n    = escanear_saves(saves_lista, MAX_SAVES);
+                        saves_sel  = -1; saves_offset = 0;
+                    } else if (item == 2) {
+                        /* Cargar: abrir overlay de seleccion */
+                        cargando   = 1;
+                        prompt_buf[0] = '\0';
+                        prompt_len    = 0;
+                        saves_n    = escanear_saves(saves_lista, MAX_SAVES);
+                        saves_sel  = -1; saves_offset = 0;
+                    }
+                    mini_menu = 0;
+                }
+                /* Click fuera del dropdown: cerrar */
+                else if (mini_menu) {
+                    mini_menu = 0;
+                }
+            }
+
             if (evento.type == SDL_TEXTINPUT) {
-                if (guardando) {
+                if (guardando || cargando) {
                     int add = (int)strlen(evento.text.text);
                     if (prompt_len + add < (int)sizeof(prompt_buf) - 1) {
                         strcat(prompt_buf, evento.text.text);
@@ -720,10 +961,75 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
         SDL_Rect hd = { editor_x, edit_h + 2, editor_w, line_h + 4 };
         SDL_SetRenderDrawColor(renderer, 0, 38, 13, 255);
         SDL_RenderFillRect(renderer, &hd);
-        dibujadoTextoSimple(renderer, fuente, "SALIDA", editor_x + 10, edit_h + 4, c_out_hd);
-        dibujadoTextoSimple(renderer, fuente,
-            "[F5] ejecutar   [F8] doc   [F9] guardar   [F10] volver",
-            editor_x + editor_w - 480, edit_h + 4, c_hint);
+        dibujadoTextoSimple(renderer, fuente, "SALIDA", editor_x + 4, edit_h + 4, c_out_hd);
+
+        /* Boton menu ≡ */
+        {
+            int mx_h, my_h; SDL_GetMouseState(&mx_h, &my_h);
+            int hov = (mx_h >= btn_menu.x && mx_h < btn_menu.x + btn_menu.w &&
+                       my_h >= btn_menu.y && my_h < btn_menu.y + btn_menu.h);
+            SDL_SetRenderDrawColor(renderer, hov || mini_menu ? 50 : 25,
+                                             hov || mini_menu ? 80 : 45,
+                                             hov || mini_menu ? 50 : 25, 255);
+            SDL_RenderFillRect(renderer, &btn_menu);
+            SDL_SetRenderDrawColor(renderer, 0, 160, 55, 255);
+            SDL_RenderDrawRect(renderer, &btn_menu);
+            int lw2; TTF_SizeUTF8(fuente, "=", &lw2, NULL);
+            dibujadoTextoSimple(renderer, fuente, "=",
+                                btn_menu.x + (btn_menu.w - lw2) / 2,
+                                btn_menu.y, (SDL_Color){180, 200, 180, 255});
+        }
+
+        /* Boton |> RUN al extremo derecho */
+        {
+            int mx_h, my_h; SDL_GetMouseState(&mx_h, &my_h);
+            int hover = (mx_h >= btn_run.x && mx_h < btn_run.x + btn_run.w &&
+                         my_h >= btn_run.y && my_h < btn_run.y + btn_run.h);
+            if (hover)
+                SDL_SetRenderDrawColor(renderer, 60, 220, 90, 255);
+            else
+                SDL_SetRenderDrawColor(renderer, 20, 160, 55, 255);
+            SDL_RenderFillRect(renderer, &btn_run);
+            SDL_SetRenderDrawColor(renderer, 0, 230, 80, 255);
+            SDL_RenderDrawRect(renderer, &btn_run);
+            /* centrar texto "|> RUN" dentro del boton */
+            int lbl_w; TTF_SizeUTF8(fuente, "|> RUN", &lbl_w, NULL);
+            int lbl_x = btn_run.x + (btn_run.w - lbl_w) / 2;
+            dibujadoTextoSimple(renderer, fuente, "|> RUN",
+                                lbl_x, btn_run.y, (SDL_Color){10, 10, 10, 255});
+        }
+
+        /* Dropdown mini menu */
+        if (mini_menu) {
+            int mx_d, my_d; SDL_GetMouseState(&mx_d, &my_d);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 10, 18, 10, 240);
+            SDL_RenderFillRect(renderer, &mdrop);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            SDL_SetRenderDrawColor(renderer, 0, 180, 60, 255);
+            SDL_RenderDrawRect(renderer, &mdrop);
+
+            for (int i = 0; i < 3; i++) {
+                int iy = mdrop.y + 3 + i * mitem_h;
+                SDL_Rect item_r = { mdrop.x + 2, iy, mdrop.w - 4, mitem_h };
+                int hov_i = (mx_d >= item_r.x && mx_d < item_r.x + item_r.w &&
+                             my_d >= item_r.y && my_d < item_r.y + item_r.h);
+                if (hov_i) {
+                    SDL_SetRenderDrawColor(renderer, 20, 60, 25, 255);
+                    SDL_RenderFillRect(renderer, &item_r);
+                }
+                /* separador entre items */
+                if (i > 0) {
+                    SDL_SetRenderDrawColor(renderer, 0, 70, 25, 255);
+                    SDL_RenderDrawLine(renderer, mdrop.x + 6, iy - 1,
+                                                mdrop.x + mdrop.w - 6, iy - 1);
+                }
+                SDL_Color c_mi = hov_i ? (SDL_Color){200, 240, 200, 255}
+                                       : (SDL_Color){142, 192, 124, 255};
+                dibujadoTextoSimple(renderer, fuente, menu_items[i],
+                                    mdrop.x + 10, iy + 2, c_mi);
+            }
+        }
 
         SDL_SetRenderDrawColor(renderer, 0, 55, 18, 160);
         SDL_RenderDrawLine(renderer, editor_x, edit_h + line_h + 8, editor_x + editor_w, edit_h + line_h + 8);
@@ -835,6 +1141,99 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             /* hint inferior */
             dibujadoTextoSimple(renderer, fuente,
                 "[↑↓] seleccionar   [Enter] guardar   [ESC] cancelar",
+                bx + 14, by + bh - line_h - 8, c_hint2);
+        }
+
+        /* ── Pantalla de carga (overlay) ──────────────────────────── */
+        if (cargando) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+            SDL_Rect sombra3 = { 0, 0, ancho, alto };
+            SDL_RenderFillRect(renderer, &sombra3);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+            int bw = editor_w - 40;  int bh = alto - 80;
+            int bx = editor_x + 20;  int by = 40;
+            SDL_Rect box = { bx, by, bw, bh };
+            SDL_SetRenderDrawColor(renderer, 20, 22, 20, 255);
+            SDL_RenderFillRect(renderer, &box);
+            SDL_SetRenderDrawColor(renderer, 0, 170, 55, 255);
+            SDL_RenderDrawRect(renderer, &box);
+
+            SDL_Color c_hdr  = {   0, 210,  75, 255 };
+            SDL_Color c_lbl  = { 146, 131, 116, 255 };
+            SDL_Color c_txt  = { 235, 219, 178, 255 };
+            SDL_Color c_sel  = {   0,  80,  30, 255 };
+            SDL_Color c_item = { 142, 192, 124, 255 };
+            SDL_Color c_hint2= {  80,  73,  69, 255 };
+
+            dibujadoTextoSimple(renderer, fuente, "Cargar archivo",
+                                bx + 14, by + 10, c_hdr);
+            SDL_SetRenderDrawColor(renderer, 0, 120, 40, 255);
+            SDL_RenderDrawLine(renderer, bx + 10, by + line_h + 14,
+                                          bx + bw - 10, by + line_h + 14);
+
+            /* campo de nombre */
+            int iy = by + line_h + 22;
+            dibujadoTextoSimple(renderer, fuente, "Nombre:", bx + 14, iy, c_lbl);
+            int lw; TTF_SizeUTF8(fuente, "Nombre: ", &lw, NULL);
+
+            SDL_Rect input_bg = { bx + 12, iy - 2, bw - 24, line_h + 4 };
+            SDL_SetRenderDrawColor(renderer, 30, 40, 30, 255);
+            SDL_RenderFillRect(renderer, &input_bg);
+            SDL_SetRenderDrawColor(renderer, 0, 130, 50, 255);
+            SDL_RenderDrawRect(renderer, &input_bg);
+            dibujadoTextoSimple(renderer, fuente, prompt_buf,
+                                bx + 14 + lw, iy, c_txt);
+            {
+                int tw = 0;
+                if (prompt_len > 0) TTF_SizeUTF8(fuente, prompt_buf, &tw, NULL);
+                SDL_SetRenderDrawColor(renderer, 235, 219, 178, 200);
+                SDL_Rect pc = { bx + 14 + lw + tw, iy, 2, line_h - 2 };
+                SDL_RenderFillRect(renderer, &pc);
+            }
+
+            /* lista de archivos */
+            int ly = iy + line_h + 10;
+            dibujadoTextoSimple(renderer, fuente, "Archivos guardados:",
+                                bx + 14, ly, c_lbl);
+            ly += line_h + 4;
+            SDL_SetRenderDrawColor(renderer, 0, 80, 25, 255);
+            SDL_RenderDrawLine(renderer, bx + 10, ly, bx + bw - 10, ly);
+            ly += 4;
+
+            int vis_saves = (by + bh - ly - line_h - 20) / (line_h + 2);
+            if (vis_saves < 1) vis_saves = 1;
+
+            if (saves_n == 0) {
+                dibujadoTextoSimple(renderer, fuente, "(no hay archivos guardados)",
+                                    bx + 20, ly, c_hint2);
+            }
+            for (int i = 0; i < vis_saves && (saves_offset + i) < saves_n; i++) {
+                int idx = saves_offset + i;
+                int fy  = ly + i * (line_h + 2);
+                if (idx == saves_sel) {
+                    SDL_Rect sel_bg = { bx + 10, fy - 2, bw - 20, line_h + 4 };
+                    SDL_SetRenderDrawColor(renderer, c_sel.r, c_sel.g, c_sel.b, 255);
+                    SDL_RenderFillRect(renderer, &sel_bg);
+                }
+                char entry[80];
+                snprintf(entry, sizeof(entry), "%s.paed", saves_lista[idx]);
+                SDL_Color ce = (idx == saves_sel) ? c_txt : c_item;
+                dibujadoTextoSimple(renderer, fuente, entry, bx + 20, fy, ce);
+
+                /* boton [X] */
+                SDL_Rect btn_x = { bx + bw - 36, fy - 2, 28, line_h + 4 };
+                SDL_SetRenderDrawColor(renderer, 100, 15, 15, 255);
+                SDL_RenderFillRect(renderer, &btn_x);
+                SDL_SetRenderDrawColor(renderer, 200, 30, 30, 255);
+                SDL_RenderDrawRect(renderer, &btn_x);
+                SDL_Color c_x = { 251, 73, 52, 255 };
+                dibujadoTextoSimple(renderer, fuente, "X", btn_x.x + 8, fy, c_x);
+            }
+
+            dibujadoTextoSimple(renderer, fuente,
+                "[↑↓] seleccionar   [Enter] cargar   [ESC] cancelar",
                 bx + 14, by + bh - line_h - 8, c_hint2);
         }
 

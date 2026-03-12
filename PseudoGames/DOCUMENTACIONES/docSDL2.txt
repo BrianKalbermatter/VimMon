@@ -30,6 +30,7 @@ INDICE
  23. Cross-compilacion para Windows y GitHub Actions
  24. Boton de configuracion y screenConfig
  25. Pantalla de feedback y contacto
+ 26. Sistema de subrayado con colores (screenDOC.c)
 
 
 ================================================================================
@@ -2385,6 +2386,187 @@ Llamadas actualizadas
     int screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                          int ancho, int alto, const char *nombre_fijo,
                          const char *cons_titulo, const char *cons_texto);
+
+================================================================================
+26. SISTEMA DE SUBRAYADO CON COLORES - screenDOC.c
+================================================================================
+
+Que es
+------
+  Sistema de highlight (resaltado) interactivo dentro de la pantalla DOC.
+  El usuario arrastra el mouse sobre texto, aparece una paleta de colores
+  flotante, elige un color, y el texto queda marcado con un rectangulo de
+  color por detras. Todo se guarda automaticamente en saves/highlights.json.
+
+Flujo completo
+--------------
+  1. El usuario arrastra el mouse sobre el texto (drag)
+  2. Al soltar, si hay seleccion valida, aparece el popup encima del cursor
+  3. El usuario hace click en un color
+  4. El highlight se aplica, se guarda, el popup desaparece
+  5. Al volver al DOC, los highlights se cargan desde el JSON
+
+Estructura de datos
+-------------------
+  typedef struct {
+      int linea_absoluta;  // indice en el array lineas[] del wiki.txt
+      int char_ini;        // posicion del primer caracter seleccionado
+      int char_fin;        // posicion del ultimo caracter seleccionado
+      int color_idx;       // indice en paleta[] (0..7)
+  } Highlight;
+
+  static Highlight highlights[MAX_HIGHLIGHTS];  // hasta 500 highlights
+  static int       total_highlights = 0;
+
+  Los highlights son estaticos (static) porque screenDoc() se llama cada
+  vez que entrас al DOC, y los datos tienen que persistir entre llamadas.
+
+Guardado - saves/highlights.json
+---------------------------------
+  Formato del archivo:
+  {
+      "highlights": [
+          {"linea": 42, "ini": 5,  "fin": 18, "color": 0},
+          {"linea": 67, "ini": 0,  "fin": 12, "color": 3}
+      ]
+  }
+
+  Funciones:
+    guardar_highlights()  — escribe el JSON con cJSON_Print
+    cargar_highlights()   — lee el JSON al entrar al DOC
+    aplicar_highlight()   — agrega o actualiza un highlight, llama a guardar
+    quitar_highlight()    — elimina un highlight del array, llama a guardar
+
+  El guardado es automatico: ocurre inmediatamente despues de cada cambio,
+  no hay boton de guardar manual.
+
+Seleccion de texto con el mouse
+--------------------------------
+  Variables de estado:
+    sel_activa      — hay una seleccion valida (drag completado)
+    sel_arrastrando — el mouse esta siendo arrastrado ahora
+    sel_lin_ini / sel_char_ini  — donde empezo el drag
+    sel_lin_fin / sel_char_fin  — donde termino (o esta) el drag
+
+  Eventos involucrados:
+    SDL_MOUSEBUTTONDOWN  → graba inicio, limpia seleccion anterior
+    SDL_MOUSEMOTION      → actualiza fin mientras se arrastra
+    SDL_MOUSEBUTTONUP    → fija la seleccion, muestra popup si es valida
+
+  Funcion pixel_a_char():
+    Convierte pixeles X desde el inicio del texto a indice de caracter.
+    Itera caracter por caracter midiendo el ancho con TTF_SizeUTF8()
+    hasta que supera el pixel clickeado. Cuenta letras, espacios, y
+    cualquier otro caracter — todo.
+
+    static int pixel_a_char(TTF_Font *fuente, const char *texto, int px_rel)
+    {
+        int len = (int)strlen(texto);
+        for (int i = 1; i <= len; i++) {
+            char tmp[512];
+            strncpy(tmp, texto, i);
+            tmp[i] = '\0';
+            int w;
+            TTF_SizeUTF8(fuente, tmp, &w, NULL);
+            if (w > px_rel) return i - 1;
+        }
+        return len;
+    }
+
+Calculo de posicion Y exacta (line_y[])
+-----------------------------------------
+  Problema que habia: las lineas vacias usan alto_linea/2 en vez de
+  alto_linea completo. Si se calcula la fila con division simple:
+    row = (my - 10) / alto_linea
+  el resultado es incorrecto cuando hay lineas vacias arriba.
+
+  Solucion: precalcular el Y real de cada linea antes del render:
+
+    int y = 10;
+    for (int i = ep_linea_desde + scroll; i < ep_linea_hasta; i++) {
+        line_y[i] = y;
+        y += (tmp[0] == '\0') ? alto_linea / 2 : alto_linea;
+    }
+
+  Ahora tanto el render como la deteccion de clicks usan line_y[i],
+  garantizando que siempre coinciden.
+
+El offset +10/+12 de dibujadoTextoColor
+-----------------------------------------
+  dibujadoTextoColor() internamente suma +10 a x y +12 a y:
+    SDL_Rect pos_txt = {x + 10, y + 12, sup->w, sup->h};
+
+  Entonces si le paso texto_param_x = contenido_x + 6,
+  el texto REALMENTE aparece en:
+    texto_real_x = contenido_x + 6 + 10 = contenido_x + 16
+
+  Todos los rects de seleccion y highlight usan texto_real_x para
+  que coincidan con la posicion visual del texto.
+
+El popup de colores
+-------------------
+  Variables:
+    popup_visible  — si el popup esta en pantalla
+    popup_x/y      — posicion (calculada en MOUSEBUTTONUP)
+    popup_lin      — linea absoluta que se va a colorear
+    popup_cs/ce    — char_ini y char_fin de la seleccion
+
+  Posicion: se calcula con las coordenadas reales del mouse al soltar:
+    popup_x = evento.button.x;
+    popup_y = evento.button.y - popup_h - 8;
+    // Si se sale por arriba: popup_y = evento.button.y + 10;
+    // Si se sale por derecha: popup_x = ancho - popup_w - 4;
+
+  Paleta de 8 colores + boton X:
+    [Amarillo] [Verde] [Cyan] [Rosa] [Naranja] [Violeta] [Rojo] [Blanco] [X]
+
+  El boton X llama a quitar_highlight() para volver al texto normal.
+
+Bug critico resuelto: popup que reaparecia
+-------------------------------------------
+  Secuencia del bug:
+    1. MOUSEBUTTONDOWN en color → popup_visible=0, sel_activa=0 ✓
+    2. MOUSEBUTTONUP del mismo click → recalcula:
+       sel_activa = (sel_lin_ini != sel_lin_fin || sel_char_ini != sel_char_fin)
+       Como sel_char_ini y sel_char_fin todavia tenian valores del drag:
+       = (false || 5 != 12) = true → popup reaparecia
+
+  Solucion: al aplicar o cerrar el popup, resetear los 4 valores:
+    sel_lin_ini = -1;  sel_lin_fin = -1;
+    sel_char_ini = 0;  sel_char_fin = 0;
+
+Bug critico resuelto: popup cerraba antes de procesar el click
+--------------------------------------------------------------
+  El handler de MOUSEBUTTONDOWN tenia:
+    if (popup_visible) { cerrar si afuera }
+    if (en area de contenido) { popup_visible = 0; ... }  // siempre ejecutaba
+
+  El popup esta en el area de contenido, entonces la segunda condicion
+  ponia popup_visible = 0 antes de que el render procesara el click en
+  el color → aplicar_highlight nunca se llamaba.
+
+  Solucion: convertir a if/else if/else if mutuamente excluyentes:
+    if (popup visible Y click adentro)  → aplicar color
+    else if (popup visible Y click afuera) → cerrar
+    else if (click en contenido) → iniciar drag
+
+Render de texto en 3 segmentos
+--------------------------------
+  Problema: si se dibujan todos los caracteres en blanco y despues se
+  dibuja el rango highlight en negro ENCIMA, hay texto doble aunque
+  esten en el mismo pixel (alineacion imperfecta).
+
+  Solucion: render en 3 segmentos con render_texto_xy() que usa
+  TTF_RenderUTF8_Blended directamente sin offsets internos:
+
+    Segmento 1: chars 0 .. cs-1    → color normal
+    Segmento 2: chars cs .. ce-1   → negro (15,15,15)
+    Segmento 3: chars ce .. fin    → color normal
+
+  Cada parte se dibuja UNA sola vez. No hay sobreposicion.
+
+  El X de cada segmento se calcula con TTF_SizeUTF8 sobre la
+  subcadena previa (los caracteres antes del segmento).
 
 ================================================================================
 FIN DE LA DOCUMENTACION
