@@ -30,8 +30,13 @@ WIN_CC     = x86_64-w64-mingw32-gcc
 WIN_LIBS   = win-libs
 WIN_CFLAGS = -Wall -Wextra -I src -I $(WIN_LIBS)/include
 WIN_LDFLAGS = -L $(WIN_LIBS)/lib \
-              -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lm \
-              -mwindows
+              -lmingw32 -lSDL2main \
+              -Wl,-Bstatic -lSDL2 \
+              -Wl,-Bdynamic -lSDL2_ttf -lm \
+              -mwindows \
+              -lole32 -loleaut32 -limm32 -lwinmm -lversion \
+              -lsetupapi -lgdi32 -lcomdlg32 \
+              -static-libgcc -static-libstdc++
 
 WIN_OBJ    = $(addprefix $(BUILDDIR)/, $(notdir $(SRC:.c=.win.o)))
 WIN_RC_OBJ = $(BUILDDIR)/app.win.o
