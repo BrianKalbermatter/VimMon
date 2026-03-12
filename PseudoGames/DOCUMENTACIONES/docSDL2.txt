@@ -31,6 +31,12 @@ INDICE
  24. Boton de configuracion y screenConfig
  25. Pantalla de feedback y contacto
  26. Sistema de subrayado con colores (screenDOC.c)
+ 27. Clipboard multi-linea en el editor (editorText.c)
+ 28. Boton |> RUN y mini menu en el editor (editorText.c)
+ 29. Sistema Guardar / Cargar archivos .paed (editorText.c)
+ 30. Icono en el ejecutable Windows (app.rc + windres)
+ 31. Linking estatico de SDL2 en Windows
+ 32. Script de release automatico (scripts/release.sh)
 
 
 ================================================================================
@@ -2567,6 +2573,298 @@ Render de texto en 3 segmentos
 
   El X de cada segmento se calcula con TTF_SizeUTF8 sobre la
   subcadena previa (los caracteres antes del segmento).
+
+================================================================================
+27. CLIPBOARD MULTI-LINEA EN EL EDITOR (editorText.c)
+================================================================================
+
+Se implementaron tres funciones separadas reutilizables para manejar el
+portapapeles dentro del editor libre. Estas funciones viven FUERA de
+screenEditorText para poder usarse en otros modulos si hace falta.
+
+  #define MAX_LINES 500
+  #define CB_MAX    50
+  static char cb_buf[CB_MAX][512];   // buffer interno
+  static int  cb_n = 0;              // cuantas lineas hay copiadas
+
+Las tres funciones:
+
+  editor_copiar(buf, r0, r1)
+  ──────────────────────────
+  Copia las lineas desde r0 hasta r1 (inclusive) en cb_buf.
+  Tambien construye un string con \n entre lineas y lo manda al
+  portapapeles del sistema con SDL_SetClipboardText().
+
+  editor_cortar(buf, &n_lines, r0, r1, &cursor_row, &cursor_col)
+  ───────────────────────────────────────────────────────────────
+  Llama editor_copiar internamente y despues elimina las lineas
+  del buffer shiftando todo hacia arriba con memmove/memcpy.
+  Si queda 0 lineas fuerza n_lines=1 con buf[0]="".
+
+  editor_pegar(buf, &n_lines, &cursor_row, &cursor_col)
+  ──────────────────────────────────────────────────────
+  Lee primero el portapapeles del SISTEMA con SDL_GetClipboardText().
+  Si tiene contenido, lo parsea linea por linea separando por '\n'
+  y actualiza cb_buf. Esto permite pegar texto de otras apps.
+  Si cb_n == 0 no hace nada.
+  Inserta las lineas DESPUES de cursor_row desplazando el buffer.
+  Deja el cursor al final de la ultima linea pegada.
+
+Atajos en el editor:
+  Ctrl+C  →  editor_copiar(buf, cursor_row, cursor_row)
+  Ctrl+X  →  editor_cortar(...)  + dirty=1
+  Ctrl+V  →  editor_pegar(...)   + dirty=1
+
+Por que son funciones separadas:
+  Para poder llamarlas desde screenEditorLvl u otros modulos en el futuro
+  sin duplicar codigo. Las variables cb_buf y cb_n son static globales
+  al archivo, por eso persisten entre llamadas.
+
+
+================================================================================
+28. BOTON |> RUN Y MINI MENU EN EL EDITOR (editorText.c)
+================================================================================
+
+En el header del panel de salida (zona inferior del editor) se agregaron
+dos botones interactivos con deteccion de hover via SDL_GetMouseState().
+
+BOTON |> RUN
+────────────
+Posicion: extremo derecho del header del panel de salida.
+
+  int btn_run_w = 72;
+  SDL_Rect btn_run = { editor_x + editor_w - btn_run_w - 6,
+                       edit_h + 3, btn_run_w, line_h };
+
+Click → hace exactamente lo mismo que F5:
+  guardar_archivo(buf, n_lines, path)
+  n_out = ejecutar_paed(path, out_buf, OUT_MAX)
+
+Hover: verde claro (60,220,90) vs verde oscuro (20,160,55).
+Texto "|> RUN" centrado con TTF_SizeUTF8 para calcular el X exacto:
+  int lbl_w; TTF_SizeUTF8(fuente, "|> RUN", &lbl_w, NULL);
+  int lbl_x = btn_run.x + (btn_run.w - lbl_w) / 2;
+
+BOTON MENU ≡
+────────────
+Cuadrado de 30px a la izquierda del RUN. Muestra "=" centrado.
+Click → toggle de mini_menu (0/1).
+Cuando mini_menu=1 se ilumina mas brillante para indicar que esta activo.
+
+DROPDOWN DEL MINI MENU
+───────────────────────
+  const char *menu_items[] = { "Volver al menu principal",
+                                "Guardar", "Cargar" };
+  int mitem_h = line_h + 6;
+  int mdrop_w = 260;
+  int mdrop_h = mitem_h * 3 + 6;
+
+Aparece ENCIMA del boton menu (mdrop.y = edit_h - mdrop_h - 4).
+Cada item tiene highlight verde oscuro al pasar el mouse.
+Separador horizontal entre items dibujado con SDL_RenderDrawLine.
+
+Prioridad de eventos en SDL_MOUSEBUTTONDOWN (con !guardando && !cargando):
+  1. Click en btn_run  → ejecutar
+  2. Click en btn_menu → toggle dropdown
+  3. Click dentro del dropdown → ejecutar item
+  4. Click fuera del dropdown → cerrar
+
+Items del dropdown:
+  item 0 "Volver al menu principal" → igual que F10
+  item 1 "Guardar"  → abre overlay de guardado con nombre precargado
+  item 2 "Cargar"   → abre overlay de carga (ver seccion 29)
+
+
+================================================================================
+29. SISTEMA GUARDAR / CARGAR ARCHIVOS .paed (editorText.c)
+================================================================================
+
+GUARDAR (F9 o menu Guardar)
+────────────────────────────
+Logica de F9:
+  - Si nombre_arch ya tiene un nombre → guarda DIRECTO sin overlay.
+    Esto evita sobreescribir accidentalmente con buffer vacio.
+  - Si nombre_arch esta vacio → abre el overlay para elegir nombre.
+
+El mini menu "Guardar" SIEMPRE abre el overlay con el nombre actual
+precargado en el campo. Funciona como "Guardar como...".
+
+Estado: int guardando = 0/1
+Variables compartidas (tambien usadas por Cargar):
+  char prompt_buf[64]       ← campo de texto del overlay
+  int  prompt_len           ← longitud del texto
+  char saves_lista[][64]    ← lista de archivos .paed en saves/
+  int  saves_n, saves_sel, saves_offset
+
+En el overlay:
+  - Flechas arriba/abajo navegan la lista, autocompletan prompt_buf
+  - ENTER guarda en saves/{nombre}.paed y actualiza nombre_arch
+  - ESC cancela
+  - Delete sobre un item elimina el archivo del disco
+
+Guardado fisico en guardar_archivo():
+  FILE *f = fopen(path, "w");
+  for (int i = 0; i < n; i++) fprintf(f, "%s\n", buf[i]);
+  fclose(f);
+
+CARGAR (menu Cargar)
+──────────────────────
+Estado: int cargando = 0/1  (nunca activo al mismo tiempo que guardando)
+
+Misma interfaz visual que guardar, titulo cambia a "Cargar archivo"
+y el hint inferior dice "[Enter] cargar" en vez de "[Enter] guardar".
+
+Al presionar ENTER con prompt_len > 0:
+  - Abre saves/{prompt_buf}.paed
+  - Si existe: limpia buf con memset, carga linea por linea
+  - Actualiza nombre_arch y libre_ultimo (static, recuerda para proxima vez)
+  - Resetea cursor_row=0, cursor_col=0, offset_row=0, dirty=0
+  - Cierra el overlay
+
+Variable persistente entre sesiones:
+  static char libre_ultimo[64] = "";
+  Se actualiza cada vez que el editor libre carga un archivo exitosamente.
+  (Reservado para uso futuro — no auto-carga al entrar, el usuario decide)
+
+El boton [X] en la lista funciona identico en ambos overlays: elimina
+el .paed del disco y refresca la lista con escanear_saves().
+
+
+================================================================================
+30. ICONO EN EL EJECUTABLE WINDOWS (app.rc + windres)
+================================================================================
+
+Para que el .exe tenga icono en el Explorador de Windows se usa un
+archivo de recursos de Windows (.rc) que se compila con windres
+(parte del toolchain MinGW).
+
+ARCHIVO src/app.rc
+──────────────────
+  1 ICON "assets/icon.ico"
+
+El ID numerico "1" es obligatorio. Windows Explorer busca el icono
+con el ID mas bajo al mostrar el ejecutable. Si se usa un nombre
+simbolico como IDI_ICON1 puede no funcionar con windres/MinGW.
+
+GENERACION DEL .ico
+────────────────────
+El .ico se genera desde el PNG del proyecto con Python + Pillow.
+Un archivo ICO es un contenedor que almacena la misma imagen en
+multiples tamaños para que Windows use el mas adecuado segun contexto
+(16px en listas, 32px en escritorio, 256px en vista grande):
+
+  Estructura binaria manual del ICO:
+    Header:    6 bytes  (magic 0x0001, tipo 1, cantidad de imagenes)
+    Directory: 16 bytes por imagen (ancho, alto, offset, tamaño)
+    Data:      cada imagen como PNG comprimido
+
+  Tamaños incluidos: 16, 32, 48, 64, 128, 256 px
+
+  Nota: para 256px el campo ancho/alto del directorio va como 0
+  (convencion del formato ICO para indicar 256).
+
+COMPILACION EN MAKEFILE
+────────────────────────
+  WIN_RC_OBJ = $(BUILDDIR)/app.win.o
+
+  $(WIN_RC_OBJ): src/app.rc assets/icon.ico | $(BUILDDIR)
+      x86_64-w64-mingw32-windres src/app.rc -o $@
+
+  $(WIN_TARGET): $(WIN_OBJ) $(WIN_RC_OBJ)
+      $(WIN_CC) $(WIN_OBJ) $(WIN_RC_OBJ) -o $@ $(WIN_LDFLAGS)
+
+windres convierte el .rc en un objeto .o que el linker trata igual
+que cualquier otro .o. El icono queda embebido en el seccion de
+recursos del PE (Portable Executable).
+
+
+================================================================================
+31. LINKING ESTATICO DE SDL2 EN WINDOWS
+================================================================================
+
+Por defecto el proyecto linkea contra las DLL de SDL2 (import libs .dll.a).
+Para distribuir el .exe con menos archivos sueltos se puede linkear SDL2
+estaticamente (el codigo de SDL2 queda DENTRO del .exe).
+
+QUE SE PUEDE HACER ESTATICO
+─────────────────────────────
+  SDL2     → SI. Libreria oficial provee libSDL2.a para MinGW.
+  SDL2_ttf → NO facilmente. Su version estatica incluye FreeType + HarfBuzz
+             que tienen dependencias del runtime de MSVC (_setjmp, UuidCreate)
+             que generan conflictos con el runtime de MinGW.
+
+RESULTADO FINAL
+────────────────
+  SDL2      → linkeado estatico  (libSDL2.a, 15MB)
+  SDL2_ttf  → sigue como DLL    (SDL2_ttf.dll, 1 archivo)
+  El exe pasa de ~330KB a ~13MB pero ya no necesita SDL2.dll.
+
+Las libs estaticas se obtienen del release oficial de SDL2 para MinGW:
+  https://github.com/libsdl-org/SDL/releases
+  Archivo: SDL2-devel-X.X.X-mingw.tar.gz
+  Dentro:  x86_64-w64-mingw32/lib/libSDL2.a
+
+FLAGS EN EL MAKEFILE
+─────────────────────
+  WIN_LDFLAGS = -L $(WIN_LIBS)/lib             \
+    -lmingw32 -lSDL2main                       \
+    -Wl,-Bstatic -lSDL2                        \  ← estatico desde aqui
+    -Wl,-Bdynamic -lSDL2_ttf -lm               \  ← dinamico desde aqui
+    -mwindows                                  \
+    -lole32 -loleaut32 -limm32 -lwinmm         \  ← APIs de Windows que
+    -lversion -lsetupapi -lgdi32 -lcomdlg32    \  ← SDL2 usa internamente
+    -static-libgcc -static-libstdc++              ← runtime GCC adentro
+
+  -Wl,-Bstatic   le dice al linker: a partir de aqui usá .a (estatico)
+  -Wl,-Bdynamic  le dice al linker: a partir de aqui usá .dll.a (dinamico)
+
+  Las APIs de Windows (ole32, winmm, etc.) son parte del sistema y
+  siempre estan disponibles en cualquier Windows moderno, no se incluyen
+  en el exe.
+
+  -static-libgcc / -static-libstdc++  meten el runtime de GCC adentro
+  del exe para no depender de libgcc_s_seh-1.dll y similares.
+
+
+================================================================================
+32. SCRIPT DE RELEASE AUTOMATICO (scripts/release.sh)
+================================================================================
+
+Script bash que compila, empaqueta y publica una nueva version en
+GitHub Releases con un solo comando:
+
+  ./scripts/release.sh v0.3
+
+PASOS QUE EJECUTA
+──────────────────
+  1. touch src/*.c       → fuerza recompilacion de todos los fuentes
+  2. make windows        → compila el .exe con linking estatico
+  3. python3             → empaqueta PseudoGames.exe + SDL2_ttf.dll en ZIP
+  4. git add -f + commit → sube el nuevo exe al repositorio
+  5. git push            → sincroniza con GitHub
+  6. gh release delete   → borra la release anterior con el mismo tag (si existe)
+  7. git tag delete      → limpia el tag local y remoto
+  8. gh release create   → crea la nueva release y sube el ZIP
+  9. rm ZIP local        → limpia el archivo temporal
+
+CONTENIDO DEL ZIP
+──────────────────
+  PseudoGames_v0.X.zip
+    ├── PseudoGames.exe     ← exe con SDL2 estatico + icono
+    └── SDL2_ttf.dll        ← unica DLL necesaria
+
+El usuario descarga el ZIP, lo extrae en cualquier carpeta y ejecuta
+PseudoGames.exe. No requiere instalacion ni dependencias adicionales.
+
+HERRAMIENTAS QUE USA EL SCRIPT
+────────────────────────────────
+  make                → compilar (Makefile del proyecto)
+  python3 + zipfile   → empaquetar (modulo estandar, sin dependencias)
+  git                 → control de versiones
+  gh (GitHub CLI)     → crear releases en GitHub
+
+El script usa "set -e" al inicio: si cualquier paso falla, el script
+se detiene inmediatamente en vez de continuar con un estado roto.
 
 ================================================================================
 FIN DE LA DOCUMENTACION
