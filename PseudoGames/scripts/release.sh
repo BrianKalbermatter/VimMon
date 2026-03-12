@@ -19,11 +19,22 @@ make windows
 
 echo "==> Empaquetando ${ZIP}..."
 python3 -c "
-import zipfile, os
+import zipfile, os, glob
+
+def add_dir(z, src_dir, zip_dir):
+    for path in glob.glob(src_dir + '/**', recursive=True):
+        if os.path.isfile(path):
+            arcname = zip_dir + '/' + os.path.relpath(path, src_dir)
+            z.write(path, arcname)
+
 with zipfile.ZipFile('${ZIP}', 'w', zipfile.ZIP_DEFLATED) as z:
     z.write('PseudoGames.exe')
     z.write('win-libs/dll/SDL2.dll',     'SDL2.dll')
     z.write('win-libs/dll/SDL2_ttf.dll', 'SDL2_ttf.dll')
+    add_dir(z, 'assets/fonts', 'assets/fonts')
+    add_dir(z, 'data',         'data')
+    # saves/ vacia para que el juego pueda crear progreso.json
+    z.writestr('saves/', '')
 print(f'  ZIP creado: {os.path.getsize(\"${ZIP}\") // 1024} KB')
 "
 
@@ -42,8 +53,10 @@ gh release create "${VERSION}" "${ZIP}" \
     --repo "${REPO}" \
     --title "PseudoGames ${VERSION}" \
     --notes "## Instalacion
-Descomprimí el ZIP en cualquier carpeta y ejecutá PseudoGames.exe.
-Solo necesita SDL2_ttf.dll en la misma carpeta. Sin instalacion." \
+1. Descomprimí el ZIP en cualquier carpeta
+2. Ejecutá PseudoGames.exe
+
+No necesita instalacion. Todo incluido en el ZIP (fuentes, datos, DLLs)." \
     --target aed_pseudo
 
 echo ""
