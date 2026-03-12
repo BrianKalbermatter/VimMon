@@ -34,12 +34,16 @@ WIN_LDFLAGS = -L $(WIN_LIBS)/lib \
               -mwindows
 
 WIN_OBJ    = $(addprefix $(BUILDDIR)/, $(notdir $(SRC:.c=.win.o)))
+WIN_RC_OBJ = $(BUILDDIR)/app.win.o
 WIN_TARGET = PseudoGames.exe
 
 windows: $(BUILDDIR) $(WIN_TARGET)
 
-$(WIN_TARGET): $(WIN_OBJ)
-	$(WIN_CC) $(WIN_OBJ) -o $@ $(WIN_LDFLAGS)
+$(WIN_RC_OBJ): src/app.rc assets/icon.ico | $(BUILDDIR)
+	x86_64-w64-mingw32-windres src/app.rc -o $@
+
+$(WIN_TARGET): $(WIN_OBJ) $(WIN_RC_OBJ)
+	$(WIN_CC) $(WIN_OBJ) $(WIN_RC_OBJ) -o $@ $(WIN_LDFLAGS)
 
 $(BUILDDIR)/%.win.o: src/%.c | $(BUILDDIR)
 	$(WIN_CC) $(WIN_CFLAGS) -c $< -o $@
