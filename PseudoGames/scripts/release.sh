@@ -22,6 +22,7 @@ python3 -c "
 import zipfile, os
 with zipfile.ZipFile('${ZIP}', 'w', zipfile.ZIP_DEFLATED) as z:
     z.write('PseudoGames.exe')
+    z.write('win-libs/dll/SDL2.dll',     'SDL2.dll')
     z.write('win-libs/dll/SDL2_ttf.dll', 'SDL2_ttf.dll')
 print(f'  ZIP creado: {os.path.getsize(\"${ZIP}\") // 1024} KB')
 "
