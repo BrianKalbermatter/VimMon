@@ -37,6 +37,7 @@ INDICE
  30. Icono en el ejecutable Windows (app.rc + windres)
  31. Linking estatico de SDL2 en Windows
  32. Script de release automatico (scripts/release.sh)
+ 33. El bug del heap doble: static SDL2 + SDL2_ttf.dll
 
 
 ================================================================================
@@ -2865,6 +2866,103 @@ HERRAMIENTAS QUE USA EL SCRIPT
 
 El script usa "set -e" al inicio: si cualquier paso falla, el script
 se detiene inmediatamente en vez de continuar con un estado roto.
+
+================================================================================
+33. EL BUG DEL HEAP DOBLE: STATIC SDL2 + SDL2_TTF.DLL
+================================================================================
+
+Este bug costo varios dias de debug. Se documenta en detalle porque es
+un error clasico en Windows que no existe en Linux y no da ningun mensaje
+de error util.
+
+SINTOMA
+────────
+  El juego arranca, pasa la animacion de inicio, entra a screenMenu(),
+  llama a SDL_FreeSurface() y explota. Sin mensaje. Sin razon aparente.
+  En Linux funciona perfecto.
+
+QUE ES UN HEAP
+───────────────
+  Cuando hacemos malloc() el sistema nos da memoria de un area llamada
+  "heap". En Linux hay un solo runtime de C (glibc) compartido por todos.
+  En Windows cada modulo (exe o DLL) puede tener su PROPIO heap si usa
+  un runtime de C diferente.
+
+  Windows tiene dos runtimes principales:
+    msvcrt.dll   → viejo, incluido en todas las Windows
+    ucrtbase.dll → nuevo (UCRT), desde Windows 10
+
+  Si una DLL aloca con msvcrt malloc y otra libera con UCRT free
+  → CRASH, porque cada runtime no reconoce bloques del otro.
+
+EL PROBLEMA: DOS COPIAS DE SDL2
+─────────────────────────────────
+  Con -Wl,-Bstatic -lSDL2 el exe incluye SDL2 compilado adentro.
+  Pero SDL2_ttf.dll en tiempo de ejecucion carga SDL2.dll por separado.
+  Resultado: dos copias de SDL2 vivas en memoria con heaps distintos.
+
+  RAM cuando el juego corria:
+  ┌─────────────────────────────────────────┐
+  │  PseudoGames.exe                        │
+  │  ┌───────────────────────────────────┐  │
+  │  │  SDL2 (estatico, dentro del exe)  │  │
+  │  │  runtime: UCRT                    │  │
+  │  │  SDL_FreeSurface() → UCRT free    │  │
+  │  └───────────────────────────────────┘  │
+  │                                         │
+  │  SDL2_ttf.dll → depende de SDL2.dll     │
+  │  ┌───────────────────────────────────┐  │
+  │  │  SDL2.dll                         │  │
+  │  │  runtime: msvcrt                  │  │
+  │  │  SDL_CreateRGBSurface() → msvcrt  │  │
+  │  └───────────────────────────────────┘  │
+  └─────────────────────────────────────────┘
+
+EL CRASH PASO A PASO
+─────────────────────
+  // TTF llama internamente a SDL2.dll que usa msvcrt malloc
+  SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente, "TEXTO", color);
+  //   sup = 0x1A2B3C4D  <- bloque en heap de msvcrt
+
+  // Nuestro exe llama a su SDL2 estatico que usa UCRT free
+  SDL_FreeSurface(sup);
+  //   UCRT free(0x1A2B3C4D)
+  //   UCRT busca ese bloque en SU heap... no lo encuentra
+  //   → Access Violation → CRASH
+
+  La analogia: pedir un envase en un local y devolverlo en otro.
+  El segundo no lo reconoce y explota.
+
+POR QUE EN LINUX NO PASABA
+───────────────────────────
+  Linux tiene un solo runtime (glibc). Tanto el exe como SDL2 y SDL2_ttf
+  comparten el mismo malloc/free. No hay heaps separados. Nunca crashea.
+  Por eso el bug era invisible hasta probar en Windows.
+
+LA SOLUCION
+────────────
+  No mezclar static y dynamic SDL2. Si SDL2_ttf usa SDL2.dll, el exe
+  tambien tiene que usar SDL2.dll. Todos sobre el mismo heap.
+
+  Makefile ANTES (roto):
+    -Wl,-Bstatic -lSDL2 \
+    -Wl,-Bdynamic -lSDL2_ttf
+
+  Makefile DESPUES (correcto):
+    -lSDL2 -lSDL2_ttf
+
+  Ahora SDL2_ttf.dll y el exe usan la misma SDL2.dll.
+  Un solo heap. Cero crashes.
+
+REGLA GENERAL EN WINDOWS
+──────────────────────────
+  La memoria SIEMPRE la tiene que liberar el mismo modulo que la aloco.
+  Si una DLL aloca → esa misma DLL (o la biblioteca dinamica compartida)
+  tiene que liberar. Nunca cruzar runtimes de C.
+
+  Aplica a: malloc/free, new/delete, fopen/fclose, y cualquier estructura
+  que SDL/TTF aloca internamente y devuelve un puntero para que vos liberes.
+
 
 ================================================================================
 FIN DE LA DOCUMENTACION
