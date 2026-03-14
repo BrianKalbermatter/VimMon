@@ -10,6 +10,7 @@
 static int completados[MAX_COMPLETADOS];
 static int n_completados = 0;
 static char progreso_path[512];
+static int s_intro_vista = 0;
 
 int cargar_progreso(const char *path) {
     snprintf(progreso_path, sizeof(progreso_path), "%s", path);
@@ -41,6 +42,10 @@ int cargar_progreso(const char *path) {
         }
     }
 
+    cJSON *intro = cJSON_GetObjectItem(root, "intro_vista");
+    if (cJSON_IsBool(intro) && cJSON_IsTrue(intro))
+        s_intro_vista = 1;
+
     cJSON_Delete(root);
     return n_completados;
 }
@@ -51,6 +56,7 @@ int guardar_progreso(const char *path) {
     cJSON *root = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateIntArray(completados, n_completados);
     cJSON_AddItemToObject(root, "completados", arr);
+    cJSON_AddBoolToObject(root, "intro_vista", s_intro_vista);
 
     /* historial */
     cJSON *hist = cJSON_CreateArray();
@@ -100,6 +106,9 @@ int nivel_desbloqueado(int numero) {
 int total_completados(void) {
     return n_completados;
 }
+
+int intro_ya_vista(void)  { return s_intro_vista; }
+void marcar_intro_vista(void) { s_intro_vista = 1; guardar_progreso(NULL); }
 
 int resetear_progreso(void) {
     n_completados = 0;

@@ -9,7 +9,7 @@ SRC = src/main.c src/ui.c src/niveles.c src/progreso.c src/cJSON.c \
       src/screenDOC.c src/screenMenu.c src/screenEditorLvl.c \
       src/screenLvLs.c src/screenEditorFree.c src/editorText.c \
       src/screenSoluction.c src/screenPomodoro.c src/pomodoro_bg.c \
-      src/screenConfig.c src/screenFeedback.c
+      src/screenConfig.c src/screenFeedback.c src/screenPJ.c
 
 OBJ     = $(addprefix $(BUILDDIR)/, $(notdir $(SRC:.c=.o)))
 TARGET  = aed
@@ -31,8 +31,7 @@ WIN_LIBS   = win-libs
 WIN_CFLAGS = -Wall -Wextra -I src -I $(WIN_LIBS)/include
 WIN_LDFLAGS = -L $(WIN_LIBS)/lib \
               -lmingw32 -lSDL2main \
-              -Wl,-Bstatic -lSDL2 \
-              -Wl,-Bdynamic -lSDL2_ttf -lm \
+              -lSDL2 -lSDL2_ttf -lm \
               -mwindows \
               -lole32 -loleaut32 -limm32 -lwinmm -lversion \
               -lsetupapi -lgdi32 -lcomdlg32 \

@@ -9,4 +9,7 @@ int nivel_desbloqueado(int numero);
 int total_completados(void);
 int resetear_progreso(void);
 
+int intro_ya_vista(void);
+void marcar_intro_vista(void);
+
 #endif

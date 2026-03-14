@@ -5,27 +5,68 @@
 #include "progreso.h"
 #include "pomodoro_bg.h"
 #include "ui.h"
+#include "screenPJ.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+/* Muestra un error aunque SDL no este cargado */
+static void fatal(const char *titulo, const char *msg) {
+#ifdef _WIN32
+    MessageBoxA(NULL, msg, titulo, MB_OK | MB_ICONERROR);
+#else
+    fprintf(stderr, "%s: %s\n", titulo, msg);
+#endif
+}
 
 int
 main(int argc, char *argv[]) {
     (void)argc; (void)argv;
-	SDL_Init(SDL_INIT_VIDEO);
-    TTF_Init(); // Inicializa la libreria SDL2_ttf, igual que SDL_Init pero para fuentes
-    
+
+#ifdef _WIN32
+    MessageBoxA(NULL, "main() iniciado", "DEBUG", MB_OK);
+    CreateDirectoryA("saves", NULL);
+#endif
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fatal("Error SDL_Init", SDL_GetError());
+        return 1;
+    }
+    if (TTF_Init() != 0) {
+        fatal("Error TTF_Init", TTF_GetError());
+        return 1;
+    }
+
     cargar_niveles("data/niveles.json");
     cargar_progreso("saves/progreso.json");
+
     TTF_Font *fuente = TTF_OpenFont("assets/fonts/main.ttf", 16);
+    if (!fuente) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "No se pudo abrir assets/fonts/main.ttf\n%s", TTF_GetError());
+        fatal("Error fuente", msg);
+        return 1;
+    }
+
     SDL_Window *ventana = SDL_CreateWindow(
             "PseudoGames",
-            SDL_WINDOWPOS_CENTERED, // Centra la pantalla automaticamente
+            SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             800, 600,
-             SDL_WINDOW_FULLSCREEN_DESKTOP  // ← pantalla completa
+            SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_BORDERLESS
             );
-    
-    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, 0);
+    if (!ventana) {
+        fatal("Error ventana", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        fatal("Error renderer", SDL_GetError());
+        return 1;
+    }
 
     // Traer la ventana al frente y darle foco de teclado/mouse sin necesitar un click
     SDL_RaiseWindow(ventana);
@@ -34,6 +75,17 @@ main(int argc, char *argv[]) {
     int ancho, alto;
     SDL_GetWindowSize(ventana, &ancho, &alto);
     screen_poweron(renderer, ancho, alto);
+
+#ifdef _WIN32
+    MessageBoxA(NULL, "screen_poweron OK, entrando a screenMenu", "DEBUG", MB_OK);
+#endif
+
+    /* ── intro: mazmorra 3D, una sola vez en la vida ── */
+    if (!intro_ya_vista()) {
+        screenPJ_intro(renderer, ventana, ancho, alto);
+        marcar_intro_vista();
+        screen_transition(renderer, ancho, alto);
+    }
 
     int opcion = 0;
     int primera_vez = 1;
