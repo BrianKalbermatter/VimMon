@@ -173,6 +173,53 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
     int panel_x = (ancho - panel_w) / 2;
     int panel_y = alto / 2 - panel_h / 2 + 28;
 
+    /* ── Overlay de bienvenida (pre-renderizado) ── */
+    const char *bv_lineas[] = {
+        "Bienvenido al entrenador de pseudocodigo AED.",
+        "",
+        "Practica algoritmos reales de la catedra:",
+        "  Secuenciales  Condicionales  Repetitivas",
+        "  Funciones  Procedimientos  Parciales",
+        "",
+        "Completa cada nivel para desbloquear el siguiente.",
+        "El ultimo nivel es un BOSS de parcial real.",
+    };
+    int bv_n = (int)(sizeof(bv_lineas) / sizeof(bv_lineas[0]));
+
+    SDL_Color c_bv_txt  = {200, 200, 200, 255};
+    SDL_Color c_bv_ver  = {255, 200,  50, 255};
+    SDL_Color c_bv_cont = {100, 100, 110, 255};
+
+    SDL_Texture *bv_tex[8]  = {0};
+    int bv_w[8] = {0}, bv_h[8] = {0};
+    for (int i = 0; i < bv_n; i++) {
+        if (!bv_lineas[i][0]) continue;
+        SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, bv_lineas[i], c_bv_txt);
+        if (s) { bv_w[i] = s->w; bv_h[i] = s->h;
+                 bv_tex[i] = SDL_CreateTextureFromSurface(renderer, s);
+                 SDL_FreeSurface(s); }
+    }
+    SDL_Texture *bv_ver = NULL; int bv_ver_w = 0, bv_ver_h = 0;
+    { SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, "v0.14 - alpha", c_bv_ver);
+      if (s) { bv_ver_w = s->w; bv_ver_h = s->h;
+               bv_ver = SDL_CreateTextureFromSurface(renderer, s); SDL_FreeSurface(s); } }
+
+    SDL_Texture *bv_cont = NULL; int bv_cont_w = 0, bv_cont_h = 0;
+    { SDL_Surface *s = TTF_RenderUTF8_Blended(fuente,
+          "[ Presiona cualquier tecla o haz click ]", c_bv_cont);
+      if (s) { bv_cont_w = s->w; bv_cont_h = s->h;
+               bv_cont = SDL_CreateTextureFromSurface(renderer, s); SDL_FreeSurface(s); } }
+    if (bv_cont) SDL_SetTextureBlendMode(bv_cont, SDL_BLENDMODE_BLEND);
+
+    int bv_line_h = 20;
+    int bv_pad    = 30;
+    int bv_pw     = 520;
+    int bv_ph     = bv_pad * 2 + titulo_h + 14 + bv_n * bv_line_h + 44;
+    int bv_px     = (ancho - bv_pw) / 2;
+    int bv_py     = (alto  - bv_ph) / 2;
+
+    static int bienvenida_activa = 1;  /* static: solo 1 en toda la sesion */
+
     /* ── Estado de corrupcion/glitch ── */
     int   glitch_activo = 0;
     int   glitch_frames = 0;
@@ -182,11 +229,14 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 
     while (resultado < 0) {
         int clicked = 0, click_x = 0, click_y = 0;
+        int tecla   = 0;   /* cualquier tecla presionada este frame */
         pom_tick();
 
         while (SDL_PollEvent(&evento)) {
             if (evento.type == SDL_QUIT) { resultado = 0; break; }
             if (evento.type == SDL_KEYDOWN) {
+                tecla = 1;
+                if (bienvenida_activa) break;  /* solo cierra la bienvenida */
                 int k = evento.key.keysym.sym;
                 if (k >= SDLK_1 && k <= SDLK_7) {
                     int idx  = k - SDLK_1;
@@ -204,6 +254,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 clicked = 1;
                 click_x = evento.button.x;
                 click_y = evento.button.y;
+                if (bienvenida_activa) break;  /* solo cierra la bienvenida */
             }
         }
 
@@ -366,11 +417,84 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             click_y >= gear_y && click_y <= gear_y + gear_size)
             resultado = 7;
 
+        /* ── Overlay de bienvenida ── */
+        if (bienvenida_activa) {
+            float t2 = SDL_GetTicks() / 1000.0f;
+
+            /* sombra sobre el menu */
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 170);
+            SDL_RenderFillRect(renderer, NULL);
+
+            /* panel */
+            SDL_SetRenderDrawColor(renderer, 4, 8, 4, 240);
+            SDL_Rect bvp = {bv_px, bv_py, bv_pw, bv_ph};
+            SDL_RenderFillRect(renderer, &bvp);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            SDL_SetRenderDrawColor(renderer, 0, 200, 60, 255);
+            SDL_RenderDrawRect(renderer, &bvp);
+            SDL_Rect bvi = {bv_px+2, bv_py+2, bv_pw-4, bv_ph-4};
+            SDL_SetRenderDrawColor(renderer, 0, 60, 20, 255);
+            SDL_RenderDrawRect(renderer, &bvi);
+
+            /* version arriba a la derecha del panel */
+            if (bv_ver) {
+                SDL_Rect dr = {bv_px + bv_pw - bv_ver_w - 12,
+                               bv_py + 10, bv_ver_w, bv_ver_h};
+                SDL_RenderCopy(renderer, bv_ver, NULL, &dr);
+            }
+
+            /* titulo pulsante */
+            if (tex_titulo) {
+                float sc    = 0.65f + 0.04f * sinf(t2 * 1.4f);
+                int   tw    = (int)(titulo_w * sc);
+                int   th    = (int)(titulo_h * sc);
+                Uint8 alp   = (Uint8)(180 + 60 * sinf(t2 * 1.8f));
+                SDL_SetTextureAlphaMod(tex_titulo, alp);
+                SDL_Rect dr = {bv_px + (bv_pw - tw) / 2, bv_py + bv_pad, tw, th};
+                SDL_RenderCopy(renderer, tex_titulo, NULL, &dr);
+                SDL_SetTextureAlphaMod(tex_titulo, 255);
+            }
+
+            /* separador */
+            int sep = bv_py + bv_pad + titulo_h + 10;
+            SDL_SetRenderDrawColor(renderer, 0, 70, 25, 255);
+            SDL_RenderDrawLine(renderer, bv_px+14, sep, bv_px+bv_pw-14, sep);
+
+            /* lineas de texto */
+            int ty = sep + 10;
+            for (int i = 0; i < bv_n; i++) {
+                if (bv_tex[i]) {
+                    SDL_Rect dr = {bv_px + 28, ty, bv_w[i], bv_h[i]};
+                    SDL_RenderCopy(renderer, bv_tex[i], NULL, &dr);
+                }
+                ty += bv_line_h;
+            }
+
+            /* "presiona tecla" parpadeante */
+            if (bv_cont) {
+                float fase  = fmodf(t2, 1.2f);
+                Uint8 alp   = fase < 0.85f ? (Uint8)(80 + 120 * sinf(fase * 3.14f)) : 0;
+                SDL_SetTextureAlphaMod(bv_cont, alp);
+                SDL_Rect dr = {bv_px + (bv_pw - bv_cont_w) / 2,
+                               bv_py + bv_ph - bv_cont_h - 12,
+                               bv_cont_w, bv_cont_h};
+                SDL_RenderCopy(renderer, bv_cont, NULL, &dr);
+            }
+
+            /* cerrar con tecla o click */
+            if (tecla || clicked) bienvenida_activa = 0;
+        }
+
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
 
     /* ── Cleanup ── */
+    if (bv_ver)  SDL_DestroyTexture(bv_ver);
+    if (bv_cont) SDL_DestroyTexture(bv_cont);
+    for (int i = 0; i < bv_n; i++)
+        if (bv_tex[i]) SDL_DestroyTexture(bv_tex[i]);
     if (tex_titulo) SDL_DestroyTexture(tex_titulo);
     if (tex_cur)    SDL_DestroyTexture(tex_cur);
     for (int c = 0; c < 2; c++)

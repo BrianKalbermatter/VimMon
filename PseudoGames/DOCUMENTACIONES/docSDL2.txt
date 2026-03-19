@@ -3321,6 +3321,173 @@ QUE SE HIZO
     Medio  → amarillo (255, 200, 50)
     Dificil → rojo  (255, 80, 80)
 
+──────────────────────────────────────────────────────────────────────────────
+39. SCROLL EN SELECCION DE NIVELES + CANDADO EN NIVELES BLOQUEADOS
+──────────────────────────────────────────────────────────────────────────────
+
+  SCROLL CON RUEDA DEL MOUSE
+  ───────────────────────────
+  Variable: scroll_y (int, inicializada en 0)
+  Evento: SDL_MOUSEWHEEL → scroll_y -= evento.wheel.y * 45
+    evento.wheel.y > 0 = rueda hacia arriba = contenido sube
+  Teclas: SDLK_UP / SDLK_DOWN también modifican scroll_y (±40px)
+  Clamp: scroll_max = contenido_h - alto; si scroll_y > scroll_max → clamp
+
+  Cada tarjeta calcula su cy con el offset:
+    cy = start_y + row * (card_h + gap_y) - scroll_y
+
+  Tarjetas fuera de pantalla se saltean con continue (sin dibujar ni procesar).
+  SDL_RenderSetClipRect() evita que nada se dibuje fuera del viewport.
+
+  BARRA INDICADORA DE SCROLL
+  ───────────────────────────
+  Solo aparece cuando scroll_max > 0.
+  bar_h = alto * alto / contenido_h   (proporcional al viewport)
+  bar_y = scroll_y * (alto - bar_h) / scroll_max
+
+  CANDADO EN NIVELES BLOQUEADOS
+  ──────────────────────────────
+  Antes: nivel bloqueado mostraba "[BLOQUEADO]" en texto dim.
+  Ahora: se dibuja un candado con primitivas SDL:
+    - Argolla: 3 SDL_RenderFillRect (lado izq, lado der, techo)
+    - Cuerpo:  1 SDL_RenderFillRect (rectangulo mas ancho)
+    - Ojo:     1 SDL_RenderFillRect pequeño con color de fondo
+  Centrado en (cx + card_w/2, cy + card_h/2).
+  El numero de nivel se muestra igual pero en gris muy oscuro.
+
+──────────────────────────────────────────────────────────────────────────────
+40. MENU RPG — OVERLAY DE BIENVENIDA
+──────────────────────────────────────────────────────────────────────────────
+
+  CONCEPTO
+  ─────────
+  La pantalla de bienvenida NO es una pantalla separada.
+  Es un overlay que se dibuja ENCIMA del menu normal en la primera llamada.
+  El menu (lluvia + panel RPG) se renderiza primero, luego el overlay encima.
+  Esto da la sensacion de una sola pantalla cohesiva.
+
+  IMPLEMENTACION
+  ───────────────
+  static int bienvenida_activa = 1;  // static: se inicializa una vez en toda la sesion
+
+  En cada frame, si bienvenida_activa:
+    1. Dibujar overlay oscuro: SDL_SetRenderDrawColor(0,0,0,170) + FillRect NULL
+    2. Dibujar panel con borde doble neon
+    3. Titulo pulsante (reutiliza tex_titulo del menu, a escala reducida)
+    4. Version "v0.14-alpha" arriba a la derecha del panel
+    5. Lineas de descripcion del juego
+    6. Texto parpadeante "[ Presiona cualquier tecla... ]"
+  Si (tecla || clicked) → bienvenida_activa = 0
+
+  BLOQUEO DE INPUTS AL MENU
+  ──────────────────────────
+  Mientras bienvenida_activa == 1:
+    - SDL_KEYDOWN → solo cierra la bienvenida (break del inner while)
+    - SDL_MOUSEBUTTONDOWN → solo cierra la bienvenida (break del inner while)
+    - Los shortcuts [1]-[7] y clicks en botones NO se procesan
+
+  VACIADO DE COLA (flush de eventos)
+  ────────────────────────────────────
+  Cuando screenBienvenida era pantalla separada (eliminada), el evento
+  que la cerraba "rebotaba" al menu siguiente.
+  Solucion original: while (SDL_PollEvent(&flush)) {} despues de la funcion.
+  Solucion actual: al integrarla en screenMenu, el mismo loop consume
+  y bloquea el evento correctamente sin necesitar flush externo.
+
+──────────────────────────────────────────────────────────────────────────────
+41. INTEGRACION DE FRANKLY/PAED COMO VERIFICADOR AUTOMATICO
+──────────────────────────────────────────────────────────────────────────────
+
+  QUE ES FRANKLY/PAED
+  ─────────────────────
+  Frankly es el interprete/compilador del lenguaje .paed creado por el usuario.
+  Archivo: Frankly/paed (script bash ejecutable)
+  Lenguaje: .paed (pseudocodigo estilo AED de UTN)
+
+  Estructura valida de un archivo .paed:
+    ACCION nombre ES
+        AMBIENTE
+            variable: TIPO;
+        PROCESO
+            instrucciones
+    FIN_ACCION
+
+  Tipos: ENTERO, REAL, BOOLEANO, AN(n), N(n)
+  Asignacion: :=
+  Salida: ESCRIBIR(variable)
+
+  EXTENSION DE PAED: ARITMETICA CON BC
+  ──────────────────────────────────────
+  Problema original: el ejecutor de paed almacenaba el RHS como string
+  sin evaluar. P := C * (1 + R) ^ anios almacenaba la cadena literal.
+
+  Solucion: en el case := de ejecutar():
+    1. Sustituir variables conocidas en el RHS
+       for var in "${!variables[@]}"; do rhs="${rhs//$var/${variables[$var]}}"; done
+    2. Evaluar con bc:
+       resultado=$(echo "scale=6; $rhs" | bc -l 2>/dev/null)
+    3. Si bc tiene exito → guardar resultado numerico
+       Si no → guardar como texto (quitar comillas)
+
+  BUG RESUELTO: GLOB EXPANSION DEL ASTERISCO
+  ─────────────────────────────────────────────
+  Problema: set -- $linea en bash expande * como glob de archivos.
+  La linea P := C * (1 + R) ^ anios se convertia en lista de archivos.
+  Solucion: set -f antes del while read (deshabilita glob) + set +f al salir.
+
+  ARQUITECTURA DE VERIFICACION
+  ──────────────────────────────
+  Flujo:
+    Editor → F9 guarda saves/nivel_N.paed
+    screenEditorLvl → llama screenVerificador(n, "nivel_N")
+    screenVerificador → para cada caso de prueba:
+      1. preparar_archivo(): copia saves/nivel_N.paed a /tmp/sol_verificar.paed
+         inyectando las variables de datos despues de PROCESO:
+           "C=100, R=0.04" → "    C := 100;\n    R := 0.04;\n"
+      2. popen("./Frankly/paed /tmp/sol_verificar.paed 2>&1", "r")
+      3. Captura stdout completo
+      4. Extrae la ultima linea no vacia como resultado
+      5. Evalua tipo: "real" = es_numero(), "entero" = es_entero(), "texto" = non-empty
+      6. PASS si exit_code==0 y tipo correcto
+
+  CAMBIO EN NIVELES.JSON / STRUCT
+  ──────────────────────────────────
+  Antes:
+    "esperado": "112.4864", "tolerancia": "0.01", "pregunta": "Cual es P?"
+  Ahora:
+    "tipo_salida": "real"
+  El verificador NO chequea el valor exacto, solo el TIPO del output.
+  Esto es correcto pedagogicamente: el alumno demuestra que sabe
+  escribir el algoritmo, no que memorizo un resultado.
+
+  TIPOS DE SALIDA VALIDOS
+  ────────────────────────
+  "real"   → strtod() parsea sin error y la cadena se consume completa
+  "entero" → igual que real pero sin punto decimal en el string
+  "texto"  → cualquier output no vacio (AN, mensajes, etc.)
+
+  INYECCION DE DATOS
+  ───────────────────
+  La funcion preparar_archivo() en C:
+    1. Lee el .paed del alumno linea por linea
+    2. Detecta la linea "PROCESO"
+    3. Inserta inmediatamente despues las asignaciones de datos
+    4. El alumno no necesita inicializar esas variables en su algoritmo
+
+──────────────────────────────────────────────────────────────────────────────
+42. DIFICULTAD POR ESTRELLAS
+──────────────────────────────────────────────────────────────────────────────
+
+  Los niveles usan caracteres Unicode ★ en vez de texto.
+  Cada ★ ocupa 3 bytes en UTF-8 (E2 98 85).
+  Para contar estrellas: estrellas = strlen(dificultad) / 3
+
+  Colores en screenLvLs:
+    1 estrella  → verde   ( 80, 220, 100)
+    2 estrellas → amarillo (255, 200,  50)
+    3 estrellas → naranja  (255, 130,  20)
+    4 estrellas → rojo     (255,  50,  50) — BOSS
+
 ================================================================================
 FIN DE LA DOCUMENTACION
 ================================================================================

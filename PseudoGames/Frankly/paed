@@ -122,7 +122,7 @@ ejecutar() {
     echo "ejecutando..."
     en_proceso=0
     declare -A variables
-    # Si el analizar funct dio el OK todo bien, puede ejecutar sino Error de sintaxis... basicamente lo que tendria que hacer es errores de sintaxis nomas... lo demas lo va haciendo el propio usuario. Funciones que necesita la va creando
+    set -f   # deshabilitar glob: el * en expresiones no expande archivos
     while read linea; do
         set -- $linea
         linea_num=$((linea_num + 1))
@@ -135,11 +135,23 @@ ejecutar() {
         then
             case $2 in
 
-                :=) 
-                    valor="${@:3}"
-                    valor="${valor%;}"
-                    valor="${valor//\"/}"
-                    variables[$1]=$valor 
+                :=)
+                    rhs="${@:3}"
+                    rhs="${rhs%;}"
+                    # Reemplazar variables conocidas por su valor
+                    for var in "${!variables[@]}"; do
+                        rhs="${rhs//$var/${variables[$var]}}"
+                    done
+                    # Intentar evaluar como expresion aritmetica con bc
+                    # ^ es exponenciacion en bc, funciona directo
+                    resultado=$(echo "scale=6; $rhs" | bc -l 2>/dev/null)
+                    if [ $? -eq 0 ] && [ -n "$resultado" ]; then
+                        variables[$1]=$resultado
+                    else
+                        # Es texto: quitar comillas
+                        rhs="${rhs//\"/}"
+                        variables[$1]=$rhs
+                    fi
                      ;;
                 "")
             
@@ -150,9 +162,7 @@ ejecutar() {
             esac
         fi
     done < "$ARCHIVO"
-
-
-
+    set +f   # re-habilitar glob
 }
 
 # $1 = el archivo que le pasas como argumento

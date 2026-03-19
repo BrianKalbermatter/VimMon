@@ -1,188 +1,117 @@
 #include "screenVerificador.h"
-#include "ui.h"
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 #include <stdlib.h>
 
-#define INPUT_MAX 64
+#define TMP_PAED  "/tmp/sol_verificar.paed"
+#define PAED_CMD  "./Frankly/paed " TMP_PAED " 2>&1"
 
-/* Dibuja un recuadro centrado con borde */
-static void dibujar_panel(SDL_Renderer *r, int ancho, int alto,
-                           int pad_x, int pad_y)
+/* Parsea "C=100, R=0.04" y genera lineas "    C := 100;\n" */
+static void
+generar_inyeccion(const char *datos, char *out, int out_max)
 {
-    SDL_Rect bg = { pad_x, pad_y, ancho - pad_x * 2, alto - pad_y * 2 };
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(r, 10, 14, 22, 230);
-    SDL_RenderFillRect(r, &bg);
-    SDL_SetRenderDrawColor(r, 60, 130, 255, 200);
-    SDL_RenderDrawRect(r, &bg);
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+    out[0] = '\0';
+    char copia[256];
+    strncpy(copia, datos, sizeof(copia)-1);
+    copia[sizeof(copia)-1] = '\0';
+
+    char *tok = strtok(copia, ",");
+    while (tok) {
+        while (*tok == ' ') tok++;
+        char *eq = strchr(tok, '=');
+        if (eq) {
+            *eq = '\0';
+            char var[64], val[64];
+            strncpy(var, tok, sizeof(var)-1); var[sizeof(var)-1] = '\0';
+            strncpy(val, eq+1, sizeof(val)-1); val[sizeof(val)-1] = '\0';
+            int vl = (int)strlen(var)-1;
+            while (vl >= 0 && var[vl] == ' ') var[vl--] = '\0';
+            char linea[128];
+            snprintf(linea, sizeof(linea), "    %s := %s;\n", var, val);
+            strncat(out, linea, out_max - (int)strlen(out) - 1);
+        }
+        tok = strtok(NULL, ",");
+    }
 }
 
-/* Compara la respuesta del jugador con el esperado dentro de la tolerancia.
-   Si el string no es numerico, hace comparacion exacta de texto. */
-static int comparar(const char *respuesta, const char *esperado, const char *tolerancia)
+/* Crea /tmp/sol_verificar.paed inyectando las vars despues de PROCESO */
+static int
+preparar_archivo(const char *path_alumno, const char *datos)
 {
-    char *endR, *endE;
-    double vR = strtod(respuesta, &endR);
-    double vE = strtod(esperado,  &endE);
+    FILE *src = fopen(path_alumno, "r");
+    if (!src) return 0;
 
-    /* si ambos son numericos, compara con tolerancia */
-    if (endR != respuesta && endE != esperado) {
-        double tol = strtod(tolerancia, NULL);
-        return fabs(vR - vE) <= tol;
+    FILE *dst = fopen(TMP_PAED, "w");
+    if (!dst) { fclose(src); return 0; }
+
+    char inyeccion[1024];
+    generar_inyeccion(datos, inyeccion, sizeof(inyeccion));
+
+    char linea[512];
+    while (fgets(linea, sizeof(linea), src)) {
+        fputs(linea, dst);
+        char *p = linea;
+        while (*p == ' ' || *p == '\t') p++;
+        if (strncmp(p, "PROCESO", 7) == 0)
+            fputs(inyeccion, dst);
     }
-
-    /* sino, comparacion de texto (sin importar mayusculas) */
-    return strcasecmp(respuesta, esperado) == 0;
+    fclose(src);
+    fclose(dst);
+    return 1;
 }
 
-int screenVerificador(SDL_Renderer *renderer, TTF_Font *fuente,
-                      int ancho, int alto, Nivel *n)
+static int es_numero(const char *s) {
+    if (!s || !*s) return 0;
+    char *end;
+    strtod(s, &end);
+    while (*end == ' ' || *end == '\n' || *end == '\r') end++;
+    return *end == '\0';
+}
+
+static int es_entero(const char *s) {
+    if (!es_numero(s)) return 0;
+    return strchr(s, '.') == NULL;
+}
+
+int
+verificar_nivel(Nivel *n, const char *nombre_nivel)
 {
-    if (!n || n->num_casos == 0) return 1;  /* sin casos = pasa directamente */
+    if (!n || n->num_casos == 0) return 0;
 
-    int caso_actual = 0;
-    char input[INPUT_MAX] = {0};
-    int input_len = 0;
-    char msg_error[128] = {0};
-    int mostrar_error = 0;
+    char path_alumno[128];
+    snprintf(path_alumno, sizeof(path_alumno), "saves/%s.paed", nombre_nivel);
 
-    SDL_StartTextInput();
+    for (int i = 0; i < n->num_casos; i++) {
+        CasoPrueba *cp = &n->casos[i];
 
-    SDL_Color c_titulo  = {180, 200, 255, 255};
-    SDL_Color c_datos   = {160, 160, 180, 255};
-    SDL_Color c_pregunta= {220, 230, 255, 255};
-    SDL_Color c_input   = {255, 255, 255, 255};
-    SDL_Color c_error   = {255,  80,  80, 255};
-    SDL_Color c_hint    = {120, 120, 140, 255};
+        if (!preparar_archivo(path_alumno, cp->datos))
+            return 0;
 
-    int pad_x = 80, pad_y = 60;
-    int ix = pad_x + 30;  /* x base del texto dentro del panel */
+        FILE *p = popen(PAED_CMD, "r");
+        if (!p) return 0;
 
-    while (1) {
-        SDL_Event ev;
-        while (SDL_PollEvent(&ev)) {
-            if (ev.type == SDL_QUIT) {
-                SDL_StopTextInput();
-                return 0;
-            }
+        char output_buf[1024] = {0};
+        int n_leido = (int)fread(output_buf, 1, sizeof(output_buf)-1, p);
+        output_buf[n_leido] = '\0';
+        int exit_code = pclose(p);
+        if (exit_code != 0) return 0;
 
-            if (ev.type == SDL_KEYDOWN) {
-                switch (ev.key.keysym.sym) {
+        /* Tomar la ultima linea como resultado */
+        char last[256] = {0};
+        char tmp[1024];
+        strncpy(tmp, output_buf, sizeof(tmp)-1);
+        char *line = strtok(tmp, "\n");
+        while (line) { strncpy(last, line, sizeof(last)-1); line = strtok(NULL, "\n"); }
 
-                    case SDLK_ESCAPE:
-                        SDL_StopTextInput();
-                        return 0;
+        int ll = (int)strlen(last)-1;
+        while (ll >= 0 && (last[ll]=='\n'||last[ll]=='\r'||last[ll]==' ')) last[ll--] = '\0';
 
-                    case SDLK_BACKSPACE:
-                        if (input_len > 0) {
-                            input[--input_len] = '\0';
-                            mostrar_error = 0;
-                        }
-                        break;
+        int tipo_ok = 0;
+        if      (strcmp(cp->tipo_salida, "real")   == 0) tipo_ok = es_numero(last);
+        else if (strcmp(cp->tipo_salida, "entero")  == 0) tipo_ok = es_entero(last);
+        else                                               tipo_ok = (last[0] != '\0');
 
-                    case SDLK_RETURN: {
-                        if (input_len == 0) break;
-
-                        CasoPrueba *cp = &n->casos[caso_actual];
-                        if (comparar(input, cp->esperado, cp->tolerancia)) {
-                            /* caso superado */
-                            caso_actual++;
-                            input[0] = '\0';
-                            input_len = 0;
-                            mostrar_error = 0;
-
-                            if (caso_actual >= n->num_casos) {
-                                /* TODOS los casos pasaron */
-                                SDL_StopTextInput();
-                                return 1;
-                            }
-                        } else {
-                            /* respuesta incorrecta */
-                            snprintf(msg_error, sizeof(msg_error),
-                                     "Incorrecto. Esperado: %s", cp->esperado);
-                            mostrar_error = 1;
-                        }
-                        break;
-                    }
-
-                    default: break;
-                }
-            }
-
-            if (ev.type == SDL_TEXTINPUT) {
-                int add = (int)strlen(ev.text.text);
-                if (input_len + add < INPUT_MAX - 1) {
-                    strcat(input, ev.text.text);
-                    input_len += add;
-                    mostrar_error = 0;
-                }
-            }
-        }
-
-        /* ── render ── */
-        SDL_SetRenderDrawColor(renderer, 8, 10, 18, 255);
-        SDL_RenderClear(renderer);
-
-        dibujar_panel(renderer, ancho, alto, pad_x, pad_y);
-
-        CasoPrueba *cp = &n->casos[caso_actual];
-
-        /* titulo */
-        char str_titulo[160];
-        snprintf(str_titulo, sizeof(str_titulo),
-                 "Verificacion — %s", n->titulo);
-        dibujadoTextoColor(renderer, fuente, str_titulo, ix, pad_y + 24, c_titulo);
-
-        /* progreso de casos */
-        char str_caso[64];
-        snprintf(str_caso, sizeof(str_caso),
-                 "Caso %d de %d", caso_actual + 1, n->num_casos);
-        dibujadoTextoColor(renderer, fuente, str_caso, ix, pad_y + 54, c_hint);
-
-        /* separador */
-        SDL_SetRenderDrawColor(renderer, 60, 80, 120, 255);
-        SDL_RenderDrawLine(renderer, pad_x + 20, pad_y + 76,
-                           ancho - pad_x - 20, pad_y + 76);
-
-        /* datos del caso */
-        char str_datos[300];
-        snprintf(str_datos, sizeof(str_datos), "Datos:    %s", cp->datos);
-        dibujadoTextoColor(renderer, fuente, str_datos, ix, pad_y + 92, c_datos);
-
-        /* pregunta */
-        dibujadoTextoColor(renderer, fuente, cp->pregunta, ix, pad_y + 130, c_pregunta);
-
-        /* caja de input */
-        int box_y = pad_y + 170;
-        SDL_Rect box = { ix, box_y, ancho - pad_x * 2 - 60, 36 };
-        SDL_SetRenderDrawColor(renderer, 20, 30, 50, 255);
-        SDL_RenderFillRect(renderer, &box);
-        SDL_SetRenderDrawColor(renderer, 80, 140, 255, 255);
-        SDL_RenderDrawRect(renderer, &box);
-
-        /* texto del input + cursor parpadeante */
-        char display[INPUT_MAX + 2];
-        Uint32 t = SDL_GetTicks();
-        if ((t / 500) % 2 == 0)
-            snprintf(display, sizeof(display), "%s|", input);
-        else
-            snprintf(display, sizeof(display), "%s ", input);
-        dibujadoTextoColor(renderer, fuente, display, ix + 8, box_y + 8, c_input);
-
-        /* mensaje de error o de ok parcial */
-        if (mostrar_error) {
-            dibujadoTextoColor(renderer, fuente, msg_error,
-                               ix, box_y + 48, c_error);
-        }
-
-        /* atajos */
-        dibujadoTextoColor(renderer, fuente, "[ENTER] Confirmar    [ESC] Volver",
-                           ix, alto - pad_y - 30, c_hint);
-
-        SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+        if (!tipo_ok) return 0;
     }
+    return 1;
 }

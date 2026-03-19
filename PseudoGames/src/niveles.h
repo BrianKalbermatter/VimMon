@@ -5,10 +5,8 @@
 #define MAX_CASOS 8
 
 typedef struct {
-    char datos[256];
-    char pregunta[256];
-    char esperado[64];
-    char tolerancia[64];
+    char datos[256];      /* variables de entrada: "C=100, R=0.04" */
+    char tipo_salida[32]; /* "real", "entero", "texto"             */
 } CasoPrueba;
 
 typedef struct {

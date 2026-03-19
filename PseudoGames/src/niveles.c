@@ -54,10 +54,8 @@ int cargar_niveles(const char *path) {
             cJSON_ArrayForEach(c, casos) {
                 if (n->num_casos >= MAX_CASOS) break;
                 CasoPrueba *cp = &n->casos[n->num_casos];
-                copiar_str(cp->datos, cJSON_GetObjectItem(c, "datos"), sizeof(cp->datos));
-                copiar_str(cp->pregunta, cJSON_GetObjectItem(c, "pregunta"), sizeof(cp->pregunta));
-                copiar_str(cp->esperado, cJSON_GetObjectItem(c, "esperado"), sizeof(cp->esperado));
-                copiar_str(cp->tolerancia, cJSON_GetObjectItem(c, "tolerancia"), sizeof(cp->tolerancia));
+                copiar_str(cp->datos,       cJSON_GetObjectItem(c, "datos"),       sizeof(cp->datos));
+                copiar_str(cp->tipo_salida, cJSON_GetObjectItem(c, "tipo_salida"), sizeof(cp->tipo_salida));
                 n->num_casos++;
             }
         }

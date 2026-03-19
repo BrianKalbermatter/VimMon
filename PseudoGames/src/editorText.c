@@ -1,4 +1,6 @@
 #include "editorText.h"
+#include "screenVerificador.h"
+#include "progreso.h"
 #include "ui.h"
 #include <string.h>
 #include <stdio.h>
@@ -386,7 +388,8 @@ ejecutar_paed(const char *path, char out[][256], int max)
 int
 screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                  int ancho, int alto, const char *nombre_fijo,
-                 const char *cons_titulo, const char *cons_texto)
+                 const char *cons_titulo, const char *cons_texto,
+                 Nivel *nivel, int nivel_num)
 {
     /* ── Buffer de lineas ─────────────────────────────────────────── */
     static char buf[MAX_LINES][512];
@@ -746,6 +749,15 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                     guardar_archivo(buf, n_lines, path);
                     n_out = ejecutar_paed(path, out_buf, OUT_MAX);
+                    if (nivel && n_out < OUT_MAX) {
+                        if (verificar_nivel(nivel, nombre_arch)) {
+                            marcar_completado(nivel_num);
+                            strncpy(out_buf[n_out], "[OK] Nivel superado!", 255);
+                        } else {
+                            strncpy(out_buf[n_out], "[FAIL] Resultado incorrecto.", 255);
+                        }
+                        n_out++;
+                    }
                 }
             }
 
@@ -789,6 +801,15 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                     guardar_archivo(buf, n_lines, path);
                     n_out = ejecutar_paed(path, out_buf, OUT_MAX);
+                    if (nivel && n_out < OUT_MAX) {
+                        if (verificar_nivel(nivel, nombre_arch)) {
+                            marcar_completado(nivel_num);
+                            strncpy(out_buf[n_out], "[OK] Nivel superado!", 255);
+                        } else {
+                            strncpy(out_buf[n_out], "[FAIL] Resultado incorrecto.", 255);
+                        }
+                        n_out++;
+                    }
                 }
                 /* Boton menu ≡: toggle dropdown */
                 else if (mx >= btn_menu.x && mx < btn_menu.x + btn_menu.w &&

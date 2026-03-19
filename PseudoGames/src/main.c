@@ -96,6 +96,7 @@ main(int argc, char *argv[]) {
         screen_transition(renderer, ancho, alto);
     }
 
+
     int opcion = 0;
     int primera_vez = 1;
     do {
