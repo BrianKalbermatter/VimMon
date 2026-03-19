@@ -2,95 +2,203 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "ui.h"
 #include "pomodoro_bg.h"
+#ifdef _WIN32
+#include <windows.h>
+#define DBG(msg) MessageBoxA(NULL, msg, "DEBUG screenMenu", MB_OK)
+#else
+#define DBG(msg) (void)(msg)
+#endif
 
-#define MAX_COLS 80
+#define MAX_COLS    80
+#define N_OPCIONES   7
 
-typedef struct {
-    int x;
-    int y;
-    int speed;
-} Columna;
+typedef struct { int x, y, speed; } Columna;
 
-// Igual que dibujadoTexto pero acepta color
+/* ── Particulas para la explosion de letras ── */
+#define MAX_PARTS 48
+typedef struct { float x, y, vx, vy, alpha; char ch[2]; } Part;
+
 static void
-dibujarChar(SDL_Renderer *renderer, TTF_Font *fuente, char c, int x, int y, SDL_Color color)
+explosion(SDL_Renderer *renderer, TTF_Font *fuente,
+          const char *texto, int cx, int cy)
 {
-    char txt[2] = {c, '\0'};
-    SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente, txt, color);
-    if (!sup) return;
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, sup);
-    SDL_Rect pos = {x, y, sup->w, sup->h};
-    SDL_RenderCopy(renderer, tex, NULL, &pos);
-    SDL_FreeSurface(sup);
-    SDL_DestroyTexture(tex);
+    Part pts[MAX_PARTS];
+    int  n = 0;
+    int  cw, ch_sz;
+    TTF_SizeUTF8(fuente, "A", &cw, &ch_sz);
+    int  len = (int)strlen(texto);
+    int  sx  = cx - (len * cw) / 2;
+
+    for (int i = 0; i < len && n < MAX_PARTS; i++) {
+        if (texto[i] == ' ') continue;
+        pts[n].x     = (float)(sx + i * cw);
+        pts[n].y     = (float)cy;
+        float ang    = (rand() % 628) / 100.0f;   /* 0..2π */
+        float spd    = 1.5f + (rand() % 35) / 10.0f;
+        pts[n].vx    = cosf(ang) * spd;
+        pts[n].vy    = sinf(ang) * spd - 2.0f;    /* sesgo hacia arriba */
+        pts[n].alpha = 255.0f;
+        pts[n].ch[0] = texto[i];
+        pts[n].ch[1] = '\0';
+        n++;
+    }
+
+    Uint32 t0 = SDL_GetTicks();
+    while (SDL_GetTicks() - t0 < 380) {
+        /* oscurecer el frame anterior */
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 50);
+        SDL_RenderFillRect(renderer, NULL);
+
+        for (int i = 0; i < n; i++) {
+            pts[i].x    += pts[i].vx;
+            pts[i].y    += pts[i].vy;
+            pts[i].vy   += 0.28f;          /* gravedad */
+            pts[i].alpha -= 9.0f;
+            if (pts[i].alpha <= 0) continue;
+
+            SDL_Color c = {0, 255, 80, (Uint8)pts[i].alpha};
+            SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, pts[i].ch, c);
+            if (!s) continue;
+            SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+            SDL_Rect dst   = {(int)pts[i].x, (int)pts[i].y, s->w, s->h};
+            SDL_RenderCopy(renderer, t, NULL, &dst);
+            SDL_FreeSurface(s);
+            SDL_DestroyTexture(t);
+        }
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+    }
 }
 
 int
 screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 {
-    int corriendo = 1;
     SDL_Event evento;
 
-    int btn_w = 300;
-    int btn_h = 50;
-    int btn_x = (ancho - btn_w) / 2;
-
-    // --- Matrix rain setup ---
+    /* ── Matrix rain ── */
     srand((unsigned int)SDL_GetTicks());
     Columna cols[MAX_COLS];
     int espaciado = ancho / MAX_COLS;
-
     for (int i = 0; i < MAX_COLS; i++) {
         cols[i].x     = i * espaciado;
-        cols[i].y     = -(rand() % alto);   // arranca en posición random negativa
-        cols[i].speed = 2 + rand() % 6;     // velocidad entre 2 y 7
+        cols[i].y     = -(rand() % alto);
+        cols[i].speed = 2 + rand() % 6;
     }
 
     SDL_Color verde_cabeza = {180, 255, 180, 255};
     SDL_Color verde_cuerpo = {0,   200,  50, 210};
     SDL_Color verde_cola   = {0,   120,  30, 150};
+    SDL_Texture *rain[2][3] = {0};
+    SDL_Color paleta[3] = { verde_cabeza, verde_cuerpo, verde_cola };
+    const char *bits[2] = {"0", "1"};
+    int ch_w = 0, ch_h = 0;
+    for (int c = 0; c < 2; c++)
+        for (int p = 0; p < 3; p++) {
+            SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, bits[c], paleta[p]);
+            if (s) {
+                rain[c][p] = SDL_CreateTextureFromSurface(renderer, s);
+                if (c == 0 && p == 0) { ch_w = s->w; ch_h = s->h; }
+                SDL_FreeSurface(s);
+            }
+        }
 
-    // --- Título PSEUDOGAMES pulsante en el fondo ---
-    // Abrimos la fuente a tamaño grande para el título
-    TTF_Font *fuente_titulo = TTF_OpenFont("assets/fonts/main.ttf", 90);
+    /* ── Título pulsante ── */
+    TTF_Font *fuente_titulo = TTF_OpenFont("assets/fonts/main.ttf", 72);
     SDL_Texture *tex_titulo = NULL;
     int titulo_w = 0, titulo_h = 0;
     if (fuente_titulo) {
-        SDL_Color blanco = {255, 255, 255, 255};
-        SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente_titulo, "PSEUDOGAMES", blanco);
+        SDL_Color ambar = {0, 255, 80, 255};
+        SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente_titulo, "PSEUDOGAMES", ambar);
         if (sup) {
+            titulo_w = sup->w; titulo_h = sup->h;
             tex_titulo = SDL_CreateTextureFromSurface(renderer, sup);
-            titulo_w = sup->w;
-            titulo_h = sup->h;
             SDL_FreeSurface(sup);
         }
         TTF_CloseFont(fuente_titulo);
     }
-    SDL_SetTextureBlendMode(tex_titulo, SDL_BLENDMODE_BLEND);
+    if (tex_titulo) SDL_SetTextureBlendMode(tex_titulo, SDL_BLENDMODE_BLEND);
 
-    while (corriendo) {
+    /* ── Labels cacheados (normal=ambar, hover=blanco) ── */
+    const char *labels[N_OPCIONES] = {
+        "Jugar", "DOC", "Pomodoro", "Editor Libre",
+        "Seleccion de Nivel", "Soluciones", "Salir"
+    };
+    const char *nums[N_OPCIONES] = {
+        "[1]","[2]","[3]","[4]","[5]","[6]","[7]"
+    };
+
+    SDL_Color c_ambar  = {  0, 230,  70, 255};  /* neon green */
+    SDL_Color c_blanco = {180, 255, 180, 255};  /* neon hover  */
+    SDL_Color c_dim    = {  0,  70,  25, 255};  /* green oscuro */
+
+    SDL_Texture *lbl_n[N_OPCIONES] = {0};
+    SDL_Texture *lbl_h[N_OPCIONES] = {0};
+    SDL_Texture *num_t[N_OPCIONES] = {0};
+    int lbl_w[N_OPCIONES] = {0}, lbl_hh[N_OPCIONES] = {0};
+    int num_w = 0, num_hh = 0;
+    TTF_SizeUTF8(fuente, "[1]", &num_w, &num_hh);
+
+    for (int i = 0; i < N_OPCIONES; i++) {
+        SDL_Surface *sn  = TTF_RenderUTF8_Blended(fuente, labels[i], c_ambar);
+        SDL_Surface *sh  = TTF_RenderUTF8_Blended(fuente, labels[i], c_blanco);
+        SDL_Surface *snu = TTF_RenderUTF8_Blended(fuente, nums[i],   c_dim);
+        if (sn) {
+            lbl_w[i] = sn->w; lbl_hh[i] = sn->h;
+            lbl_n[i] = SDL_CreateTextureFromSurface(renderer, sn);
+            SDL_FreeSurface(sn);
+        }
+        if (sh) { lbl_h[i] = SDL_CreateTextureFromSurface(renderer, sh); SDL_FreeSurface(sh); }
+        if (snu){ num_t[i] = SDL_CreateTextureFromSurface(renderer, snu); SDL_FreeSurface(snu); }
+    }
+
+    /* ── Cursor > (blanco brillante) ── */
+    int cur_w = 0, cur_hh = 0;
+    TTF_SizeUTF8(fuente, ">", &cur_w, &cur_hh);
+    SDL_Texture *tex_cur = NULL;
+    {
+        SDL_Surface *sc = TTF_RenderUTF8_Blended(fuente, ">", c_blanco);
+        if (sc) { tex_cur = SDL_CreateTextureFromSurface(renderer, sc); SDL_FreeSurface(sc); }
+    }
+
+    /* ── Layout del panel RPG ── */
+    int row_h   = lbl_hh[0] + 10;
+    int pad_x   = 22;
+    int pad_y   = 18;
+    int panel_w = num_w + cur_w + 14 + lbl_w[4] + pad_x * 2 + 8; /* ancho minimo para "Seleccion de Nivel" */
+    int panel_h = pad_y * 2 + N_OPCIONES * row_h;
+    int panel_x = (ancho - panel_w) / 2;
+    int panel_y = alto / 2 - panel_h / 2 + 28;
+
+    /* ── Estado de corrupcion/glitch ── */
+    int   glitch_activo = 0;
+    int   glitch_frames = 0;
+    Uint32 next_glitch  = SDL_GetTicks() + 1500 + (Uint32)(rand() % 4000);
+
+    int resultado = -1;   /* -1 = seguir corriendo */
+
+    while (resultado < 0) {
         int clicked = 0, click_x = 0, click_y = 0;
-
-        pom_tick();   // mantener el proceso vivo aunque no se este viendo
+        pom_tick();
 
         while (SDL_PollEvent(&evento)) {
-            if (evento.type == SDL_QUIT) return 0;
+            if (evento.type == SDL_QUIT) { resultado = 0; break; }
             if (evento.type == SDL_KEYDOWN) {
-                switch (evento.key.keysym.sym) {
-                    case SDLK_1: return 1;
-                    case SDLK_2: return 2;
-                    case SDLK_3: return 3;
-                    case SDLK_4: return 4;
-                    case SDLK_5: return 5;
-                    case SDLK_6: return 6;
-                    // control global del pomodoro desde el menu
-                    case SDLK_p: pom_send("p", 1); break;
-                    case SDLK_0: pom_send("0", 1); break;
+                int k = evento.key.keysym.sym;
+                if (k >= SDLK_1 && k <= SDLK_7) {
+                    int idx  = k - SDLK_1;
+                    int ex   = panel_x + pad_x + num_w + cur_w + 14 + lbl_w[idx] / 2;
+                    int ey   = panel_y + pad_y + idx * row_h + row_h / 2;
+                    explosion(renderer, fuente, labels[idx], ex, ey);
+                    resultado = (idx == N_OPCIONES - 1) ? 0 : idx + 1;
+                    break;
                 }
+                if (k == SDLK_p) pom_send("p", 1);
+                if (k == SDLK_0) pom_send("0", 1);
             }
-            // capturar click dentro del poll, no después
             if (evento.type == SDL_MOUSEBUTTONDOWN &&
                 evento.button.button == SDL_BUTTON_LEFT) {
                 clicked = 1;
@@ -99,128 +207,179 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             }
         }
 
-        // Fade: rectángulo negro semitransparente en vez de RenderClear total
-        // El alpha bajo (25) crea la cola larga de los caracteres automáticamente
+        /* ── Matrix rain ── */
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 25);
         SDL_RenderFillRect(renderer, NULL);
 
-        // --- Dibujar columnas de 0s y 1s ---
         for (int i = 0; i < MAX_COLS; i++) {
-            char c = (rand() % 2) ? '0' : '1';
-
-            // cabeza: más brillante
-            dibujarChar(renderer, fuente, c, cols[i].x, cols[i].y, verde_cabeza);
-
-            // cuerpo: un char atrás
-            if (cols[i].y - 16 >= 0) {
-                char c2 = (rand() % 2) ? '0' : '1';
-                dibujarChar(renderer, fuente, c2, cols[i].x, cols[i].y - 16, verde_cuerpo);
+            int ci = rand() % 2;
+            SDL_Rect d0 = { cols[i].x, cols[i].y, ch_w, ch_h };
+            if (rain[ci][0]) SDL_RenderCopy(renderer, rain[ci][0], NULL, &d0);
+            if (cols[i].y - ch_h >= 0) {
+                int c2 = rand() % 2;
+                SDL_Rect d1 = { cols[i].x, cols[i].y - ch_h, ch_w, ch_h };
+                if (rain[c2][1]) SDL_RenderCopy(renderer, rain[c2][1], NULL, &d1);
             }
-
-            // cola: dos chars atrás
-            if (cols[i].y - 32 >= 0) {
-                char c3 = (rand() % 2) ? '0' : '1';
-                dibujarChar(renderer, fuente, c3, cols[i].x, cols[i].y - 32, verde_cola);
+            if (cols[i].y - ch_h * 2 >= 0) {
+                int c3 = rand() % 2;
+                SDL_Rect d2 = { cols[i].x, cols[i].y - ch_h*2, ch_w, ch_h };
+                if (rain[c3][2]) SDL_RenderCopy(renderer, rain[c3][2], NULL, &d2);
             }
-
             cols[i].y += cols[i].speed;
-
-            // reset: cuando sale por abajo vuelve a aparecer arriba con delay random
             if (cols[i].y > alto) {
                 cols[i].y     = -(rand() % 300);
                 cols[i].speed = 2 + rand() % 6;
             }
         }
 
-        // --- Título PSEUDOGAMES pulsante en el fondo ---
+        /* ── Vidrio: velo oscuro sobre la lluvia ── */
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 0, 4, 0, 140);
+        SDL_RenderFillRect(renderer, NULL);
+
+        /* ── Titulo pulsante ── */
         if (tex_titulo) {
             float t     = SDL_GetTicks() / 1000.0f;
-            // oscila entre 0.85 y 1.15 — suave y lento
-            float scale = 1.0f + 0.15f * sinf(t * 0.6f);
-            int w = (int)(titulo_w * scale);
-            int h = (int)(titulo_h * scale);
-            int x = (ancho - w) / 2;
-            int y = alto / 6 - h / 2;    // parte superior, centrado
-            SDL_SetTextureAlphaMod(tex_titulo, 35); // muy transparente: empotrado en el fondo
-            SDL_Rect dst = {x, y, w, h};
+            float scale = 1.0f + 0.07f * sinf(t * 0.8f);
+            int   tw    = (int)(titulo_w * scale);
+            int   th    = (int)(titulo_h * scale);
+            Uint8 alpha = (Uint8)(160 + 60 * sinf(t * 1.1f));
+            SDL_SetTextureAlphaMod(tex_titulo, alpha);
+            SDL_Rect dst = {(ancho - tw) / 2, panel_y - th - 16, tw, th};
             SDL_RenderCopy(renderer, tex_titulo, NULL, &dst);
         }
 
-        // --- Botones encima del efecto ---
-        int mx, my;
-        SDL_GetMouseState(&mx, &my);
-        char *labels[7] = {"Jugar", "DOC", "Pomodoro", "Editor Libre",
-                           "Seleccion de Nivel", "Soluciones", "Salir"};
+        /* ── Panel: fondo + borde doble estilo RPG ── */
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 4, 6, 4, 210);
+        SDL_Rect panel = {panel_x, panel_y, panel_w, panel_h};
+        SDL_RenderFillRect(renderer, &panel);
 
-        for (int i = 0; i < 7; i++) {
-            int btn_y = (alto / 2) - 80 + (i * 70);
-            int hover = (mx >= btn_x && mx <= btn_x + btn_w &&
-                         my >= btn_y && my <= btn_y + btn_h);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        SDL_SetRenderDrawColor(renderer, 0, 220, 70, 255);   /* borde externo neon */
+        SDL_RenderDrawRect(renderer, &panel);
+        SDL_Rect inner = {panel_x+2, panel_y+2, panel_w-4, panel_h-4};
+        SDL_SetRenderDrawColor(renderer, 0, 70, 25, 255);    /* borde interno oscuro */
+        SDL_RenderDrawRect(renderer, &inner);
 
-            SDL_Rect btn = {btn_x, btn_y, btn_w, btn_h};
-
-            // Fondo acrílico: azul semitransparente, se ve la lluvia por detrás
+        /* ── Glitch de corrupcion ── */
+        Uint32 ahora = SDL_GetTicks();
+        if (!glitch_activo && ahora >= next_glitch) {
+            glitch_activo = 1;
+            glitch_frames = 3 + rand() % 7;
+        }
+        if (glitch_activo) {
+            /* scanlines de ruido horizontal */
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            if (hover)
-                SDL_SetRenderDrawColor(renderer, 0, 150, 255, 80);
-            else
-                SDL_SetRenderDrawColor(renderer, 0, 60, 120, 60);
-            SDL_RenderFillRect(renderer, &btn);
-
-            // Borde del botón
-            if (hover)
-                SDL_SetRenderDrawColor(renderer, 0, 220, 255, 220);
-            else
-                SDL_SetRenderDrawColor(renderer, 0, 180, 100, 160);
-            SDL_RenderDrawRect(renderer, &btn);
-
-            // Texto centrado dentro del botón
-            int txt_w, txt_h;
-            TTF_SizeUTF8(fuente, labels[i], &txt_w, &txt_h);
-            int txt_x = btn_x + (btn_w - txt_w) / 2;
-            int txt_y = btn_y + (btn_h - txt_h) / 2;
-
-            SDL_Color color_txt = hover ? (SDL_Color){255, 255, 255, 255}
-                                        : (SDL_Color){180, 255, 180, 255};
-            SDL_Surface *sup = TTF_RenderUTF8_Blended(fuente, labels[i], color_txt);
-            SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, sup);
-            SDL_Rect pos_txt = {txt_x, txt_y, sup->w, sup->h};
-            SDL_RenderCopy(renderer, tex, NULL, &pos_txt);
-            SDL_FreeSurface(sup);
-            SDL_DestroyTexture(tex);
-
-            if (clicked &&
-                click_x >= btn_x && click_x <= btn_x + btn_w &&
-                click_y >= btn_y && click_y <= btn_y + btn_h)
-                return (i == 6) ? 0 : i + 1;
+            int n_lines = 2 + rand() % 5;
+            for (int g = 0; g < n_lines; g++) {
+                int gy  = rand() % alto;
+                int gh  = 1 + rand() % 4;
+                int gx  = rand() % (ancho / 2);   /* offset horizontal aleatorio */
+                Uint8 ga = (Uint8)(40 + rand() % 100);
+                SDL_SetRenderDrawColor(renderer, 0, 255, 80, ga);
+                SDL_Rect gr = {gx, gy, ancho - gx, gh};
+                SDL_RenderFillRect(renderer, &gr);
+            }
+            glitch_frames--;
+            if (glitch_frames <= 0) {
+                glitch_activo = 0;
+                next_glitch   = ahora + 1200 + (Uint32)(rand() % 5000);
+            }
         }
 
-        // --- Boton engranaje: esquina inferior derecha ---
-        int gear_size = 48;
-        int gear_x    = ancho - gear_size - 18;
-        int gear_y    = alto  - gear_size - 18;
+        /* ── Opciones ── */
+        int mx, my;
+        SDL_GetMouseState(&mx, &my);
+        float t = SDL_GetTicks() / 1000.0f;
+        int cursor_pulse = (int)(4.0f * sinf(t * 5.0f));  /* pulso horizontal del > */
+
+        for (int i = 0; i < N_OPCIONES; i++) {
+            int oy    = panel_y + pad_y + i * row_h;
+            int ox    = panel_x + pad_x;
+            int hover = (mx >= panel_x + 4 && mx <= panel_x + panel_w - 4 &&
+                         my >= oy           && my <= oy + row_h);
+
+            /* corrupcion: alpha y offset random cuando hay glitch */
+            int   gx_off = (glitch_activo && rand() % 3 == 0) ? (rand() % 9 - 4) : 0;
+            Uint8 g_alpha = (glitch_activo && rand() % 4 == 0) ? (Uint8)(40 + rand() % 80) : 255;
+
+            /* [N] en gris/dim */
+            if (num_t[i]) {
+                SDL_Rect rn = {ox, oy + (row_h - num_hh) / 2, num_w, num_hh};
+                SDL_RenderCopy(renderer, num_t[i], NULL, &rn);
+            }
+
+            int text_x = ox + num_w + cur_w + 14;
+
+            if (hover) {
+                /* cursor > con pulso */
+                if (tex_cur) {
+                    SDL_Rect rc = {ox + num_w + 4 + cursor_pulse,
+                                   oy + (row_h - cur_hh) / 2, cur_w, cur_hh};
+                    SDL_RenderCopy(renderer, tex_cur, NULL, &rc);
+                }
+                /* label hover: sin glitch */
+                if (lbl_h[i]) {
+                    SDL_SetTextureAlphaMod(lbl_h[i], 255);
+                    SDL_Rect rl = {text_x, oy + (row_h - lbl_hh[i]) / 2,
+                                   lbl_w[i], lbl_hh[i]};
+                    SDL_RenderCopy(renderer, lbl_h[i], NULL, &rl);
+                }
+                /* click */
+                if (clicked &&
+                    click_x >= panel_x + 4 && click_x <= panel_x + panel_w - 4 &&
+                    click_y >= oy           && click_y <= oy + row_h) {
+                    int ex = text_x + lbl_w[i] / 2;
+                    int ey = oy + row_h / 2;
+                    explosion(renderer, fuente, labels[i], ex, ey);
+                    resultado = (i == N_OPCIONES - 1) ? 0 : i + 1;
+                }
+            } else {
+                /* label neon: con glitch de alpha y offset */
+                if (lbl_n[i]) {
+                    SDL_SetTextureAlphaMod(lbl_n[i], g_alpha);
+                    SDL_Rect rl = {text_x + gx_off, oy + (row_h - lbl_hh[i]) / 2,
+                                   lbl_w[i], lbl_hh[i]};
+                    SDL_RenderCopy(renderer, lbl_n[i], NULL, &rl);
+                    SDL_SetTextureAlphaMod(lbl_n[i], 255);  /* resetear */
+                }
+            }
+        }
+
+        /* ── Engranaje config (esquina inferior derecha) ── */
+        int gear_size = 34;
+        int gear_x    = ancho - gear_size - 14;
+        int gear_y    = alto  - gear_size - 14;
         int gear_cx   = gear_x + gear_size / 2;
         int gear_cy   = gear_y + gear_size / 2;
         int gear_hover = (mx >= gear_x && mx <= gear_x + gear_size &&
                           my >= gear_y && my <= gear_y + gear_size);
-
-        SDL_Color c_gear = gear_hover ? (SDL_Color){220, 220, 255, 255}
-                                      : (SDL_Color){120, 120, 160, 255};
-        // color del agujero: fondo oscuro del menu
-        SDL_Color c_hole = {10, 10, 14, 255};
-        dibujarArandela(renderer, gear_cx, gear_cy, gear_size / 2 - 2,
-                        c_gear, c_hole);
+        SDL_Color c_gear = gear_hover ? (SDL_Color){  0, 255,  80, 255}
+                                      : (SDL_Color){  0, 100,  35, 255};
+        SDL_Color c_hole = {4, 6, 4, 255};
+        dibujarArandela(renderer, gear_cx, gear_cy, gear_size / 2 - 2, c_gear, c_hole);
 
         if (clicked &&
             click_x >= gear_x && click_x <= gear_x + gear_size &&
             click_y >= gear_y && click_y <= gear_y + gear_size)
-            return 7;  // opcion config
+            resultado = 7;
 
         SDL_RenderPresent(renderer);
-        SDL_Delay(16); // ~60 fps
+        SDL_Delay(16);
     }
 
+    /* ── Cleanup ── */
     if (tex_titulo) SDL_DestroyTexture(tex_titulo);
-    return 0;
+    if (tex_cur)    SDL_DestroyTexture(tex_cur);
+    for (int c = 0; c < 2; c++)
+        for (int p = 0; p < 3; p++)
+            if (rain[c][p]) SDL_DestroyTexture(rain[c][p]);
+    for (int i = 0; i < N_OPCIONES; i++) {
+        if (lbl_n[i]) SDL_DestroyTexture(lbl_n[i]);
+        if (lbl_h[i]) SDL_DestroyTexture(lbl_h[i]);
+        if (num_t[i]) SDL_DestroyTexture(num_t[i]);
+    }
+    return resultado;
 }

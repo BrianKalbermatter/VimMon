@@ -2965,5 +2965,362 @@ REGLA GENERAL EN WINDOWS
 
 
 ================================================================================
+SECCION 34 - VERIFICADOR DE NIVELES + FIX VENTANA WSLg (2026-03-19)
+================================================================================
+
+QUE SE HIZO
+───────────
+  1. Verificador de niveles (screenVerificador.c / screenVerificador.h)
+  2. Dificultad en tarjetas de nivel (JSON + struct + render)
+  3. Fix de ventana invisible en WSLg
+  4. Fix de crash al poner pantalla completa en Linux
+
+──────────────────────────────────────────────────────────────────────────────
+34.1 ARQUITECTURA DEL VERIFICADOR
+──────────────────────────────────────────────────────────────────────────────
+
+  POR QUE NO ES UN SCRIPT BASH
+  ─────────────────────────────
+  La primera idea era tener scripts/verificar.sh que validara el pseudocodigo.
+  Eso esta MAL porque:
+    - El pseudocodigo del jugador vive en memoria RAM (buffer del editor SDL)
+    - Un script bash no puede leer la RAM de otro proceso
+    - El juego ya tiene los casos_prueba en niveles.json con esperado + tolerancia
+
+  LA SOLUCION CORRECTA
+  ─────────────────────
+  El verificador vive DENTRO del juego como una pantalla mas (screenVerificador.c).
+
+  Flujo:
+    screenEditorLvl (jugador escribe pseudocodigo)
+        → [cierra editor]
+        → screenVerificador (muestra cada caso_prueba del nivel)
+            → jugador ingresa su respuesta numerica
+            → se compara con "esperado" dentro de "tolerancia" con strtod()
+            → TODOS OK → marcar_completado()
+            → FALLO    → mensaje de error, puede reintentar
+
+  COMPARACION NUMERICA
+  ─────────────────────
+  Se usa strtod() para convertir el string a double y comparar con tolerancia:
+
+    double vR = strtod(respuesta, &endR);
+    double vE = strtod(esperado,  &endE);
+    if (fabs(vR - vE) <= tol) → PASA
+
+  Si el string no es numerico (endR == respuesta), cae a strcasecmp() para
+  comparacion de texto exacto (sin importar mayusculas).
+
+  ARCHIVOS MODIFICADOS
+  ─────────────────────
+    src/screenVerificador.c   ← nuevo: la pantalla de verificacion
+    src/screenVerificador.h   ← nuevo: declaracion de screenVerificador()
+    src/screenEditorLvl.c     ← llama al verificador en vez de marcar directo
+    Makefile                  ← agrega screenVerificador.c a la compilacion
+
+  ANTES (malo - marcaba completado sin verificar):
+    screenEditorText(...);
+    marcar_completado(nivel_num);   ← siempre, sin importar si resolvio bien
+
+  DESPUES (correcto):
+    screenEditorText(...);
+    int aprobado = screenVerificador(renderer, fuente, ancho, alto, n);
+    if (aprobado)
+        marcar_completado(nivel_num);
+
+──────────────────────────────────────────────────────────────────────────────
+34.2 DIFICULTAD EN TARJETAS DE NIVEL
+──────────────────────────────────────────────────────────────────────────────
+
+  Se agrego el campo "dificultad" al JSON de niveles y se muestra en la tarjeta
+  con color segun el valor:
+    "Facil"  → verde  (80, 220, 100)
+    "Medio"  → amarillo (255, 200, 50)
+    "Dificil"→ rojo   (255, 80, 80)
+
+  CADENA DE CAMBIOS (dato importante: siempre se hace en este orden):
+    1. data/niveles.json    → agregar "dificultad": "Facil" en cada nivel
+    2. src/niveles.h        → agregar char dificultad[32] al struct Nivel
+    3. src/niveles.c        → agregar copiar_str(n->dificultad, ...) al parser
+    4. src/screenLvLs.c     → leer nv->dificultad y dibujarlo con strcmp()
+
+  REGLA APRENDIDA: el JSON es la fuente de verdad de los datos.
+  El C no decide que es facil o dificil — lo define el archivo de datos.
+  El C solo lee y muestra.
+
+──────────────────────────────────────────────────────────────────────────────
+34.3 BUG: VENTANA INVISIBLE EN WSLg
+──────────────────────────────────────────────────────────────────────────────
+
+  SINTOMA
+  ────────
+  El juego aparecia en la barra de tareas de Windows pero al hacer click
+  no se veia nada — ventana invisible / contenido negro.
+
+  CAUSA
+  ──────
+  En WSL2 con WSLg coexisten dos servidores de display:
+    - DISPLAY=:0         → X11 via XWayland
+    - WAYLAND_DISPLAY=0  → Wayland via Weston
+
+  SDL2 en Linux prefiere Wayland, pero el compositor Weston de WSLg
+  no puede pasar contenido OpenGL/hardware-acelerado al compositor
+  de Windows (DWM). El resultado: ventana existente pero invisible.
+
+  DIAGNOSTICO REALIZADO
+  ──────────────────────
+  Se agrego fprintf(stderr, "[DBG] ...") en main.c para rastrear:
+    [DBG] SDL_Init OK. Driver: x11
+    [DBG] Ventana creada OK
+    [DBG] Renderer OK
+    [DBG] Tamano ventana: 1920x1080
+
+  Todo OK tecnicamente pero sin contenido visible. El proceso corria
+  (5 segundos, 120MB RAM, sockets abiertos) pero sin nada en pantalla.
+
+  INTENTOS FALLIDOS
+  ──────────────────
+  - SDL_WINDOW_FULLSCREEN_DESKTOP sin BORDERLESS → no funciono
+  - SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED → no
+  - SDL_RENDERER_SOFTWARE con fullscreen → no
+  - setenv("SDL_VIDEODRIVER", "x11", 1) → x11 ya se usaba, no cambio nada
+  - setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1) → muy tarde, Mesa ya cargo
+
+  SOLUCION FINAL
+  ───────────────
+  Dos cambios en main.c:
+
+  1. Cambiar SDL_RENDERER_ACCELERATED → SDL_RENDERER_SOFTWARE
+     El renderer acelerado usa OpenGL que XWayland no puede compositar.
+     El renderer de software usa CPU puro de SDL2, sin Mesa ni OpenGL.
+
+  2. Cambiar SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_BORDERLESS
+     → SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE (800x600)
+     Las ventanas fullscreen en WSLg no se mapean correctamente al
+     escritorio de Windows. Una ventana normal si funciona.
+
+  3. Agregar SDL_ShowWindow + SDL_RestoreWindow + SDL_RaiseWindow
+     para asegurarse que la ventana arranca visible y al frente.
+
+  4. SDL_RenderSetLogicalSize(renderer, 800, 600)
+     El juego siempre renderiza en coordenadas 800x600 y SDL escala
+     automaticamente al tamaño real de la ventana (con letterboxing
+     si la proporcion no coincide). Ningun otro archivo necesito cambios.
+
+  CODIGO FINAL en main.c:
+    SDL_Window *ventana = SDL_CreateWindow("PseudoGames",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600,
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1,
+        SDL_RENDERER_SOFTWARE);
+
+    SDL_RenderSetLogicalSize(renderer, 800, 600);
+    SDL_ShowWindow(ventana);
+    SDL_RestoreWindow(ventana);
+    SDL_RaiseWindow(ventana);
+
+    int ancho = 800, alto = 600;  // logico, no fisico
+
+──────────────────────────────────────────────────────────────────────────────
+34.4 BUG: CRASH AL ACTIVAR PANTALLA COMPLETA EN LINUX
+──────────────────────────────────────────────────────────────────────────────
+
+  SINTOMA
+  ────────
+  En screenConfig, activar "Pantalla completa: Si" cerraba el juego
+  (crash sin mensaje de error).
+
+  CAUSA
+  ──────
+  screenConfig.c llamaba SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP).
+  En WSLg con SDL_RENDERER_SOFTWARE, cambiar a modo fullscreen en runtime
+  causa un crash en la capa XWayland/Weston.
+
+  SOLUCION
+  ─────────
+  En Linux, en vez de fullscreen real se usa maximizar/restaurar la ventana,
+  que da el mismo efecto visual sin el crash:
+
+    #ifdef _WIN32
+        SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    #else
+        SDL_MaximizeWindow(ventana);   // "pantalla completa" en Linux/WSLg
+    #endif
+
+    #ifdef _WIN32
+        SDL_SetWindowFullscreen(ventana, 0);
+    #else
+        SDL_RestoreWindow(ventana);    // volver a ventana normal
+    #endif
+
+  En Windows sigue funcionando con fullscreen real (Direct3D/OpenGL ok).
+  En Linux usa maximize que es compatible con todos los compositors.
+
+──────────────────────────────────────────────────────────────────────────────
+35. RENDERER GPU CON FALLBACK A SOFTWARE
+──────────────────────────────────────────────────────────────────────────────
+
+  PROBLEMA
+  ─────────
+  SDL_RENDERER_SOFTWARE es el mas lento posible: usa solo CPU.
+  SDL_RENDERER_ACCELERATED usa la GPU (OpenGL/Vulkan/Metal segun plataforma)
+  pero en WSLg puede fallar si XWayland no tiene soporte OpenGL.
+
+  SOLUCION: intentar GPU primero, caer a SOFTWARE si falla
+  ──────────────────────────────────────────────────────────
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer)
+        renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_SOFTWARE);
+
+  VENTAJAS
+  ─────────
+  - En sistemas con GPU disponible (Windows nativo, Linux con Mesa):
+    SDL_RenderCopy va directo a VRAM. Mucho mas rapido.
+  - SDL_RENDERER_PRESENTVSYNC sincroniza al refresh del monitor.
+    Sin el SDL_Delay(16) impreciso — el frame espera exactamente
+    hasta el proximo vsync.
+  - En WSLg sin OpenGL: fallback silencioso a SOFTWARE, sin crash.
+
+  CON GPU ACTIVA: fullscreen real funciona en todos los OS
+  ─────────────────────────────────────────────────────────
+  Con SOFTWARE renderer, SDL_SetWindowFullscreen crasheaba en WSLg.
+  Con ACCELERATED, OpenGL puede manejar el cambio de modo → no crash.
+  Ya no se necesita el #ifdef WIN32 en fullscreen.
+
+──────────────────────────────────────────────────────────────────────────────
+36. FULLSCREEN UNIFICADO Y FOCO AUTOMATICO
+──────────────────────────────────────────────────────────────────────────────
+
+  PROBLEMA ANTERIOR
+  ──────────────────
+  Al cambiar a pantalla completa el usuario tenia que hacer click extra
+  en la ventana para que el juego recibiera inputs de teclado/mouse.
+  Ademas el codigo tenia #ifdef WIN32 duplicado en cada lugar.
+
+  SOLUCION: funcion aplicar_fullscreen() en screenConfig.c
+  ──────────────────────────────────────────────────────────
+
+    static void aplicar_fullscreen(SDL_Window *ventana, int activar) {
+        if (activar) {
+            if (SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+                // fallback si el renderer no soporta fullscreen real
+                SDL_SetWindowBordered(ventana, SDL_FALSE);
+                SDL_MaximizeWindow(ventana);
+            }
+        } else {
+            SDL_SetWindowFullscreen(ventana, 0);
+            SDL_SetWindowBordered(ventana, SDL_TRUE);
+            SDL_RestoreWindow(ventana);
+        }
+        SDL_RaiseWindow(ventana);
+        SDL_SetWindowInputFocus(ventana);  // foco automatico, sin click extra
+    }
+
+  SDL_GetWindowSize DENTRO DEL LOOP DE screenConfig
+  ───────────────────────────────────────────────────
+  ancho/alto se pasan por valor a screenConfig.
+  Al cambiar de modo la ventana cambia de tamaño pero las variables
+  quedaban desactualizadas → layout roto.
+  Fix: llamar SDL_GetWindowSize al inicio de cada frame del loop.
+
+──────────────────────────────────────────────────────────────────────────────
+37. MENU ESTILO RPG + EFECTO GLITCH
+──────────────────────────────────────────────────────────────────────────────
+
+  DISEÑO
+  ───────
+  El menu anterior usaba rectangulos azules grandes que tapaban la lluvia.
+  Nuevo diseño inspirado en Final Fantasy / RPG retro:
+
+  - Panel pequeno con doble borde (borde exterior neon, interior oscuro)
+  - Fondo del panel semitransparente: la lluvia se ve detras (como vidrio)
+  - Sobre la lluvia: velo oscuro semitransparente (rgba 0,4,0,140)
+    Efecto "lluvia detras de una ventana empanada"
+  - Colores: verde neon (0, 230, 70) normal / verde brillante (180,255,180) hover
+  - Cursor > que pulsa horizontalmente con sinf()
+  - Numeros [1]-[7] en verde oscuro dim a la izquierda
+
+  CACHE DE TEXTURAS (optimizacion)
+  ─────────────────────────────────
+  Todos los textos se pre-renderizan UNA vez antes del loop:
+    - rain[2][3]  : 6 texturas para la lluvia (0/1 x cabeza/cuerpo/cola)
+    - lbl_n[7]    : labels en color normal
+    - lbl_h[7]    : labels en color hover
+    - num_t[7]    : numeros [1]-[7]
+    - tex_cur     : cursor >
+    - tex_titulo  : "PSEUDOGAMES"
+  En el loop solo se llama SDL_RenderCopy → cero llamadas TTF por frame.
+
+  EXPLOSION DE LETRAS AL SELECCIONAR
+  ────────────────────────────────────
+  Al hacer click o presionar una tecla, antes de retornar:
+    1. Se crean particulas (una por letra del label)
+    2. Cada particula tiene velocidad (vx,vy) random y gravedad
+    3. Loop de ~380ms: mover + fade out con alpha decreciente
+    4. Recien entonces retorna el numero de opcion
+  Implementado en funcion explosion() al inicio de screenMenu.c
+
+  EFECTO GLITCH / CORRUPCION
+  ───────────────────────────
+  Estado: glitch_activo + glitch_frames + next_glitch (timestamp)
+  Cada 1.2 a 6.2 segundos (random) se activa el glitch:
+    - Dura 3 a 10 frames (~50-170ms)
+    - Dibuja 2-7 scanlines horizontales verdes con alpha y posicion random
+    - Cada label no-hover tiene probabilidad de:
+        * gx_off: desplazarse 1-4px horizontal
+        * g_alpha: volverse casi transparente (40-120 de 255)
+    - El label con hover NO se corrompe (siempre visible al usuario)
+  Efecto: parece que el menu tiene corrupcion de datos, como un CRT viejo.
+
+──────────────────────────────────────────────────────────────────────────────
+38. SISTEMA DE VERIFICACION DE NIVELES (screenVerificador)
+──────────────────────────────────────────────────────────────────────────────
+
+  ARQUITECTURA
+  ─────────────
+  El verificador NO es un script externo (bash/python).
+  Es una pantalla SDL2 dentro del juego porque:
+    - El pseudocodigo del jugador vive en RAM (buffer del editor)
+    - Un script externo no puede acceder a esa RAM
+    - La validacion tiene que ser interactiva (pantalla, input, feedback)
+
+  FLUJO
+  ──────
+  screenEditorLvl → [Enter/Verificar] → screenVerificador(nivel) → resultado
+    Si aprobado: marcar_completado(nivel_num)
+    Si no: volver al editor
+
+  DATOS DE TEST EN niveles.json
+  ──────────────────────────────
+  Cada nivel tiene un array "casos_prueba":
+    {
+      "datos": "descripcion de la entrada",
+      "pregunta": "Que debe devolver tu funcion con entrada X?",
+      "esperado": "42",
+      "tolerancia": "0"
+    }
+  tolerancia > 0 permite comparacion numerica aproximada (para floats).
+
+  COMPARACION INTELIGENTE
+  ────────────────────────
+    static int comparar(respuesta, esperado, tolerancia) {
+        // intenta parsear ambos como double con strtod()
+        // si ambos son numeros: |vR - vE| <= tol
+        // si alguno es texto: strcasecmp() case-insensitive
+    }
+
+  CAMPO DIFICULTAD EN NIVELES
+  ────────────────────────────
+  Agregado a niveles.json: "dificultad": "Facil" / "Medio" / "Dificil"
+  Propagado a struct Nivel (char dificultad[32]) en niveles.h y niveles.c
+  Mostrado en screenLvLs con color:
+    Facil  → verde  (80, 220, 100)
+    Medio  → amarillo (255, 200, 50)
+    Dificil → rojo  (255, 80, 80)
+
+================================================================================
 FIN DE LA DOCUMENTACION
 ================================================================================

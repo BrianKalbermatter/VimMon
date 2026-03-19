@@ -13,6 +13,7 @@ typedef struct {
 
 typedef struct {
     int numero;
+    char dificultad[32];
     char titulo[128];
     char enunciado[2048];
     char pista[1024];

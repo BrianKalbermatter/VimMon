@@ -2,6 +2,26 @@
 #include <SDL2/SDL_ttf.h>
 #include "ui.h"
 
+/* Intenta SDL_WINDOW_FULLSCREEN_DESKTOP; si falla (renderer SOFTWARE)
+   usa el truco de borderless+maximize como fallback */
+static void
+aplicar_fullscreen(SDL_Window *ventana, int activar)
+{
+    if (activar) {
+        if (SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+            SDL_SetWindowBordered(ventana, SDL_FALSE);
+            SDL_MaximizeWindow(ventana);
+        }
+    } else {
+        SDL_SetWindowFullscreen(ventana, 0);
+        SDL_SetWindowBordered(ventana, SDL_TRUE);
+        SDL_RestoreWindow(ventana);
+    }
+    /* Forzar foco al juego: sin esto hay que hacer click extra */
+    SDL_RaiseWindow(ventana);
+    SDL_SetWindowInputFocus(ventana);
+}
+
 // Opciones de configuracion disponibles
 typedef struct {
     const char *nombre;
@@ -16,7 +36,7 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
 {
     // --- definir opciones ---
     OpcionConfig opciones[] = {
-        { "Pantalla completa",  {"Si", "No"},       2, 0 },
+        { "Pantalla completa",  {"Si", "No"},       2, 1 },
         { "Velocidad lluvia",   {"Lenta", "Normal", "Rapida"}, 3, 1 },
         { "Brillo",             {"Bajo", "Normal", "Alto"},    3, 1 },
     };
@@ -28,6 +48,8 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
 
     while (corriendo) {
         int clicked = 0, click_x = 0, click_y = 0;
+        /* Re-leer tamaño real: cambia al entrar/salir de fullscreen */
+        SDL_GetWindowSize(ventana, &ancho, &alto);
 
         while (SDL_PollEvent(&evento)) {
             if (evento.type == SDL_QUIT)   return 0;
@@ -56,10 +78,7 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
                 }
 
                 // aplicar pantalla completa en tiempo real
-                if (opciones[0].seleccion == 0)
-                    SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP);
-                else
-                    SDL_SetWindowFullscreen(ventana, 0);
+                aplicar_fullscreen(ventana, opciones[0].seleccion == 0);
             }
             if (evento.type == SDL_MOUSEBUTTONDOWN &&
                 evento.button.button == SDL_BUTTON_LEFT) {
@@ -68,6 +87,9 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
                 click_y  = evento.button.y;
             }
         }
+
+        // aplicar también al hacer click en < >
+        if (clicked) aplicar_fullscreen(ventana, opciones[0].seleccion == 0);
 
         // --- render ---
         SDL_SetRenderDrawColor(renderer, 12, 12, 18, 255);
@@ -153,11 +175,6 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
                     if (opciones[i].seleccion >= opciones[i].n_valores)
                         opciones[i].seleccion = 0;
                 }
-                // aplicar pantalla completa
-                if (opciones[0].seleccion == 0)
-                    SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP);
-                else
-                    SDL_SetWindowFullscreen(ventana, 0);
             }
         }
 

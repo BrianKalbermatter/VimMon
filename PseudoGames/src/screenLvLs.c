@@ -131,6 +131,18 @@ screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
             else if (!desbloqueado)
                 dibujadoTextoColor(renderer, fuente, "[BLOQUEADO]", cx, cy + 68, c_num);
 
+            // dificultad
+            if (desbloqueado) {
+                SDL_Color c_dif;
+                if (strcmp(nv->dificultad, "Facil") == 0)
+                    c_dif = (SDL_Color){80, 220, 100, 255};
+                else if (strcmp(nv->dificultad, "Medio") == 0)
+                    c_dif = (SDL_Color){255, 200, 50, 255};
+                else
+                    c_dif = (SDL_Color){255, 80, 80, 255};
+                dibujadoTextoColor(renderer, fuente, nv->dificultad, cx, cy + card_h - 58, c_dif);
+            }
+
             // puntos
             dibujadoTextoColor(renderer, fuente, "100 pts", cx, cy + card_h - 38, c_pts);
 

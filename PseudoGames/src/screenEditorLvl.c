@@ -5,6 +5,7 @@
 #include "niveles.h"
 #include "progreso.h"
 #include "editorText.h"
+#include "screenVerificador.h"
 
 int
 screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, int nivel_num)
@@ -18,6 +19,10 @@ screenLvLEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, i
     /* Editor con consigna a la izquierda y editor a la derecha */
     screenEditorText(renderer, fuente, ancho, alto, nombre, n->titulo, n->enunciado);
 
-    marcar_completado(nivel_num);
+    /* Solo si el jugador pasa todos los casos de prueba se marca completado */
+    int aprobado = screenVerificador(renderer, fuente, ancho, alto, n);
+    if (aprobado)
+        marcar_completado(nivel_num);
+
     return 0;
 }

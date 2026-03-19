@@ -12,7 +12,7 @@ PseudoGames/
 │
 ├── data/
 │   ├── niveles.json        ✓ hecho
-│   ├── wiki.json           ✓ hecho
+│   ├── wiki.txt            ✓ hecho  ← FORMATO TXT (no JSON)
 │   ├── stdlib.json         pendiente
 │   ├── sintaxis.json       pendiente
 │   ├── recompensas.json    pendiente

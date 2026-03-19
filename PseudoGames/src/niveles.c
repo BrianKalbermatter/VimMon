@@ -42,6 +42,7 @@ int cargar_niveles(const char *path) {
         cJSON *num = cJSON_GetObjectItem(item, "numero");
         if (cJSON_IsNumber(num)) n->numero = num->valueint;
 
+        copiar_str(n->dificultad, cJSON_GetObjectItem(item, "dificultad"), sizeof(n->dificultad));
         copiar_str(n->titulo, cJSON_GetObjectItem(item, "titulo"), sizeof(n->titulo));
         copiar_str(n->enunciado, cJSON_GetObjectItem(item, "enunciado"), sizeof(n->enunciado));
         copiar_str(n->pista, cJSON_GetObjectItem(item, "pista"), sizeof(n->pista));

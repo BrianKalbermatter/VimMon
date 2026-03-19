@@ -55,23 +55,32 @@ main(int argc, char *argv[]) {
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             800, 600,
-            SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_BORDERLESS
+            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
             );
     if (!ventana) {
         fatal("Error ventana", SDL_GetError());
         return 1;
     }
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_ACCELERATED);
+    /* Intentar GPU primero; si falla (WSLg sin OpenGL) usar software */
+    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer)
+        renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer) {
         fatal("Error renderer", SDL_GetError());
         return 1;
     }
 
-    // Traer la ventana al frente y darle foco de teclado/mouse sin necesitar un click
+    SDL_ShowWindow(ventana);
+    SDL_RestoreWindow(ventana);
     SDL_RaiseWindow(ventana);
     SDL_SetWindowInputFocus(ventana);
 
+    /* Leer el tamaño real de la ventana — sin logical size para evitar
+       el blur del escalado interno de SDL. Cada pantalla dibuja directo
+       en la resolución nativa. Se re-lee al inicio de cada iteración
+       para capturar cambios (maximizar, pantalla completa, resize). */
     int ancho, alto;
     SDL_GetWindowSize(ventana, &ancho, &alto);
     screen_poweron(renderer, ancho, alto);
@@ -90,6 +99,10 @@ main(int argc, char *argv[]) {
     int opcion = 0;
     int primera_vez = 1;
     do {
+        /* Re-leer resolución real en cada vuelta del loop:
+           captura maximize, fullscreen o resize del usuario */
+        SDL_GetWindowSize(ventana, &ancho, &alto);
+
         if (!primera_vez) screen_transition(renderer, ancho, alto);
         primera_vez = 0;
         opcion = screenMenu(renderer, fuente, ancho, alto);

@@ -9,7 +9,8 @@ SRC = src/main.c src/ui.c src/niveles.c src/progreso.c src/cJSON.c \
       src/screenDOC.c src/screenMenu.c src/screenEditorLvl.c \
       src/screenLvLs.c src/screenEditorFree.c src/editorText.c \
       src/screenSoluction.c src/screenPomodoro.c src/pomodoro_bg.c \
-      src/screenConfig.c src/screenFeedback.c src/screenPJ.c
+      src/screenConfig.c src/screenFeedback.c src/screenPJ.c \
+      src/screenVerificador.c
 
 OBJ     = $(addprefix $(BUILDDIR)/, $(notdir $(SRC:.c=.o)))
 TARGET  = aed

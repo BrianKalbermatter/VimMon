@@ -308,6 +308,25 @@ void screenPJ_intro(SDL_Renderer *renderer, SDL_Window *ventana, int ancho, int 
     SDL_Texture *screen = SDL_CreateTexture(renderer,
         SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, PJ_W, PJ_H);
 
+    /* ── notificacion "UsuarioAnonimo Conectado" ── */
+    TTF_Font *fnt = TTF_OpenFont("assets/fonts/main.ttf", 14);
+    SDL_Texture *notif_tex = NULL;
+    SDL_Rect notif_rect = {0,0,0,0};
+    int notif_frames = 120;   /* 2 seg a 60fps */
+    if (fnt) {
+        SDL_Color verde = {80, 220, 80, 255};
+        SDL_Surface *surf = TTF_RenderUTF8_Blended(fnt, "● UsuarioAnonimo Conectado", verde);
+        if (surf) {
+            notif_tex = SDL_CreateTextureFromSurface(renderer, surf);
+            notif_rect.w = surf->w;
+            notif_rect.h = surf->h;
+            notif_rect.x = 18;
+            notif_rect.y = alto - surf->h - 14;
+            SDL_FreeSurface(surf);
+        }
+        TTF_CloseFont(fnt);
+    }
+
     /* mouse */
     SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1");
     Uint8 cdata[1]={0}, cmask[1]={0};
@@ -387,6 +406,22 @@ void screenPJ_intro(SDL_Renderer *renderer, SDL_Window *ventana, int ancho, int 
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, screen, NULL, &dest);
 
+        /* ── notificacion servidor ── */
+        if (notif_tex && notif_frames > 0) {
+            /* fadeout en los ultimos 30 frames */
+            Uint8 alpha = (notif_frames < 30) ? (Uint8)(notif_frames * 8) : 220;
+            SDL_SetTextureAlphaMod(notif_tex, alpha);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            /* fondo semitransparente detras del texto */
+            SDL_Rect fondo = { notif_rect.x - 8, notif_rect.y - 4,
+                               notif_rect.w + 16, notif_rect.h + 8 };
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(alpha * 0.6));
+            SDL_RenderFillRect(renderer, &fondo);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            SDL_RenderCopy(renderer, notif_tex, NULL, &notif_rect);
+            notif_frames--;
+        }
+
         /* overlay negro del fade */
         if (fade > 0) {
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -404,5 +439,6 @@ void screenPJ_intro(SDL_Renderer *renderer, SDL_Window *ventana, int ancho, int 
     SDL_SetWindowGrab(ventana, SDL_FALSE);
     SDL_ShowCursor(SDL_ENABLE);
     SDL_FreeCursor(cur);
+    if (notif_tex) SDL_DestroyTexture(notif_tex);
     SDL_DestroyTexture(screen);
 }

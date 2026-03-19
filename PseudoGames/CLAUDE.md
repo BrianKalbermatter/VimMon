@@ -23,7 +23,7 @@
   │
   ├── data/
   │   ├── niveles.json              ← ya lo tenés
-  │   ├── wiki.json                 ← contenido de tu wiki personal (estilo vimtutor)
+  │   ├── wiki.txt                  ← contenido de tu wiki personal (estilo vimtutor) — FORMATO TXT
   │   │                                Estructura:
   │   │                                {
   │   │                                  "titulo": "AED Wiki",
