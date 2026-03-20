@@ -185,27 +185,44 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
     int panel_y = alto / 2 - panel_h / 2 + 28;
 
     /* ── Overlay de bienvenida (pre-renderizado) ── */
+    /* tipo: 0=cuerpo  1=header(verde)  2=warning(ambar) */
     const char *bv_lineas[] = {
-        "Bienvenido al entrenador de pseudocodigo AED.",
+        ">> Busco testers para mi juego indie (ALPHA)",
         "",
-        "Practica algoritmos reales de la catedra:",
-        "  Secuenciales  Condicionales  Repetitivas",
-        "  Funciones  Procedimientos  Parciales",
+        "Estoy desarrollando este entrenador y busco",
+        "ayuda para mejorarlo durante la cursada.",
+        "Usalo como herramienta de apoyo: refuerza",
+        "conceptos cuando tengas dudas, sin reemplazar",
+        "la practica en hoja.",
         "",
-        "Completa cada nivel para desbloquear el siguiente.",
-        "El ultimo nivel es un BOSS de parcial real.",
+        ">> Como puedes ayudar?",
+        "  + Probando el juego y reportando lo que no anda",
+        "  + Creando Issues en GitHub  (seccion Games)",
+        "  + Diciendo que partes no se entienden",
+        "",
+        "[!] Windows aun en progreso (desarrollo en Linux)",
+        "    Con tu ayuda tambien lo haremos portable.",
+        "",
+        "Gracias a todos por la ayuda!",
     };
+    int bv_tipo[] = { 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 1 };
     int bv_n = (int)(sizeof(bv_lineas) / sizeof(bv_lineas[0]));
 
-    SDL_Color c_bv_txt  = {200, 200, 200, 255};
-    SDL_Color c_bv_ver  = {255, 200,  50, 255};
-    SDL_Color c_bv_cont = {100, 100, 110, 255};
+    SDL_Color c_bv_hdr  = {  0, 220,  70, 255};  /* header verde neon  */
+    SDL_Color c_bv_txt  = {180, 180, 190, 255};  /* cuerpo gris claro  */
+    SDL_Color c_bv_warn = {255, 160,  40, 255};  /* warning ambar      */
+    SDL_Color c_bv_ver  = {255, 200,  50, 255};  /* version            */
+    SDL_Color c_bv_cont = {100, 100, 110, 255};  /* press any key      */
 
-    SDL_Texture *bv_tex[8]  = {0};
-    int bv_w[8] = {0}, bv_h[8] = {0};
+#define BV_MAX 20
+    SDL_Texture *bv_tex[BV_MAX] = {0};
+    int bv_w[BV_MAX] = {0}, bv_h[BV_MAX] = {0};
     for (int i = 0; i < bv_n; i++) {
         if (!bv_lineas[i][0]) continue;
-        SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, bv_lineas[i], c_bv_txt);
+        SDL_Color col = bv_tipo[i] == 1 ? c_bv_hdr
+                      : bv_tipo[i] == 2 ? c_bv_warn
+                      : c_bv_txt;
+        SDL_Surface *s = TTF_RenderUTF8_Blended(fuente, bv_lineas[i], col);
         if (s) { bv_w[i] = s->w; bv_h[i] = s->h;
                  bv_tex[i] = SDL_CreateTextureFromSurface(renderer, s);
                  SDL_FreeSurface(s); }
@@ -222,9 +239,9 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                bv_cont = SDL_CreateTextureFromSurface(renderer, s); SDL_FreeSurface(s); } }
     if (bv_cont) SDL_SetTextureBlendMode(bv_cont, SDL_BLENDMODE_BLEND);
 
-    int bv_line_h = 20;
-    int bv_pad    = 30;
-    int bv_pw     = 520;
+    int bv_line_h = 21;
+    int bv_pad    = 24;
+    int bv_pw     = 560;
     int bv_ph     = bv_pad * 2 + titulo_h + 14 + bv_n * bv_line_h + 44;
     int bv_px     = (ancho - bv_pw) / 2;
     int bv_py     = (alto  - bv_ph) / 2;
@@ -549,7 +566,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
     /* ── Cleanup ── */
     if (bv_ver)  SDL_DestroyTexture(bv_ver);
     if (bv_cont) SDL_DestroyTexture(bv_cont);
-    for (int i = 0; i < bv_n; i++)
+    for (int i = 0; i < BV_MAX; i++)
         if (bv_tex[i]) SDL_DestroyTexture(bv_tex[i]);
     if (tex_titulo) SDL_DestroyTexture(tex_titulo);
     if (tex_cur)    SDL_DestroyTexture(tex_cur);
