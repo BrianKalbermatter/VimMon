@@ -10,27 +10,16 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 /* Muestra un error aunque SDL no este cargado */
 static void fatal(const char *titulo, const char *msg) {
-#ifdef _WIN32
-    MessageBoxA(NULL, msg, titulo, MB_OK | MB_ICONERROR);
-#else
     fprintf(stderr, "%s: %s\n", titulo, msg);
-#endif
 }
 
 int
 main(int argc, char *argv[]) {
     (void)argc; (void)argv;
 
-#ifdef _WIN32
-    MessageBoxA(NULL, "main() iniciado", "DEBUG", MB_OK);
-    CreateDirectoryA("saves", NULL);
-#endif
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fatal("Error SDL_Init", SDL_GetError());
@@ -98,9 +87,6 @@ main(int argc, char *argv[]) {
     SDL_GetWindowSize(ventana, &ancho, &alto);
     screen_poweron(renderer, ancho, alto);
 
-#ifdef _WIN32
-    MessageBoxA(NULL, "screen_poweron OK, entrando a screenMenu", "DEBUG", MB_OK);
-#endif
 
     /* ── intro: mazmorra 3D, una sola vez en la vida ── */
     if (!intro_ya_vista()) {

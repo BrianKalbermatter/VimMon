@@ -6,13 +6,6 @@
 #include "ui.h"
 #include "pomodoro_bg.h"
 #include "audio.h"
-#ifdef _WIN32
-#include <windows.h>
-#define DBG(msg) MessageBoxA(NULL, msg, "DEBUG screenMenu", MB_OK)
-#else
-#define DBG(msg) (void)(msg)
-#endif
-
 #define MAX_COLS    80
 #define N_OPCIONES   7
 
