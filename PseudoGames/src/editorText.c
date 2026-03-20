@@ -1,6 +1,7 @@
 #include "editorText.h"
 #include "screenVerificador.h"
 #include "progreso.h"
+#include "audio.h"
 #include "ui.h"
 #include <string.h>
 #include <stdio.h>
@@ -628,11 +629,12 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
 
                 /* ── Editor normal ─────────────────────────────────── */
                 if (k == SDLK_F10) {
+                    audio_sfx_btn();
                     if (dirty) confirm_salir = 1;
                     else       corriendo = 0;
                     break;
                 }
-                if (k == SDLK_F8)  { screenDoc(renderer, fuente, ancho, alto); break; }
+                if (k == SDLK_F8)  { audio_sfx_btn(); screenDoc(renderer, fuente, ancho, alto); break; }
 
                 /* ENTER: partir linea en cursor_col */
                 if (k == SDLK_RETURN && n_lines < MAX_LINES) {
@@ -724,6 +726,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 if (cursor_row >= offset_row + vis_lines)
                     offset_row = cursor_row - vis_lines + 1;
 
+                /* F5: ya tiene audio_sfx_btn en su bloque abajo */
                 /* F9: guardar
                  * Si ya tiene nombre (fijo o dado antes): sobreescribe directo.
                  * Si no tiene nombre todavia: abre el overlay para elegir uno. */
@@ -745,6 +748,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
 
                 /* F5: guardar y ejecutar */
                 if (k == SDLK_F5) {
+                    audio_sfx_btn();
                     char path[128];
                     snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                     guardar_archivo(buf, n_lines, path);
@@ -797,6 +801,7 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 int mx = evento.button.x, my = evento.button.y;
                 if (mx >= btn_run.x && mx < btn_run.x + btn_run.w &&
                     my >= btn_run.y && my < btn_run.y + btn_run.h) {
+                    audio_sfx_btn();
                     char path[128];
                     snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
                     guardar_archivo(buf, n_lines, path);

@@ -1,0 +1,40 @@
+#ifndef AUDIO_H
+#define AUDIO_H
+
+/* Inicializa SDL2_mixer. Llamar una sola vez en main(). */
+void audio_init(void);
+
+/* Reproduce el efecto de sonido de boton. */
+void audio_sfx_btn(void);
+
+/* Libera recursos. Llamar al cerrar el juego. */
+void audio_cleanup(void);
+
+/* Reproduce musica en loop (loops=-1 = infinito). */
+void audio_play(const char *path, int loops);
+
+/* Programa la primera reproduccion para despues de `ms` milisegundos.
+   Util para no arrancar la musica inmediatamente al inicio. */
+void audio_play_delayed(const char *path, int ms);
+
+/* Fade out de la musica actual en `ms` milisegundos. */
+void audio_fade_out(int ms);
+
+/* Fade in de una nueva musica en `ms` milisegundos, en loop. */
+void audio_fade_in(const char *path, int ms, int loops);
+
+/* Parar la musica inmediatamente. */
+void audio_stop(void);
+
+/* Pausa / reanuda sin perder la posicion. */
+void audio_pausar(void);
+void audio_reanudar(void);
+
+/* Devuelve 1 si hay musica reproduciendose (no pausada, no parada). */
+int audio_reproduciendo(void);
+
+/* Llamar cada frame desde el game loop. Gestiona el reinicio automatico
+   despues de 10 min de silencio cuando la musica por defecto termina. */
+void audio_tick(void);
+
+#endif

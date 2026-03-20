@@ -7,6 +7,55 @@
 #include "niveles.h"
 #include "progreso.h"
 #include "pomodoro_bg.h"
+#include "audio.h"
+
+/* Dibuja una estrella de 5 puntas rellena centrada en (cx, cy) con radio r.
+   Usa scanline fill sobre el poligono de 10 vertices (5 ext + 5 int). */
+static void
+dibujar_estrella(SDL_Renderer *renderer, int cx, int cy, int r, SDL_Color color)
+{
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+    float pts[10][2];
+    float ri = r * 0.42f;   /* radio interior */
+
+    for (int i = 0; i < 5; i++) {
+        float ao = (float)(-M_PI / 2.0 + i * 2.0 * M_PI / 5.0);
+        float ai = ao + (float)(M_PI / 5.0);
+        pts[i*2  ][0] = cx + cosf(ao) * r;
+        pts[i*2  ][1] = cy + sinf(ao) * r;
+        pts[i*2+1][0] = cx + cosf(ai) * ri;
+        pts[i*2+1][1] = cy + sinf(ai) * ri;
+    }
+
+    /* scanline fill */
+    for (int y = cy - r; y <= cy + r; y++) {
+        float xs[20];
+        int   nx = 0;
+        for (int i = 0; i < 10; i++) {
+            int   j  = (i + 1) % 10;
+            float y0 = pts[i][1], y1 = pts[j][1];
+            float x0 = pts[i][0], x1 = pts[j][0];
+            if ((y0 <= y && y1 > y) || (y1 <= y && y0 > y))
+                xs[nx++] = x0 + ((float)y - y0) / (y1 - y0) * (x1 - x0);
+        }
+        /* ordenar intersecciones (burbuja, max 10 elementos) */
+        for (int a = 0; a < nx - 1; a++)
+            for (int b = a + 1; b < nx; b++)
+                if (xs[a] > xs[b]) { float t = xs[a]; xs[a] = xs[b]; xs[b] = t; }
+        for (int a = 0; a + 1 < nx; a += 2)
+            SDL_RenderDrawLine(renderer, (int)xs[a], y, (int)xs[a+1], y);
+    }
+}
+
+/* Dibuja N estrellas seguidas desde el punto (x, y) */
+static void
+dibujar_estrellas(SDL_Renderer *renderer, int n, int x, int y, int r, SDL_Color color)
+{
+    int gap = r * 2 + 5;
+    for (int i = 0; i < n; i++)
+        dibujar_estrella(renderer, x + i * gap + r, y, r, color);
+}
 
 /* Dibuja un candado centrado en (lx, ly) */
 static void
@@ -183,15 +232,22 @@ screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 if (completado)
                     dibujadoTextoColor(renderer, fuente, "[OK]", cx, cy + 68, c_num);
 
-                /* estrellas de dificultad */
+                /* estrellas de dificultad dibujadas con SDL */
                 int estrellas = (int)(strlen(nv->dificultad) / 3);
+                if (estrellas < 1) estrellas = 1;
                 SDL_Color c_dif;
                 if      (estrellas <= 1) c_dif = (SDL_Color){ 80, 220, 100, 255};
                 else if (estrellas == 2) c_dif = (SDL_Color){255, 200,  50, 255};
                 else if (estrellas == 3) c_dif = (SDL_Color){255, 130,  20, 255};
                 else                    c_dif = (SDL_Color){255,  50,  50, 255};
-                dibujadoTextoColor(renderer, fuente, nv->dificultad,
-                                   cx, cy + card_h - 58, c_dif);
+                SDL_Color c_lbl = {100, 100, 120, 255};
+                int dif_y = cy + card_h - 90;
+                dibujadoTextoColor(renderer, fuente, "Dificultad:",
+                                   cx, dif_y, c_lbl);
+                int lbl_w2 = 0;
+                TTF_SizeUTF8(fuente, "Dificultad: ", &lbl_w2, NULL);
+                dibujar_estrellas(renderer, estrellas,
+                                  cx + lbl_w2 + 10, dif_y + 20, 6, c_dif);
 
                 dibujadoTextoColor(renderer, fuente, "100 pts",
                                    cx, cy + card_h - 38, c_pts);
@@ -199,8 +255,10 @@ screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 /* click */
                 if (clicked &&
                     click_x >= cx && click_x <= cx + card_w &&
-                    click_y >= cy && click_y <= cy + card_h)
+                    click_y >= cy && click_y <= cy + card_h) {
+                    audio_sfx_btn();
                     return num;
+                }
             }
         }
 
@@ -222,8 +280,10 @@ screenLvLs(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 
             if (clicked &&
                 click_x >= rbtn_x && click_x <= rbtn_x + rbtn_w &&
-                click_y >= rbtn_y && click_y <= rbtn_y + rbtn_h)
+                click_y >= rbtn_y && click_y <= rbtn_y + rbtn_h) {
+                audio_sfx_btn();
                 resetear_progreso();
+            }
         }
 
         /* barra de scroll indicadora (derecha) */

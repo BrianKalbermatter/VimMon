@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "ui.h"
+#include "config.h"
 
 /* Intenta SDL_WINDOW_FULLSCREEN_DESKTOP; si falla (renderer SOFTWARE)
    usa el truco de borderless+maximize como fallback */
@@ -17,9 +18,14 @@ aplicar_fullscreen(SDL_Window *ventana, int activar)
         SDL_SetWindowBordered(ventana, SDL_TRUE);
         SDL_RestoreWindow(ventana);
     }
-    /* Forzar foco al juego: sin esto hay que hacer click extra */
+    /* Forzar foco: RaiseWindow + InputFocus + warp del mouse al centro.
+       El warp es necesario en Linux/Wayland donde el WM ignora InputFocus. */
     SDL_RaiseWindow(ventana);
     SDL_SetWindowInputFocus(ventana);
+    int w, h;
+    SDL_GetWindowSize(ventana, &w, &h);
+    SDL_WarpMouseInWindow(ventana, w / 2, h / 2);
+    SDL_PumpEvents();  /* procesar el warp para que el WM actualice el foco */
 }
 
 // Opciones de configuracion disponibles
@@ -34,11 +40,14 @@ int
 screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
              SDL_Window *ventana)
 {
+    // --- cargar config guardada ---
+    config_cargar();
+
     // --- definir opciones ---
     OpcionConfig opciones[] = {
-        { "Pantalla completa",  {"Si", "No"},       2, 1 },
-        { "Velocidad lluvia",   {"Lenta", "Normal", "Rapida"}, 3, 1 },
-        { "Brillo",             {"Bajo", "Normal", "Alto"},    3, 1 },
+        { "Pantalla completa",  {"Si", "No"},       2, config_get_fullscreen() },
+        { "Velocidad lluvia",   {"Lenta", "Normal", "Rapida"}, 3, config_get_lluvia() },
+        { "Brillo",             {"Bajo", "Normal", "Alto"},    3, config_get_brillo() },
     };
     int n_opciones = (int)(sizeof(opciones) / sizeof(opciones[0]));
     int seleccionada = 0;  // fila seleccionada con el teclado
@@ -55,7 +64,13 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
             if (evento.type == SDL_QUIT)   return 0;
             if (evento.type == SDL_KEYDOWN) {
                 switch (evento.key.keysym.sym) {
-                    case SDLK_ESCAPE: corriendo = 0; break;
+                    case SDLK_ESCAPE:
+                        config_set_fullscreen(opciones[0].seleccion);
+                        config_set_lluvia(opciones[1].seleccion);
+                        config_set_brillo(opciones[2].seleccion);
+                        config_guardar();
+                        corriendo = 0;
+                        break;
                     case SDLK_UP:
                         seleccionada--;
                         if (seleccionada < 0) seleccionada = n_opciones - 1;

@@ -6,6 +6,8 @@
 #include "pomodoro_bg.h"
 #include "ui.h"
 #include "screenPJ.h"
+#include "audio.h"
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef _WIN32
@@ -39,6 +41,10 @@ main(int argc, char *argv[]) {
         return 1;
     }
 
+    audio_init();
+    /* la musica arranca cuando el usuario cierra la pantalla de bienvenida */
+
+    config_cargar();
     cargar_niveles("data/niveles.json");
     cargar_progreso("saves/progreso.json");
 
@@ -77,6 +83,13 @@ main(int argc, char *argv[]) {
     SDL_RaiseWindow(ventana);
     SDL_SetWindowInputFocus(ventana);
 
+    /* aplicar fullscreen guardado */
+    if (config_get_fullscreen() == 0) {  /* 0=Si en el array de opciones */
+        SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_RaiseWindow(ventana);
+        SDL_SetWindowInputFocus(ventana);
+    }
+
     /* Leer el tamaño real de la ventana — sin logical size para evitar
        el blur del escalado interno de SDL. Cada pantalla dibuja directo
        en la resolución nativa. Se re-lee al inicio de cada iteración
@@ -104,6 +117,8 @@ main(int argc, char *argv[]) {
            captura maximize, fullscreen o resize del usuario */
         SDL_GetWindowSize(ventana, &ancho, &alto);
 
+        audio_tick();  /* reinicio automatico de musica tras 10 min de silencio */
+
         if (!primera_vez) screen_transition(renderer, ancho, alto);
         primera_vez = 0;
         opcion = screenMenu(renderer, fuente, ancho, alto);
@@ -127,7 +142,12 @@ main(int argc, char *argv[]) {
         }
     }while (opcion != 0);
     
+    SDL_GetWindowSize(ventana, &ancho, &alto);
+    audio_fade_out(800);
+    screen_poweroff(renderer, ancho, alto);
+
     pom_cleanup();
+    audio_cleanup();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(ventana);
     TTF_Quit();

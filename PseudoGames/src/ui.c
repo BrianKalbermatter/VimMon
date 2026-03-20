@@ -450,82 +450,265 @@ screen_poweron(SDL_Renderer *renderer, int ancho, int alto)
 void
 screen_transition(SDL_Renderer *renderer, int ancho, int alto)
 {
-    // Capturar el frame actual antes de distorsionarlo
-    SDL_Surface *snap_surf = SDL_CreateRGBSurface(
-        0, ancho, alto, 32,
-        0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-    if (!snap_surf) return;
-
-    SDL_RenderReadPixels(renderer, NULL,
-        SDL_PIXELFORMAT_ARGB8888, snap_surf->pixels, snap_surf->pitch);
-
-    SDL_Texture *snap = SDL_CreateTextureFromSurface(renderer, snap_surf);
-    SDL_FreeSurface(snap_surf);
-    if (!snap) return;
-
-    // Fases del efecto: 0-1 = distorsion creciente, 0.7-1 = flash blanco
-    int FRAMES = 22;
+    int cy = alto / 2;
     srand(SDL_GetTicks());
 
-    for (int f = 0; f < FRAMES; f++) {
-        float t = (float)f / (float)FRAMES;  // 0.0 → 1.0
+    /* ── MITAD 1: pantalla se comprime hacia el centro (apagado CRT) ── */
+    for (int f = 0; f < 22; f++) {
+        float p  = (float)f / 21.0f;
+        float ep = p * p;   /* ease-in: rapido al final */
+
+        int half_h = (int)((1.0f - ep) * (alto / 2));
+        int top    = cy - half_h;
+        int bot    = cy + half_h;
+        if (top < 0)    top = 0;
+        if (bot > alto) bot = alto;
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-
-        // --- Desgarro horizontal: dibujar el snapshot en bandas desplazadas ---
-        float intensidad = sinf(t * 3.14159f) * 120.0f; // crece y baja
-        int band_h = 3 + rand() % 6;
-
-        for (int y = 0; y < alto; y += band_h) {
-            // desplazamiento aleatorio ponderado por la intensidad
-            int shift = (int)(((float)(rand() % 201) - 100.0f) / 100.0f * intensidad);
-
-            // algunas bandas quedan en negro (rasgaduras)
-            if (rand() % 8 == 0) continue;
-
-            SDL_Rect src = {0,     y, ancho,         band_h};
-            SDL_Rect dst = {shift, y, ancho + abs(shift), band_h};
-            SDL_RenderCopy(renderer, snap, &src, &dst);
-        }
-
-        // --- Ruido: lineas horizontales de estatica ---
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        int n_ruido = (int)(t * 30);
-        for (int i = 0; i < n_ruido; i++) {
-            int ry  = rand() % alto;
-            int rh  = 1 + rand() % 3;
-            int rw  = ancho / 3 + rand() % (ancho * 2 / 3);
-            int rx  = rand() % (ancho / 4);
-            Uint8 v = (Uint8)(rand() % 256);
-            SDL_SetRenderDrawColor(renderer, v, v, v, 180 + rand() % 75);
-            SDL_Rect rl = {rx, ry, rw, rh};
-            SDL_RenderFillRect(renderer, &rl);
+
+        /* zona visible que colapsa */
+        SDL_SetRenderDrawColor(renderer, 8, 14, 8, 255);
+        if (bot > top) {
+            SDL_Rect vis = {0, top, ancho, bot - top};
+            SDL_RenderFillRect(renderer, &vis);
         }
 
-        // --- Linea de sincronizacion: barre de arriba a abajo ---
-        int sync_y = (int)(t * alto);
-        SDL_SetRenderDrawColor(renderer, 200, 200, 220, 60);
-        SDL_Rect sync_line = {0, sync_y, ancho, 2};
-        SDL_RenderFillRect(renderer, &sync_line);
+        /* estatica en la zona visible */
+        if (bot > top) {
+            int n = (int)(ep * 12);
+            for (int i = 0; i < n; i++) {
+                int ry = top + rand() % (bot - top + 1);
+                int rw = rand() % ancho;
+                SDL_SetRenderDrawColor(renderer, 180, 200, 180, 100);
+                SDL_Rect nl = {rand() % (ancho - rw + 1), ry, rw, 1};
+                SDL_RenderFillRect(renderer, &nl);
+            }
+        }
 
-        // --- Flash blanco al final ---
-        if (t > 0.72f) {
-            float flash = (t - 0.72f) / 0.28f;
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255,
-                (Uint8)(flash * flash * 255));
-            SDL_RenderFillRect(renderer, NULL);
+        /* bordes brillantes que se cierran */
+        for (int g = 6; g >= 1; g--) {
+            Uint8 a = (Uint8)(120 / g);
+            SDL_SetRenderDrawColor(renderer, 160, 220, 160, a);
+            if (top - g >= 0) { SDL_Rect e = {0, top-g, ancho, 1}; SDL_RenderFillRect(renderer, &e); }
+            if (bot + g < alto){ SDL_Rect e = {0, bot+g, ancho, 1}; SDL_RenderFillRect(renderer, &e); }
+        }
+        SDL_SetRenderDrawColor(renderer, 200, 255, 200, 200);
+        SDL_Rect et = {0, top,     ancho, 2};
+        SDL_Rect eb = {0, bot - 2, ancho, 2};
+        SDL_RenderFillRect(renderer, &et);
+        SDL_RenderFillRect(renderer, &eb);
+
+        /* barras negras */
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        if (top > 0)    { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,0,ancho,top};     SDL_RenderFillRect(renderer,&b); }
+        if (bot < alto) { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,bot,ancho,alto-bot}; SDL_RenderFillRect(renderer,&b); }
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(9);
+    }
+
+    /* ── linea brillante central breve ── */
+    for (int f = 0; f < 6; f++) {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        for (int g = 8; g >= 1; g--) {
+            SDL_SetRenderDrawColor(renderer, 160, 220, 160, (Uint8)(80/g));
+            SDL_Rect h = {0, cy - g*2, ancho, 4 + g*4};
+            SDL_RenderFillRect(renderer, &h);
+        }
+        SDL_SetRenderDrawColor(renderer, 230, 255, 230, 240);
+        SDL_Rect linea = {0, cy - 1, ancho, 3};
+        SDL_RenderFillRect(renderer, &linea);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(10);
+    }
+
+    /* ── MITAD 2: pantalla se abre desde el centro (encendido CRT) ── */
+    for (int f = 0; f < 22; f++) {
+        float p  = (float)f / 21.0f;
+        float ep = 1.0f - (1.0f - p) * (1.0f - p);  /* ease-out */
+
+        int half_h = (int)(ep * (alto / 2));
+        int top    = cy - half_h;
+        int bot    = cy + half_h;
+        if (top < 0)    top = 0;
+        if (bot > alto) bot = alto;
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+        SDL_SetRenderDrawColor(renderer, 8, 14, 8, 255);
+        if (bot > top) {
+            SDL_Rect vis = {0, top, ancho, bot - top};
+            SDL_RenderFillRect(renderer, &vis);
+        }
+
+        /* bordes brillantes que se abren */
+        for (int g = 6; g >= 1; g--) {
+            Uint8 a = (Uint8)(120 / g);
+            SDL_SetRenderDrawColor(renderer, 160, 220, 160, a);
+            if (top - g >= 0) { SDL_Rect e = {0, top-g, ancho, 1}; SDL_RenderFillRect(renderer, &e); }
+            if (bot + g < alto){ SDL_Rect e = {0, bot+g, ancho, 1}; SDL_RenderFillRect(renderer, &e); }
+        }
+        SDL_SetRenderDrawColor(renderer, 200, 255, 200, 200);
+        SDL_Rect et2 = {0, top,     ancho, 2};
+        SDL_Rect eb2 = {0, bot - 2, ancho, 2};
+        SDL_RenderFillRect(renderer, &et2);
+        SDL_RenderFillRect(renderer, &eb2);
+
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        if (top > 0)    { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,0,ancho,top};      SDL_RenderFillRect(renderer,&b); }
+        if (bot < alto) { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,bot,ancho,alto-bot}; SDL_RenderFillRect(renderer,&b); }
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(9);
+    }
+}
+
+void
+screen_poweroff(SDL_Renderer *renderer, int ancho, int alto)
+{
+    int cy = alto / 2;
+    srand(SDL_GetTicks());
+
+    /* FASE 1 (40 frames): la pantalla se comprime verticalmente hacia el centro
+       como un CRT apagandose — rapido al principio, frena al llegar a la linea */
+    for (int f = 0; f < 40; f++) {
+        float p  = (float)f / 39.0f;
+        /* ease-in: lento al principio, rapido al final */
+        float ep = p * p;
+
+        int half_h = (int)((1.0f - ep) * (alto / 2));
+        int top    = cy - half_h;
+        int bot    = cy + half_h;
+        if (top < 0)    top = 0;
+        if (bot > alto) bot = alto;
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+        /* zona visible que se va achicando */
+        SDL_SetRenderDrawColor(renderer, 8, 14, 8, 255);
+        SDL_Rect visible = {0, top, ancho, bot - top};
+        SDL_RenderFillRect(renderer, &visible);
+
+        /* ruido estatico mientras colapsa */
+        int n_ruido = (int)(ep * 25);
+        for (int i = 0; i < n_ruido; i++) {
+            if (bot <= top) break;
+            int ry = top + rand() % (bot - top + 1);
+            int rw = rand() % ancho;
+            int rx = rand() % (ancho - rw + 1);
+            Uint8 v = (Uint8)(rand() % 200);
+            SDL_SetRenderDrawColor(renderer, v, v, v, 120);
+            SDL_Rect nl = {rx, ry, rw, 1};
+            SDL_RenderFillRect(renderer, &nl);
+        }
+
+        /* bordes brillantes que se cierran */
+        for (int g = 8; g >= 0; g--) {
+            Uint8 a = (Uint8)(150 / (g + 1));
+            SDL_SetRenderDrawColor(renderer, 180, 230, 180, a);
+            if (top - g >= 0) {
+                SDL_Rect et = {0, top - g, ancho, 1};
+                SDL_RenderFillRect(renderer, &et);
+            }
+            if (bot + g < alto) {
+                SDL_Rect eb = {0, bot + g, ancho, 1};
+                SDL_RenderFillRect(renderer, &eb);
+            }
+        }
+        SDL_SetRenderDrawColor(renderer, 220, 255, 220, 220);
+        SDL_Rect et = {0, top,     ancho, 2};
+        SDL_Rect eb = {0, bot - 2, ancho, 2};
+        SDL_RenderFillRect(renderer, &et);
+        SDL_RenderFillRect(renderer, &eb);
+
+        /* barras negras arriba y abajo */
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        if (top > 0) {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_Rect tb = {0, 0, ancho, top};
+            SDL_RenderFillRect(renderer, &tb);
+        }
+        if (bot < alto) {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_Rect bb = {0, bot, ancho, alto - bot};
+            SDL_RenderFillRect(renderer, &bb);
+        }
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(10);
+    }
+
+    /* FASE 2 (25 frames): queda solo la linea brillante horizontal,
+       se encoge desde los extremos hacia el centro */
+    for (int f = 0; f < 25; f++) {
+        float p  = (float)f / 24.0f;
+        float ep = p * p;
+
+        int lw = (int)((1.0f - ep) * ancho);
+        int lx = (ancho - lw) / 2;
+        int lh = 3;
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+        /* halo alrededor de la linea */
+        for (int g = 8; g >= 1; g--) {
+            Uint8 a = (Uint8)(60 * (1.0f - p) / g);
+            SDL_SetRenderDrawColor(renderer, 180, 230, 180, a);
+            SDL_Rect halo = {lx - g*2, cy - lh/2 - g*2, lw + g*4, lh + g*4};
+            SDL_RenderFillRect(renderer, &halo);
+        }
+        /* nucleo */
+        SDL_SetRenderDrawColor(renderer, 230, 255, 230, (Uint8)(255 * (1.0f - p * 0.5f)));
+        SDL_Rect linea = {lx, cy - lh/2, lw, lh};
+        SDL_RenderFillRect(renderer, &linea);
+
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(12);
+    }
+
+    /* FASE 3 (20 frames): el punto central se desvanece */
+    for (int f = 0; f < 20; f++) {
+        float p = (float)f / 19.0f;
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+        int pw = (int)((1.0f - p) * 12);
+        if (pw > 0) {
+            Uint8 a = (Uint8)(255 * (1.0f - p));
+            for (int g = 6; g >= 1; g--) {
+                SDL_SetRenderDrawColor(renderer, 200, 240, 200, (Uint8)(a / g));
+                SDL_Rect halo = {ancho/2 - pw/2 - g*3, cy - g*2, pw + g*6, 4 + g*4};
+                SDL_RenderFillRect(renderer, &halo);
+            }
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, a);
+            SDL_Rect punto = {ancho/2 - pw/2, cy - 1, pw, 3};
+            SDL_RenderFillRect(renderer, &punto);
         }
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         SDL_RenderPresent(renderer);
-        SDL_Delay(14);
+        SDL_Delay(16);
     }
 
-    SDL_DestroyTexture(snap);
+    /* negro final */
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+    SDL_Delay(80);
 }
-
-
-
 
 

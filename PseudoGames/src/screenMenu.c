@@ -5,6 +5,7 @@
 #include <string.h>
 #include "ui.h"
 #include "pomodoro_bg.h"
+#include "audio.h"
 #ifdef _WIN32
 #include <windows.h>
 #define DBG(msg) MessageBoxA(NULL, msg, "DEBUG screenMenu", MB_OK)
@@ -164,8 +165,25 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
         if (sc) { tex_cur = SDL_CreateTextureFromSurface(renderer, sc); SDL_FreeSurface(sc); }
     }
 
+    /* ── Ícono engranaje (Nerd Font U+E615) ── */
+    SDL_Texture *tex_gear = NULL;
+    int gear_iw = 0, gear_ih = 0;
+    {
+        TTF_Font *fgear = TTF_OpenFont("assets/fonts/nerd.ttf", 28);
+        if (fgear) {
+            SDL_Color cg = {0, 200, 60, 255};
+            SDL_Surface *sg = TTF_RenderUTF8_Blended(fgear, "\xee\x98\x95", cg); /* U+E615 */
+            if (sg) {
+                gear_iw = sg->w; gear_ih = sg->h;
+                tex_gear = SDL_CreateTextureFromSurface(renderer, sg);
+                SDL_FreeSurface(sg);
+            }
+            TTF_CloseFont(fgear);
+        }
+    }
+
     /* ── Layout del panel RPG ── */
-    int row_h   = lbl_hh[0] + 10;
+    int row_h   = lbl_hh[0] + 20;
     int pad_x   = 22;
     int pad_y   = 18;
     int panel_w = num_w + cur_w + 14 + lbl_w[4] + pad_x * 2 + 8; /* ancho minimo para "Seleccion de Nivel" */
@@ -226,6 +244,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
     Uint32 next_glitch  = SDL_GetTicks() + 1500 + (Uint32)(rand() % 4000);
 
     int resultado = -1;   /* -1 = seguir corriendo */
+    Uint32 menu_habilitado_en = 0;  /* 0 = no habilitado aun */
 
     while (resultado < 0) {
         int clicked = 0, click_x = 0, click_y = 0;
@@ -237,8 +256,10 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             if (evento.type == SDL_KEYDOWN) {
                 tecla = 1;
                 if (bienvenida_activa) break;  /* solo cierra la bienvenida */
+                if (menu_habilitado_en && SDL_GetTicks() < menu_habilitado_en) break; /* cooldown */
                 int k = evento.key.keysym.sym;
                 if (k >= SDLK_1 && k <= SDLK_7) {
+                    audio_sfx_btn();
                     int idx  = k - SDLK_1;
                     int ex   = panel_x + pad_x + num_w + cur_w + 14 + lbl_w[idx] / 2;
                     int ey   = panel_y + pad_y + idx * row_h + row_h / 2;
@@ -251,10 +272,11 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             }
             if (evento.type == SDL_MOUSEBUTTONDOWN &&
                 evento.button.button == SDL_BUTTON_LEFT) {
+                if (bienvenida_activa) break;  /* solo cierra la bienvenida */
+                if (menu_habilitado_en && SDL_GetTicks() < menu_habilitado_en) break; /* cooldown */
                 clicked = 1;
                 click_x = evento.button.x;
                 click_y = evento.button.y;
-                if (bienvenida_activa) break;  /* solo cierra la bienvenida */
             }
         }
 
@@ -350,7 +372,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             int oy    = panel_y + pad_y + i * row_h;
             int ox    = panel_x + pad_x;
             int hover = (mx >= panel_x + 4 && mx <= panel_x + panel_w - 4 &&
-                         my >= oy           && my <= oy + row_h);
+                         my >= oy + 4       && my <= oy + row_h - 4);
 
             /* corrupcion: alpha y offset random cuando hay glitch */
             int   gx_off = (glitch_activo && rand() % 3 == 0) ? (rand() % 9 - 4) : 0;
@@ -381,7 +403,8 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 /* click */
                 if (clicked &&
                     click_x >= panel_x + 4 && click_x <= panel_x + panel_w - 4 &&
-                    click_y >= oy           && click_y <= oy + row_h) {
+                    click_y >= oy + 4       && click_y <= oy + row_h - 4) {
+                    audio_sfx_btn();
                     int ex = text_x + lbl_w[i] / 2;
                     int ey = oy + row_h / 2;
                     explosion(renderer, fuente, labels[i], ex, ey);
@@ -405,17 +428,52 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
         int gear_y    = alto  - gear_size - 14;
         int gear_cx   = gear_x + gear_size / 2;
         int gear_cy   = gear_y + gear_size / 2;
-        int gear_hover = (mx >= gear_x && mx <= gear_x + gear_size &&
-                          my >= gear_y && my <= gear_y + gear_size);
-        SDL_Color c_gear = gear_hover ? (SDL_Color){  0, 255,  80, 255}
-                                      : (SDL_Color){  0, 100,  35, 255};
-        SDL_Color c_hole = {4, 6, 4, 255};
-        dibujarArandela(renderer, gear_cx, gear_cy, gear_size / 2 - 2, c_gear, c_hole);
+
+        /* medir etiqueta para expandir zona de click */
+        int cfg_lw = 0, cfg_lh = 0;
+        TTF_SizeUTF8(fuente, "Configuracion", &cfg_lw, &cfg_lh);
+        int lbl_x  = gear_x - cfg_lw - 10;   /* a la izquierda del engranaje */
+        int lbl_y  = gear_y + (gear_size - cfg_lh) / 2;
+
+        /* zona de hover unificada: texto + engranaje */
+        int hit_x1 = lbl_x;
+        int hit_x2 = gear_x + gear_size;
+        int hit_y1 = gear_y;
+        int hit_y2 = gear_y + gear_size;
+        int gear_hover = (mx >= hit_x1 && mx <= hit_x2 &&
+                          my >= hit_y1 && my <= hit_y2);
+
+        SDL_Color c_cfg_lbl = gear_hover ? (SDL_Color){180, 255, 180, 255}
+                                         : (SDL_Color){  0, 100,  35, 255};
+        dibujadoTextoColor(renderer, fuente, "Configuracion",
+                           lbl_x - 10, lbl_y - 12, c_cfg_lbl);
+
+        if (tex_gear) {
+            /* ícono ⚙ cacheado */
+            Uint8 ga = gear_hover ? 255 : 160;
+            SDL_SetTextureColorMod(tex_gear,
+                gear_hover ? 0   : 0,
+                gear_hover ? 255 : 160,
+                gear_hover ? 80  : 50);
+            SDL_SetTextureAlphaMod(tex_gear, ga);
+            SDL_Rect gr = {gear_x + (gear_size - gear_iw) / 2,
+                           gear_y + (gear_size - gear_ih) / 2,
+                           gear_iw, gear_ih};
+            SDL_RenderCopy(renderer, tex_gear, NULL, &gr);
+        } else {
+            /* fallback: arandela dibujada */
+            SDL_Color c_gear = gear_hover ? (SDL_Color){0,255,80,255}
+                                          : (SDL_Color){0,100,35,255};
+            SDL_Color c_hole = {4, 6, 4, 255};
+            dibujarArandela(renderer, gear_cx, gear_cy, gear_size/2-2, c_gear, c_hole);
+        }
 
         if (clicked &&
-            click_x >= gear_x && click_x <= gear_x + gear_size &&
-            click_y >= gear_y && click_y <= gear_y + gear_size)
+            click_x >= hit_x1 && click_x <= hit_x2 &&
+            click_y >= hit_y1 && click_y <= hit_y2) {
+            audio_sfx_btn();
             resultado = 7;
+        }
 
         /* ── Overlay de bienvenida ── */
         if (bienvenida_activa) {
@@ -482,8 +540,13 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 SDL_RenderCopy(renderer, bv_cont, NULL, &dr);
             }
 
-            /* cerrar con tecla o click */
-            if (tecla || clicked) bienvenida_activa = 0;
+            /* cerrar con tecla o click: arrancar musica con fade in suave */
+            if (tecla || clicked) {
+                audio_sfx_btn();
+                bienvenida_activa = 0;
+                menu_habilitado_en = SDL_GetTicks() + 1000; /* 1 seg de gracia */
+                audio_fade_in("assets/Audio/specular_city_dance_extended.ogg", 2000, 0);
+            }
         }
 
         SDL_RenderPresent(renderer);
@@ -497,6 +560,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
         if (bv_tex[i]) SDL_DestroyTexture(bv_tex[i]);
     if (tex_titulo) SDL_DestroyTexture(tex_titulo);
     if (tex_cur)    SDL_DestroyTexture(tex_cur);
+    if (tex_gear)   SDL_DestroyTexture(tex_gear);
     for (int c = 0; c < 2; c++)
         for (int p = 0; p < 3; p++)
             if (rain[c][p]) SDL_DestroyTexture(rain[c][p]);
