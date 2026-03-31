@@ -1,4 +1,5 @@
 #include "audio.h"
+#ifndef SIN_AUDIO
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 #include <stdio.h>
@@ -187,3 +188,5 @@ audio_reproduciendo(void)
 {
     return Mix_PlayingMusic() && !Mix_PausedMusic();
 }
+
+#endif /* SIN_AUDIO */

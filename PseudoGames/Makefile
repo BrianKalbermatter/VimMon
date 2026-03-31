@@ -30,7 +30,7 @@ $(BUILDDIR):
 # ── Windows cross-compile (mingw-w64) ──────────────────────────────────────
 WIN_CC     = x86_64-w64-mingw32-gcc
 WIN_LIBS   = win-libs
-WIN_CFLAGS = -Wall -Wextra -I src -I $(WIN_LIBS)/include
+WIN_CFLAGS = -Wall -Wextra -I src -I $(WIN_LIBS)/include -DSIN_AUDIO
 WIN_LDFLAGS = -L $(WIN_LIBS)/lib \
               -lmingw32 -lSDL2main \
               -lSDL2 -lSDL2_ttf -lm \
@@ -45,7 +45,7 @@ WIN_TARGET = PseudoGames.exe
 
 windows: $(BUILDDIR) $(WIN_TARGET)
 
-$(WIN_RC_OBJ): src/app.rc assets/icon.ico | $(BUILDDIR)
+$(WIN_RC_OBJ): src/app.rc assets/Icono/icon.ico | $(BUILDDIR)
 	x86_64-w64-mingw32-windres src/app.rc -o $@
 
 $(WIN_TARGET): $(WIN_OBJ) $(WIN_RC_OBJ)

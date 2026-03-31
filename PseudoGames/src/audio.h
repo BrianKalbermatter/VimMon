@@ -1,6 +1,22 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
+#ifdef SIN_AUDIO
+/* Stubs vacios para builds sin SDL2_mixer (ej: Windows) */
+static inline void audio_init(void)             {}
+static inline void audio_sfx_btn(void)          {}
+static inline void audio_cleanup(void)          {}
+static inline void audio_play(const char *p, int l) { (void)p; (void)l; }
+static inline void audio_play_delayed(const char *p, int ms) { (void)p; (void)ms; }
+static inline void audio_fade_out(int ms)       { (void)ms; }
+static inline void audio_fade_in(const char *p, int ms, int l) { (void)p; (void)ms; (void)l; }
+static inline void audio_stop(void)             {}
+static inline void audio_pausar(void)           {}
+static inline void audio_reanudar(void)         {}
+static inline int  audio_reproduciendo(void)    { return 0; }
+static inline void audio_tick(void)             {}
+#else
+
 /* Inicializa SDL2_mixer. Llamar una sola vez en main(). */
 void audio_init(void);
 
@@ -37,4 +53,5 @@ int audio_reproduciendo(void);
    despues de 10 min de silencio cuando la musica por defecto termina. */
 void audio_tick(void);
 
-#endif
+#endif /* SIN_AUDIO */
+#endif /* AUDIO_H */

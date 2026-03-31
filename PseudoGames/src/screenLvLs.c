@@ -8,6 +8,7 @@
 #include "progreso.h"
 #include "pomodoro_bg.h"
 #include "audio.h"
+#include <math.h>
 
 /* Dibuja una estrella de 5 puntas rellena centrada en (cx, cy) con radio r.
    Usa scanline fill sobre el poligono de 10 vertices (5 ext + 5 int). */
