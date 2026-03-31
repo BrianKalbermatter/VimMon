@@ -5,6 +5,18 @@
 #include <SDL2/SDL_ttf.h>
 #include "niveles.h"
 
+#define MAX_LINES 500
+
+typedef struct {
+    char buf[MAX_LINES][512];
+    int  n_lines;
+    int  cursor_row;
+    int  cursor_col;
+    int  offset_row;
+    char nombre_arch[64];
+    int  dirty;
+} EditorPanel;
+
 /* Dibuja el editor dentro de un rect sin loop propio (para embeber) */
 void drawEditorText(SDL_Renderer *renderer, TTF_Font *fuente, SDL_Rect area);
 

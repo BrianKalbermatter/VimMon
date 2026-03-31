@@ -10,7 +10,8 @@
 static int completados[MAX_COMPLETADOS];
 static int n_completados = 0;
 static char progreso_path[512];
-static int s_intro_vista = 0;
+static int s_intro_vista    = 0;
+static int s_tutorial_visto = 0;
 
 int cargar_progreso(const char *path) {
     snprintf(progreso_path, sizeof(progreso_path), "%s", path);
@@ -46,6 +47,10 @@ int cargar_progreso(const char *path) {
     if (cJSON_IsBool(intro) && cJSON_IsTrue(intro))
         s_intro_vista = 1;
 
+    cJSON *tut = cJSON_GetObjectItem(root, "tutorial_visto");
+    if (cJSON_IsBool(tut) && cJSON_IsTrue(tut))
+        s_tutorial_visto = 1;
+
     cJSON_Delete(root);
     return n_completados;
 }
@@ -56,7 +61,8 @@ int guardar_progreso(const char *path) {
     cJSON *root = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateIntArray(completados, n_completados);
     cJSON_AddItemToObject(root, "completados", arr);
-    cJSON_AddBoolToObject(root, "intro_vista", s_intro_vista);
+    cJSON_AddBoolToObject(root, "intro_vista",    s_intro_vista);
+    cJSON_AddBoolToObject(root, "tutorial_visto", s_tutorial_visto);
 
     /* historial */
     cJSON *hist = cJSON_CreateArray();
@@ -107,8 +113,11 @@ int total_completados(void) {
     return n_completados;
 }
 
-int intro_ya_vista(void)  { return s_intro_vista; }
-void marcar_intro_vista(void) { s_intro_vista = 1; guardar_progreso(NULL); }
+int intro_ya_vista(void)       { return s_intro_vista; }
+void marcar_intro_vista(void)  { s_intro_vista = 1; guardar_progreso(NULL); }
+
+int tutorial_ya_visto(void)        { return s_tutorial_visto; }
+void marcar_tutorial_visto(void)   { s_tutorial_visto = 1; guardar_progreso(NULL); }
 
 int resetear_progreso(void) {
     n_completados = 0;

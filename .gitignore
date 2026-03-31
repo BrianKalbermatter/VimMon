@@ -1,26 +1,11 @@
-# Dependencies
-node_modules/
+# Ignorar todo excepto PseudoGames
+/*
+!/PseudoGames/
+!/.gitignore
+!/LICENSE
+!/.github/
 
-# Environment variables (secrets)
-.env
-.env.local
-.env.production
-
-# Core logic - NEVER upload
-aed-web/db/pool.js
-aed-web/middleware/
-aed-web/routes/
-aed-web/services/
-aed-web/controllers/
-
-# Docker volumes
-postgres_data/
-src_postgres_data/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-npm-debug.log*
+# Build output dentro de PseudoGames
+PseudoGames/build/
+PseudoGames/aed
+PseudoGames/PseudoGames.exe

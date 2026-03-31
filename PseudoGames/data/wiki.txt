@@ -5,6 +5,218 @@ Para mas informacion oficial: https://aed-frre.github.io/
 
 
 =======
+CAPITULO 0: Tutorial - Algoritmos y Estructura de Datos
+=======================================================
+
+  EPISODIO 1: El hardware que ejecuta tu codigo
+  -----------------------------------------------
+
+  Antes de escribir una sola linea de codigo, hay que entender donde
+  corre ese codigo y como lo maneja la maquina.
+
+  EL PROCESADOR (CPU)
+  Es el cerebro de la computadora. Ejecuta instrucciones una por una,
+  a velocidades altisimas. Cuando escribis un algoritmo, basicamente le
+  estas dando ordenes al procesador en un lenguaje que el pueda entender.
+
+  MEMORIA INTERNA - LA RAM
+  La RAM es la memoria de trabajo. Cuando ejecutas un programa, todo lo
+  que ese programa necesita (variables, resultados parciales, instrucciones)
+  se carga en la RAM. Es rapida, pero es temporal: cuando el programa
+  termina o apagas la computadora, todo lo que habia ahi desaparece.
+
+  Pensala como el escritorio de tu cuarto: es el espacio donde trabajas,
+  pero no guardas las cosas ahi para siempre.
+
+  MEMORIA EXTERNA - EL DISCO (HDD/SSD)
+  El disco es donde se guardan los archivos de forma permanente. Cuando
+  guardas un documento o instalas un programa, va al disco. Es mas lenta
+  que la RAM, pero persiste aunque apagues todo.
+
+  Siguiendo la analogia: el disco es el cajon donde guardas las cosas
+  cuando terminas de trabajar.
+
+  DONDE VIVE UNA VARIABLE?
+  Cuando en tu algoritmo escribis en el ambiente: salario : ENTERO;
+  lo que haces es reservar un espacio en la RAM con el nombre "salario"
+  y guardar ahi el valor que despues le daras en el proceso.
+  Ese espacio existe solo mientras el programa corre.
+
+  Y LOS ARCHIVOS?
+  Los archivos (datos que guardas en disco) estan en la memoria externa
+  y hay que pedirle explicitamente al programa que los abra, los lea
+  o los escriba.
+
+
+  EPISODIO 2: Las 4 areas del analisis previo
+  --------------------------------------------
+
+  Antes de escribir pseudocodigo, SIEMPRE hay que pensar.
+  Este analisis se hace a mano, en papel si hace falta, y siempre
+  en este orden:
+
+  1. ENTRADA
+  Que datos le llegan al algoritmo desde afuera? Que le pide el usuario?
+  Que archivos necesita?
+
+    Ejemplo: Para calcular el salario de un empleado, la entrada es
+    la cantidad de horas trabajadas y el valor de la hora.
+
+  2. SALIDA
+  Que resultado tiene que mostrar o producir el algoritmo?
+
+    Ejemplo: El salario total calculado, mostrado por pantalla.
+
+  3. AMBIENTE
+  Que variables internas vamos a necesitar? Que espacio en la RAM
+  vamos a reservar?
+
+    Ejemplo: horas, valorHora, salario.
+
+  4. PROCESO
+  Como transformamos la entrada en la salida? Aca describes los pasos
+  del algoritmo.
+
+    Ejemplo: salario := horas * valorHora
+
+  ESTE ORDEN NO ES OPCIONAL. Si lo saltas, vas a terminar escribiendo
+  algoritmos que no tienen sentido o que te falta algo a mitad de camino.
+
+
+  EPISODIO 3: Los lenguajes de programacion y el pseudocodigo
+  ------------------------------------------------------------
+
+  CADA LENGUAJE TIENE SU LUGAR
+  No existe un lenguaje que sea "el mejor". Cada uno esta pensado para
+  resolver algo especifico:
+
+    - Para paginas web: navegadores, HTML, JavaScript, frameworks, APIs.
+    - Para sistemas de bajo nivel (cerca del hardware): C, Assembly.
+    - Para ciencia de datos: Python.
+    - Para aplicaciones moviles: Swift o Kotlin.
+
+  No tiene sentido programar una pagina web desde el procesador
+  directamente. Para eso existen las herramientas adecuadas, incluyendo
+  hoy en dia la IA, que te ayuda a pensar y a construir lo que imaginas.
+
+  LA CREATIVIDAD IMPORTA
+  Esta area premia a quienes se animan a crear. Si te esfuerzas en
+  aprender y en construir, la recompensa existe y es real.
+
+  EL PSEUDOCODIGO
+  El pseudocodigo es un lenguaje conceptual. No lo ejecuta ninguna
+  computadora directamente, pero te permite disenar cualquier algoritmo
+  de la vida real: calculos, busquedas, ordenamientos, recursividad,
+  complejidad.
+
+  Los algoritmos se aprenden usandolos. No hay un libro que te prepare
+  para todo. La experiencia de aplicarlos en el dia a dia es lo que te
+  lleva a entenderlos de verdad.
+
+
+  EPISODIO 4: Tipos de datos
+  --------------------------
+
+  Tipos de Datos
+  +-- Simples
+  |   +-- Numericos
+  |   |   +-- Enteros       (1, 2, -5, 100)
+  |   |   +-- Reales        (3.14, -0.5, 1000.99)
+  |   +-- Alfanumericos
+  |   |   +-- Caracteres / Cadena de texto   ("Hola", 'A')
+  |   |       ATENCION: En pseudocodigo NO existe la cadena de texto
+  |   |       como tal porque no se puede concatenar. Usarlo asi en
+  |   |       la practica es incorrecto para las actividades.
+  |   +-- Booleanos
+  |       +-- Solo dos valores posibles: Verdadero (V) o Falso (F)
+  +-- Estructurados
+      (se veran mas adelante en la materia)
+
+  LOS BOOLEANOS Y EL PROCESADOR
+  Todo en la computadora, en el fondo, es un booleano. El procesador
+  solo entiende Verdadero o Falso, 1 o 0. Cuando escribis un bucle o
+  una condicion, lo que esta pasando adentro es que el procesador evalua
+  algo y obtiene V o F. De ahi parte toda la logica.
+
+  PALABRAS RESERVADAS
+  Son palabras que el lenguaje ya usa para sus propias instrucciones.
+  No podes usarlas como nombres de variables porque generaria error de
+  sintaxis. Ejemplos: SI, MIENTRAS, PARA, FIN, INICIO, etc.
+
+  FUNCIONES COMUNES EN PSEUDOCODIGO
+
+  ESCRIBIR -- muestra algo por pantalla:
+    ESCRIBIR("Bienvenido al sistema");
+
+    Todo el contenido va entre comillas dobles "".
+    Si queres que algo aparezca entre comillas en pantalla, usas
+    comillas simples '' adentro:
+    ESCRIBIR("El nombre es 'Juan'");
+    Mezclar mal las comillas = error de sintaxis.
+
+  LEER -- recibe un valor del usuario y lo guarda en una variable:
+    LEER(salario);
+
+    Lo que hace por detras: reserva un espacio en la RAM con el nombre
+    de la variable y guarda ahi lo que el usuario escriba. A partir de
+    ese momento podes usar esa variable en el resto del algoritmo.
+
+
+  EPISODIO 5: Acumuladores
+  ------------------------
+
+  Un acumulador es una variable que SE MODIFICA A SI MISMA con cada
+  operacion. La idea es que va "acumulando" un valor a medida que el
+  algoritmo avanza.
+
+  EJEMPLO PASO A PASO:
+    Salario := 10000        // Reservo la variable y le asigno 10000
+    Salario := Salario + 3  // Ahora Salario vale 10003
+    Salario := Salario / 2  // Ahora Salario vale 5001.5
+
+  Lo importante: el valor final depende completamente del valor inicial.
+
+  Si arrancas con 10000 y despues sumas 3 y divides por 2, el resultado
+  (5001.5) es mas chico que el valor original (10000). El acumulador no
+  "recuerda" que antes era 10000, simplemente opera sobre lo que tiene
+  en ese momento.
+
+  Esto es fundamental para entender bucles, donde el acumulador se va
+  modificando en cada iteracion.
+
+
+  EPISODIO 6: Acciones
+  --------------------
+
+  Acciones
+  +-- Simples
+  |   +-- Elementales
+  |   |   +-- Instrucciones basicas como ESCRIBIR o LEER
+  |   +-- Asignaciones
+  |       +-- Puras         -> Le das un valor fijo a una variable
+  |       |   Ejemplo: Salario := 10000
+  |       +-- De expresion  -> El valor viene de una operacion
+  |           Ejemplo: Salario := Salario + 3
+  +-- Complejas
+      +-- Con nombres
+      |   +-- Procedimientos o funciones que tienen un nombre
+      |       y se pueden llamar desde otras partes del algoritmo
+      +-- Condiciones
+      |   +-- SI (condicion) ENTONCES ... FIN_SI
+      |       Evaluan un booleano y ejecutan algo segun V o F
+      +-- Repetitivas / Bucles
+          +-- MIENTRAS, PARA, REPETIR
+              Ejecutan un bloque de codigo mientras una condicion
+              sea Verdadera. Cada iteracion evalua un booleano.
+
+  LAS CONDICIONES Y LOS BUCLES SON BOOLEANOS
+  Cada vez que escribis un SI o un MIENTRAS, el algoritmo evalua una
+  condicion que da V o F. Si es Verdadero, entra al bloque. Si es Falso,
+  lo saltea o termina el bucle. No hay mas opciones.
+  El procesador no entiende "tal vez".
+
+
+=======
 CAPITULO 1: Los primeros pasos
 =======================================================
 

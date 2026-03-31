@@ -112,6 +112,8 @@ main(int argc, char *argv[]) {
         screen_transition(renderer, ancho, alto);
         switch (opcion){
             case 1:{
+                   screenTutorial(renderer, fuente, ancho, alto);
+                   screen_transition(renderer, ancho, alto);
                    int nivel = screenLvLs(renderer, fuente, ancho, alto);
                    if(nivel > 0) {
                         screen_transition(renderer, ancho, alto);
@@ -127,7 +129,7 @@ main(int argc, char *argv[]) {
             case 7: screenConfig(renderer, fuente, ancho, alto, ventana); break;
         }
     }while (opcion != 0);
-    
+
     SDL_GetWindowSize(ventana, &ancho, &alto);
     audio_fade_out(800);
     screen_poweroff(renderer, ancho, alto);

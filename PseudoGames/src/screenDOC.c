@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include "ui.h"
 #include "cJSON.h"
+#include "progreso.h"
+#include "screenTutorial.h"
 
 // =============================================================
 //  HIGHLIGHTS  (saves/highlights.json)
@@ -199,6 +201,11 @@ altura_wrap(TTF_Font *fuente, const char *texto, int max_ancho)
 int
 screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
 {
+    if (!tutorial_ya_visto()) {
+        screenTutorial(renderer, fuente, ancho, alto);
+        marcar_tutorial_visto();
+    }
+
     cargar_highlights();
 
     int capitulo_sel  = 0;
@@ -447,7 +454,7 @@ screenDoc(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                     else if (k == SDLK_PAGEUP)   scroll -= lineas_visibles / 2;
                     else if (k == SDLK_PAGEDOWN)  scroll += lineas_visibles / 2;
                 } else if (foco == 0) {
-                    if (k == SDLK_ESCAPE) { SDL_RenderSetClipRect(renderer, NULL); return 0; }
+                    if (k == SDLK_ESCAPE || k == SDLK_F9) { SDL_RenderSetClipRect(renderer, NULL); return 0; }
                     else if (k == SDLK_UP)   { capitulo_sel--; episodio_sel = 0; scroll = 0; }
                     else if (k == SDLK_DOWN) { capitulo_sel++; episodio_sel = 0; scroll = 0; }
                     else if (k == SDLK_RETURN || k == SDLK_RIGHT) foco = 1;

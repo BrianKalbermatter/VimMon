@@ -12,4 +12,7 @@ int resetear_progreso(void);
 int intro_ya_vista(void);
 void marcar_intro_vista(void);
 
+int tutorial_ya_visto(void);
+void marcar_tutorial_visto(void);
+
 #endif

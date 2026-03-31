@@ -25,4 +25,5 @@ int screenPomodoro(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto
 int screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, SDL_Window *ventana);
 int screenFeedback(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
 int screenFreeEditor(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto, int nivel_num);
+int screenTutorial(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto);
 #endif

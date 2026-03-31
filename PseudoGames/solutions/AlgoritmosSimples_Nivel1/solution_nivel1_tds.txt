@@ -1,5 +1,5 @@
 # Ejercicio 0.1.1
-
+----------------------------
 Para los siguientes enunciados, identifique la acción principal y determine el estado inicial y final de los objetos sobre los que se actúa.
 
 1. Elaboración de una torta.
@@ -12,6 +12,53 @@ Para los siguientes enunciados, identifique la acción principal y determine el 
 
 5. Se quiere colocar una repisa en la pared, para lo cual se cuenta con un taladro, tacos fisher, tornillos, destornillador, etc.
 
+############
+PSEUDOCODIGO
+Importante: Para detectar texto o enunciados, algunas pistas son:
+ENTRADA:
+    "dados...", "a partir de...", "se cuenta con...".
+SALIDA:
+    "obtener", "hallar", "calcular", "escribir"
+AMBIENTE:
+    Variables que voy a usar en mi algoritmos, definirlas antes!
+PROCESO:
+    verbos de accion (mezclar, controlar, convertir)
+
+1. 
+ACCION elaboracionDeTorta ES
+    AMBIENTE
+        huevo:BOOLEANO;
+        arina:BOOLEANO;
+    PROCESO
+        ESCRIBIR("VERDADERO o FALSO segun tengas el ingrediente: ");
+        ESCRIBIR("Tengo huevos?: ");
+        LEER(huevo);
+        ESCRIBIR("Tengo arina?: ");
+        LEER(arina);
+        SI (huevo = VERDADERO) Y (arina = VERDADERO) ENTONCES
+            ESCRIBIR("Tengo todos los ingredientes y puedo comenzar con la elaboracion de la torta!");
+        SINO
+            SI (huevo = FALSO) Y (arina = FALSO) ENTONCES
+                ESCRIBIR("No puedo proceder a realizar la torta no tengo huevos ni arina!");
+            SINO
+                SI (huevo = VERDADERO) Y (arina = FALSO) ENTONCES
+                    ESCRIBIR("Me falta la arina");
+                SINO
+                    ESCRIBIR("Me falta los huevos");
+                FIN_SI
+            FIN_SI
+        FIN_SI
+FIN_ACCION
+El output va a depender de que opciones elijas por lo general esto se lo hace mucho mas comodo con un segun de casos para menos codigo!. Porque imaginate tener 12 o 20 productos que tengas o no!...
+
+2.
+ACCION SegEj ES
+    AMBIENTE
+        
+    PROCESO
+        
+FIN_ACCION
+############
 
 # Ejercicio 0.1.2
 
@@ -78,10 +125,17 @@ B := REDOND (NUM/NUM2);
 A := (A + B) - 9 * 2 -1;
 
 # Ejercicio 0.1.5
-
+-------------------
 Diseñe un algoritmo que permita resolver cada uno de los ejercicios enunciados a continuación:
 
     1. Leer los datos de un automóvil en la forma ¨Marca¨ seguida de ¨Modelo¨, y escribir en la forma ¨Modelo¨ seguido por ¨Marca¨.
-    2. Convertir una suma en dólares a PESOS. Se debe prever que el valor de conversión puede cambiar.
+    2. Convertir una suma en dólares a PESOS. Se debe preveer que el valor de conversión puede cambiar.
+
+###################
+PSEUDOCODIGO
+
+
+###################
+
 
 

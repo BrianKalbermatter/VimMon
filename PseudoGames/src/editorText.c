@@ -233,7 +233,6 @@ render_highlighted(SDL_Renderer *renderer, TTF_Font *fuente,
 }
 
 /* ── Clipboard multi-linea ────────────────────────────────────────── */
-#define MAX_LINES 500
 #define CB_MAX 50
 static char cb_buf[CB_MAX][512];
 static int  cb_n = 0;
@@ -393,13 +392,17 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                  Nivel *nivel, int nivel_num)
 {
     /* ── Buffer de lineas ─────────────────────────────────────────── */
-    static char buf[MAX_LINES][512];
+    static EditorPanel paneles[2];
+    static int panel_activo  = 0;
+    static int n_paneles     = 1;
     static char libre_ultimo[64] = "";  /* ultimo archivo guardado en modo libre */
-    int  n_lines    = 1;
-    int  cursor_row = 0;
-    int  cursor_col = 0;
-    int  offset_row = 0;   /* primera linea visible (scroll) */
-    memset(buf, 0, sizeof(buf));
+
+    /* Reset del panel activo al entrar */
+    memset(&paneles[panel_activo], 0, sizeof(EditorPanel));
+    paneles[panel_activo].n_lines = 1;
+
+    /* Alias corto para el panel activo */
+    EditorPanel *ep = &paneles[panel_activo];
 
     /* ── Layout ───────────────────────────────────────────────────── */
     int tiene_consigna = (cons_titulo && cons_titulo[0] != '\0');
@@ -408,7 +411,6 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     int line_h    = TTF_FontHeight(fuente) + 4;
     int out_h     = line_h * 6 + 24;
     int edit_h    = alto - out_h;
-    int text_x    = editor_x + GUTTER_W + 12;
     int vis_lines = (edit_h - 8) / line_h;
 
     /* Boton |> RUN (panel de salida, extremo derecho) */
@@ -431,16 +433,14 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
 
     /* ── Guardar ──────────────────────────────────────────────────── */
     int tiene_nombre_fijo = (nombre_fijo && nombre_fijo[0] != '\0');
-    char nombre_arch[64];
-    if (tiene_nombre_fijo) strncpy(nombre_arch, nombre_fijo, sizeof(nombre_arch)-1);
-    else                   nombre_arch[0] = '\0';
-    nombre_arch[sizeof(nombre_arch)-1] = '\0';
+    if (tiene_nombre_fijo) strncpy(ep->nombre_arch, nombre_fijo, sizeof(ep->nombre_arch)-1);
+    else                   ep->nombre_arch[0] = '\0';
+    ep->nombre_arch[sizeof(ep->nombre_arch)-1] = '\0';
 
     char prompt_buf[64]  = "";
     int  prompt_len      = 0;
     int  guardando       = 0;
     int  cargando        = 0;
-    int  dirty           = 0;   /* 1 = hay cambios sin guardar */
     int  confirm_salir   = 0;   /* 1 = mostrando dialogo "salir sin guardar?" */
 
     /* ── Lista de archivos guardados (para overlay F9) ────────────── */
@@ -453,20 +453,20 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
     /* ── Cargar archivo existente (solo si tiene nombre fijo) ─────── */
     if (tiene_nombre_fijo) {
         char path[128];
-        snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
+        snprintf(path, sizeof(path), "saves/%s.paed", ep->nombre_arch);
         FILE *f = fopen(path, "r");
         if (f) {
-            n_lines = 0;
+            ep->n_lines = 0;
             char linea[512];
-            while (n_lines < MAX_LINES && fgets(linea, sizeof(linea), f)) {
+            while (ep->n_lines < MAX_LINES && fgets(linea, sizeof(linea), f)) {
                 int l = (int)strlen(linea);
                 if (l > 0 && linea[l-1] == '\n') linea[l-1] = '\0';
-                strncpy(buf[n_lines], linea, 511);
-                buf[n_lines][511] = '\0';
-                n_lines++;
+                strncpy(ep->buf[ep->n_lines], linea, 511);
+                ep->buf[ep->n_lines][511] = '\0';
+                ep->n_lines++;
             }
             fclose(f);
-            if (n_lines == 0) n_lines = 1;
+            if (ep->n_lines == 0) ep->n_lines = 1;
         }
     }
 
@@ -546,16 +546,16 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                         } else { prompt_buf[0] = '\0'; prompt_len = 0; }
                     }
                     if (k == SDLK_RETURN && prompt_len > 0) {
-                        strncpy(nombre_arch, prompt_buf, sizeof(nombre_arch)-1);
-                        nombre_arch[sizeof(nombre_arch)-1] = '\0';
+                        strncpy(ep->nombre_arch, prompt_buf, sizeof(ep->nombre_arch)-1);
+                        ep->nombre_arch[sizeof(ep->nombre_arch)-1] = '\0';
                         char path[128];
-                        snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
-                        guardar_archivo(buf, n_lines, path);
-                        dirty     = 0;
+                        snprintf(path, sizeof(path), "saves/%s.paed", ep->nombre_arch);
+                        guardar_archivo(ep->buf, ep->n_lines, path);
+                        ep->dirty = 0;
                         guardando = 0; prompt_len = 0; prompt_buf[0] = '\0';
                         /* recordar el nombre para auto-cargar la proxima vez */
                         if (!tiene_nombre_fijo)
-                            strncpy(libre_ultimo, nombre_arch, sizeof(libre_ultimo)-1);
+                            strncpy(libre_ultimo, ep->nombre_arch, sizeof(libre_ultimo)-1);
                     }
                     break;
                 }
@@ -605,22 +605,22 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                         snprintf(path, sizeof(path), "saves/%s.paed", prompt_buf);
                         FILE *fl = fopen(path, "r");
                         if (fl) {
-                            memset(buf, 0, sizeof(buf));
-                            n_lines = 0;
+                            memset(ep->buf, 0, sizeof(ep->buf));
+                            ep->n_lines = 0;
                             char linea[512];
-                            while (n_lines < MAX_LINES && fgets(linea, sizeof(linea), fl)) {
+                            while (ep->n_lines < MAX_LINES && fgets(linea, sizeof(linea), fl)) {
                                 int l = (int)strlen(linea);
                                 if (l > 0 && linea[l-1] == '\n') linea[l-1] = '\0';
-                                strncpy(buf[n_lines], linea, 511);
-                                buf[n_lines][511] = '\0';
-                                n_lines++;
+                                strncpy(ep->buf[ep->n_lines], linea, 511);
+                                ep->buf[ep->n_lines][511] = '\0';
+                                ep->n_lines++;
                             }
                             fclose(fl);
-                            if (n_lines == 0) n_lines = 1;
-                            strncpy(nombre_arch, prompt_buf, sizeof(nombre_arch)-1);
+                            if (ep->n_lines == 0) ep->n_lines = 1;
+                            strncpy(ep->nombre_arch, prompt_buf, sizeof(ep->nombre_arch)-1);
                             strncpy(libre_ultimo, prompt_buf, sizeof(libre_ultimo)-1);
-                            cursor_row = 0; cursor_col = 0; offset_row = 0;
-                            dirty = 0;
+                            ep->cursor_row = 0; ep->cursor_col = 0; ep->offset_row = 0;
+                            ep->dirty = 0;
                         }
                         cargando = 0; prompt_len = 0; prompt_buf[0] = '\0';
                     }
@@ -630,112 +630,142 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 /* ── Editor normal ─────────────────────────────────── */
                 if (k == SDLK_F10) {
                     audio_sfx_btn();
-                    if (dirty) confirm_salir = 1;
-                    else       corriendo = 0;
+                    if (ep->dirty) confirm_salir = 1;
+                    else           corriendo = 0;
                     break;
                 }
                 if (k == SDLK_F8)  { audio_sfx_btn(); screenDoc(renderer, fuente, ancho, alto); break; }
+                if (k == SDLK_TAB && (SDL_GetModState() & KMOD_CTRL)) { audio_sfx_btn(); screenDoc(renderer, fuente, ancho, alto); break; }
+                if (k == SDLK_TAB && !(SDL_GetModState() & KMOD_CTRL)) {
+                    char *ln = ep->buf[ep->cursor_row];
+                    int len = (int)strlen(ln);
+                    if (len + 4 < 511) {
+                        memmove(ln + ep->cursor_col + 4, ln + ep->cursor_col, len - ep->cursor_col + 1);
+                        memset(ln + ep->cursor_col, ' ', 4);
+                        ep->cursor_col += 4;
+                        ep->dirty = 1;
+                    }
+                    break;
+                }
+
+                /* Toggle split: Ctrl+\ */
+                if (k == SDLK_BACKSLASH && (SDL_GetModState() & KMOD_CTRL)) {
+                    audio_sfx_btn();
+                    n_paneles = (n_paneles == 1) ? 2 : 1;
+                    if (n_paneles == 2 && paneles[1].n_lines == 0)
+                        paneles[1].n_lines = 1;
+                    break;
+                }
+                /* Cambiar foco entre paneles: Ctrl+W */
+                if (k == SDLK_w && (SDL_GetModState() & KMOD_CTRL)) {
+                    if (n_paneles == 2) {
+                        audio_sfx_btn();
+                        panel_activo = 1 - panel_activo;
+                        ep = &paneles[panel_activo];
+                    }
+                    break;
+                }
 
                 /* ENTER: partir linea en cursor_col */
-                if (k == SDLK_RETURN && n_lines < MAX_LINES) {
+                if (k == SDLK_RETURN && ep->n_lines < MAX_LINES) {
                     char resto[512];
-                    strncpy(resto, buf[cursor_row] + cursor_col, 511);
+                    strncpy(resto, ep->buf[ep->cursor_row] + ep->cursor_col, 511);
                     resto[511] = '\0';
-                    buf[cursor_row][cursor_col] = '\0';
-                    for (int i = n_lines; i > cursor_row + 1; i--)
-                        memcpy(buf[i], buf[i-1], 512);
-                    strncpy(buf[cursor_row + 1], resto, 511);
-                    buf[cursor_row + 1][511] = '\0';
-                    n_lines++;
-                    cursor_row++;
-                    cursor_col = 0;
-                    dirty = 1;
+                    ep->buf[ep->cursor_row][ep->cursor_col] = '\0';
+                    for (int i = ep->n_lines; i > ep->cursor_row + 1; i--)
+                        memcpy(ep->buf[i], ep->buf[i-1], 512);
+                    strncpy(ep->buf[ep->cursor_row + 1], resto, 511);
+                    ep->buf[ep->cursor_row + 1][511] = '\0';
+                    ep->n_lines++;
+                    ep->cursor_row++;
+                    ep->cursor_col = 0;
+                    ep->dirty = 1;
                 }
 
                 /* BACKSPACE */
                 if (k == SDLK_BACKSPACE) {
-                    if (cursor_col > 0) {
-                        int len = (int)strlen(buf[cursor_row]);
-                        memmove(buf[cursor_row] + cursor_col - 1,
-                                buf[cursor_row] + cursor_col,
-                                len - cursor_col + 1);
-                        cursor_col--;
-                        dirty = 1;
-                    } else if (cursor_row > 0) {
+                    if (ep->cursor_col > 0) {
+                        int len = (int)strlen(ep->buf[ep->cursor_row]);
+                        memmove(ep->buf[ep->cursor_row] + ep->cursor_col - 1,
+                                ep->buf[ep->cursor_row] + ep->cursor_col,
+                                len - ep->cursor_col + 1);
+                        ep->cursor_col--;
+                        ep->dirty = 1;
+                    } else if (ep->cursor_row > 0) {
                         /* al inicio: merge con linea anterior */
-                        int prev_len = (int)strlen(buf[cursor_row - 1]);
-                        int cur_len  = (int)strlen(buf[cursor_row]);
+                        int prev_len = (int)strlen(ep->buf[ep->cursor_row - 1]);
+                        int cur_len  = (int)strlen(ep->buf[ep->cursor_row]);
                         if (prev_len + cur_len < 511) {
-                            strcat(buf[cursor_row - 1], buf[cursor_row]);
-                            for (int i = cursor_row; i < n_lines - 1; i++)
-                                memcpy(buf[i], buf[i+1], 512);
-                            buf[n_lines - 1][0] = '\0';
-                            n_lines--;
-                            cursor_row--;
-                            cursor_col = prev_len;
-                            dirty = 1;
+                            strcat(ep->buf[ep->cursor_row - 1], ep->buf[ep->cursor_row]);
+                            for (int i = ep->cursor_row; i < ep->n_lines - 1; i++)
+                                memcpy(ep->buf[i], ep->buf[i+1], 512);
+                            ep->buf[ep->n_lines - 1][0] = '\0';
+                            ep->n_lines--;
+                            ep->cursor_row--;
+                            ep->cursor_col = prev_len;
+                            ep->dirty = 1;
                         }
                     }
                 }
 
                 /* Flechas */
                 if (k == SDLK_LEFT) {
-                    if (cursor_col > 0) cursor_col--;
-                    else if (cursor_row > 0) {
-                        cursor_row--;
-                        cursor_col = (int)strlen(buf[cursor_row]);
+                    if (ep->cursor_col > 0) ep->cursor_col--;
+                    else if (ep->cursor_row > 0) {
+                        ep->cursor_row--;
+                        ep->cursor_col = (int)strlen(ep->buf[ep->cursor_row]);
                     }
                 }
                 if (k == SDLK_RIGHT) {
-                    int cur_len = (int)strlen(buf[cursor_row]);
-                    if (cursor_col < cur_len) cursor_col++;
-                    else if (cursor_row < n_lines - 1) { cursor_row++; cursor_col = 0; }
+                    int cur_len = (int)strlen(ep->buf[ep->cursor_row]);
+                    if (ep->cursor_col < cur_len) ep->cursor_col++;
+                    else if (ep->cursor_row < ep->n_lines - 1) { ep->cursor_row++; ep->cursor_col = 0; }
                 }
-                if (k == SDLK_UP && cursor_row > 0) {
-                    cursor_row--;
-                    int cur_len = (int)strlen(buf[cursor_row]);
-                    if (cursor_col > cur_len) cursor_col = cur_len;
+                if (k == SDLK_UP && ep->cursor_row > 0) {
+                    ep->cursor_row--;
+                    int cur_len = (int)strlen(ep->buf[ep->cursor_row]);
+                    if (ep->cursor_col > cur_len) ep->cursor_col = cur_len;
                 }
-                if (k == SDLK_DOWN && cursor_row < n_lines - 1) {
-                    cursor_row++;
-                    int cur_len = (int)strlen(buf[cursor_row]);
-                    if (cursor_col > cur_len) cursor_col = cur_len;
+                if (k == SDLK_DOWN && ep->cursor_row < ep->n_lines - 1) {
+                    ep->cursor_row++;
+                    int cur_len = (int)strlen(ep->buf[ep->cursor_row]);
+                    if (ep->cursor_col > cur_len) ep->cursor_col = cur_len;
                 }
-                if (k == SDLK_HOME) cursor_col = 0;
-                if (k == SDLK_END)  cursor_col = (int)strlen(buf[cursor_row]);
+                if (k == SDLK_HOME) ep->cursor_col = 0;
+                if (k == SDLK_END)  ep->cursor_col = (int)strlen(ep->buf[ep->cursor_row]);
 
                 /* Ctrl+C: copiar linea actual */
                 if (k == SDLK_c && (evento.key.keysym.mod & KMOD_CTRL))
-                    editor_copiar(buf, cursor_row, cursor_row);
+                    editor_copiar(ep->buf, ep->cursor_row, ep->cursor_row);
 
                 /* Ctrl+X: cortar linea actual */
                 if (k == SDLK_x && (evento.key.keysym.mod & KMOD_CTRL)) {
-                    editor_cortar(buf, &n_lines, cursor_row, cursor_row,
-                                  &cursor_row, &cursor_col);
-                    dirty = 1;
+                    editor_cortar(ep->buf, &ep->n_lines, ep->cursor_row, ep->cursor_row,
+                                  &ep->cursor_row, &ep->cursor_col);
+                    ep->dirty = 1;
                 }
 
                 /* Ctrl+V: pegar (una o multiples lineas) */
                 if (k == SDLK_v && (evento.key.keysym.mod & KMOD_CTRL)) {
-                    editor_pegar(buf, &n_lines, &cursor_row, &cursor_col);
-                    dirty = 1;
+                    editor_pegar(ep->buf, &ep->n_lines, &ep->cursor_row, &ep->cursor_col);
+                    ep->dirty = 1;
                 }
 
                 /* Scroll: mantener cursor visible */
-                if (cursor_row < offset_row) offset_row = cursor_row;
-                if (cursor_row >= offset_row + vis_lines)
-                    offset_row = cursor_row - vis_lines + 1;
+                if (ep->cursor_row < ep->offset_row) ep->offset_row = ep->cursor_row;
+                if (ep->cursor_row >= ep->offset_row + vis_lines)
+                    ep->offset_row = ep->cursor_row - vis_lines + 1;
 
                 /* F5: ya tiene audio_sfx_btn en su bloque abajo */
                 /* F9: guardar
                  * Si ya tiene nombre (fijo o dado antes): sobreescribe directo.
                  * Si no tiene nombre todavia: abre el overlay para elegir uno. */
                 if (k == SDLK_F9) {
-                    if (nombre_arch[0] != '\0') {
+                    if (ep->nombre_arch[0] != '\0') {
                         char path[128];
-                        snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
-                        guardar_archivo(buf, n_lines, path);
-                        dirty = 0;
+                        snprintf(path, sizeof(path), "saves/%s.paed", ep->nombre_arch);
+                        guardar_archivo(ep->buf, ep->n_lines, path);
+                        ep->dirty = 0;
                     } else {
                         /* sin nombre aun: abrir overlay */
                         guardando  = 1;
@@ -750,11 +780,11 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                 if (k == SDLK_F5) {
                     audio_sfx_btn();
                     char path[128];
-                    snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
-                    guardar_archivo(buf, n_lines, path);
+                    snprintf(path, sizeof(path), "saves/%s.paed", ep->nombre_arch);
+                    guardar_archivo(ep->buf, ep->n_lines, path);
                     n_out = ejecutar_paed(path, out_buf, OUT_MAX);
                     if (nivel && n_out < OUT_MAX) {
-                        if (verificar_nivel(nivel, nombre_arch)) {
+                        if (verificar_nivel(nivel, ep->nombre_arch)) {
                             marcar_completado(nivel_num);
                             strncpy(out_buf[n_out], "[OK] Nivel superado!", 255);
                         } else {
@@ -803,11 +833,11 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     my >= btn_run.y && my < btn_run.y + btn_run.h) {
                     audio_sfx_btn();
                     char path[128];
-                    snprintf(path, sizeof(path), "saves/%s.paed", nombre_arch);
-                    guardar_archivo(buf, n_lines, path);
+                    snprintf(path, sizeof(path), "saves/%s.paed", ep->nombre_arch);
+                    guardar_archivo(ep->buf, ep->n_lines, path);
                     n_out = ejecutar_paed(path, out_buf, OUT_MAX);
                     if (nivel && n_out < OUT_MAX) {
-                        if (verificar_nivel(nivel, nombre_arch)) {
+                        if (verificar_nivel(nivel, ep->nombre_arch)) {
                             marcar_completado(nivel_num);
                             strncpy(out_buf[n_out], "[OK] Nivel superado!", 255);
                         } else {
@@ -828,14 +858,14 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     int item = (my - mdrop.y - 3) / mitem_h;
                     if (item == 0) {
                         /* Volver al menu principal: igual que F10 */
-                        if (dirty) confirm_salir = 1;
-                        else       corriendo = 0;
+                        if (ep->dirty) confirm_salir = 1;
+                        else           corriendo = 0;
                     } else if (item == 1) {
                         /* Guardar: abre overlay con nombre actual pre-cargado.
                          * Siempre muestra el overlay para confirmar/cambiar nombre. */
                         guardando = 1;
-                        if (nombre_arch[0] != '\0')
-                            strncpy(prompt_buf, nombre_arch, sizeof(prompt_buf)-1);
+                        if (ep->nombre_arch[0] != '\0')
+                            strncpy(prompt_buf, ep->nombre_arch, sizeof(prompt_buf)-1);
                         else
                             prompt_buf[0] = '\0';
                         prompt_len = (int)strlen(prompt_buf);
@@ -866,14 +896,14 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                     }
                 } else {
                     int add     = (int)strlen(evento.text.text);
-                    int cur_len = (int)strlen(buf[cursor_row]);
+                    int cur_len = (int)strlen(ep->buf[ep->cursor_row]);
                     if (cur_len + add < 511) {
-                        memmove(buf[cursor_row] + cursor_col + add,
-                                buf[cursor_row] + cursor_col,
-                                cur_len - cursor_col + 1);
-                        memcpy(buf[cursor_row] + cursor_col, evento.text.text, add);
-                        cursor_col += add;
-                        dirty = 1;
+                        memmove(ep->buf[ep->cursor_row] + ep->cursor_col + add,
+                                ep->buf[ep->cursor_row] + ep->cursor_col,
+                                cur_len - ep->cursor_col + 1);
+                        memcpy(ep->buf[ep->cursor_row] + ep->cursor_col, evento.text.text, add);
+                        ep->cursor_col += add;
+                        ep->dirty = 1;
                     }
                 }
             }
@@ -882,6 +912,11 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
         /* ── Render ───────────────────────────────────────────────── */
         SDL_SetRenderDrawColor(renderer, BG_R, 255);
         SDL_RenderClear(renderer);
+
+        /* Layout ajustado al split */
+        int p_w  = n_paneles == 2 ? editor_w / 2 : editor_w;
+        int p_x  = editor_x + panel_activo * p_w;
+        int p_tx = p_x + GUTTER_W + 12;
 
         /* Panel consigna (izquierda) */
         if (tiene_consigna) {
@@ -901,24 +936,24 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
         }
 
         /* Fondo editor */
-        SDL_Rect editor_bg = { editor_x, 0, editor_w, edit_h };
+        SDL_Rect editor_bg = { p_x, 0, p_w, edit_h };
         SDL_SetRenderDrawColor(renderer, BG_R, 255);
         SDL_RenderFillRect(renderer, &editor_bg);
 
         /* Gutter */
-        SDL_Rect gutter = { editor_x, 0, GUTTER_W, edit_h };
+        SDL_Rect gutter = { p_x, 0, GUTTER_W, edit_h };
         SDL_SetRenderDrawColor(renderer, GT_R, 255);
         SDL_RenderFillRect(renderer, &gutter);
         SDL_SetRenderDrawColor(renderer, LN_R, 255);
-        SDL_RenderDrawLine(renderer, editor_x + GUTTER_W, 0, editor_x + GUTTER_W, edit_h);
+        SDL_RenderDrawLine(renderer, p_x + GUTTER_W, 0, p_x + GUTTER_W, edit_h);
 
         /* Lineas visibles */
-        SDL_Rect edit_clip = { editor_x, 0, editor_w, edit_h };
+        SDL_Rect edit_clip = { p_x, 0, p_w, edit_h };
         SDL_RenderSetClipRect(renderer, &edit_clip);
 
         for (int i = 0; i < vis_lines; i++) {
-            int row = offset_row + i;
-            if (row >= n_lines) break;
+            int row = ep->offset_row + i;
+            if (row >= ep->n_lines) break;
             int y = 8 + i * line_h;
 
             /* Numero de linea alineado a la derecha del gutter */
@@ -928,34 +963,60 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
             SDL_Surface *sn = TTF_RenderUTF8_Blended(fuente, num, c_num);
             if (sn) {
                 SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, sn);
-                SDL_Rect pos = { editor_x + GUTTER_W - nw - 8, y, sn->w, sn->h };
+                SDL_Rect pos = { p_x + GUTTER_W - nw - 8, y, sn->w, sn->h };
                 SDL_RenderCopy(renderer, t, NULL, &pos);
                 SDL_FreeSurface(sn); SDL_DestroyTexture(t);
             }
 
+            /* Guias de indentacion */
+            {
+                static const SDL_Color indent_col[] = {
+                    { 90, 25, 25,  60 },   /* nivel 1 — rojo     */
+                    { 25, 80, 25,  60 },   /* nivel 2 — verde    */
+                    { 85, 75, 10,  60 },   /* nivel 3 — amarillo */
+                    { 20, 50, 90,  60 },   /* nivel 4 — azul     */
+                    { 70, 20, 75,  60 },   /* nivel 5 — violeta  */
+                };
+                int sp_w; TTF_SizeUTF8(fuente, "    ", &sp_w, NULL);
+                int espacios = 0;
+                while (ep->buf[row][espacios] == ' ') espacios++;
+                int niveles = espacios / 4;
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                for (int lv = 0; lv < niveles && lv < 5; lv++) {
+                    SDL_Color gc = indent_col[lv];
+                    SDL_SetRenderDrawColor(renderer, gc.r, gc.g, gc.b, gc.a);
+                    SDL_Rect zona = { p_tx + lv * sp_w, y, sp_w, line_h - 1 };
+                    SDL_RenderFillRect(renderer, &zona);
+                    /* linea vertical al borde izquierdo de cada nivel */
+                    SDL_SetRenderDrawColor(renderer, gc.r, gc.g, gc.b, 130);
+                    SDL_RenderDrawLine(renderer, zona.x, y, zona.x, y + line_h - 2);
+                }
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            }
+
             /* Texto de la linea (o placeholder en linea 1 vacia) */
-            if (buf[row][0] == '\0' && n_lines == 1) {
+            if (ep->buf[row][0] == '\0' && ep->n_lines == 1) {
                 SDL_Surface *s = TTF_RenderUTF8_Blended(fuente,
                                      "Escribe tu codigo aqui...", c_ph);
                 if (s) {
                     SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
-                    SDL_Rect pos = { text_x, y, s->w, s->h };
+                    SDL_Rect pos = { p_tx, y, s->w, s->h };
                     SDL_RenderCopy(renderer, t, NULL, &pos);
                     SDL_FreeSurface(s); SDL_DestroyTexture(t);
                 }
-            } else if (buf[row][0] != '\0') {
-                render_highlighted(renderer, fuente, buf[row], text_x, y);
+            } else if (ep->buf[row][0] != '\0') {
+                render_highlighted(renderer, fuente, ep->buf[row], p_tx, y);
             }
 
             /* Cursor fijo en la fila activa */
-            if (row == cursor_row) {
-                int cx = text_x;
-                if (cursor_col > 0) {
+            if (row == ep->cursor_row) {
+                int cx = p_tx;
+                if (ep->cursor_col > 0) {
                     char antes[512];
-                    strncpy(antes, buf[cursor_row], cursor_col);
-                    antes[cursor_col] = '\0';
+                    strncpy(antes, ep->buf[ep->cursor_row], ep->cursor_col);
+                    antes[ep->cursor_col] = '\0';
                     int tw; TTF_SizeUTF8(fuente, antes, &tw, NULL);
-                    cx = text_x + tw;
+                    cx = p_tx + tw;
                 }
                 SDL_SetRenderDrawColor(renderer, TX_R, 200);
                 SDL_Rect cur = { cx, y, 2, line_h - 2 };
@@ -964,11 +1025,60 @@ screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
         }
         SDL_RenderSetClipRect(renderer, NULL);
 
+        /* Panel inactivo (cuando hay split) */
+        if (n_paneles == 2) {
+            int inact = 1 - panel_activo;
+            int inact_x = editor_x + (1 - panel_activo) * p_w;
+            EditorPanel *ip = &paneles[inact];
+            int lh = TTF_FontHeight(fuente) + 4;
+
+            /* Fondo */
+            SDL_Rect inact_bg = { inact_x, 0, p_w, edit_h };
+            SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
+            SDL_RenderFillRect(renderer, &inact_bg);
+
+            /* Gutter */
+            SDL_Rect inact_gut = { inact_x, 0, GUTTER_W, edit_h };
+            SDL_SetRenderDrawColor(renderer, GT_R, 255);
+            SDL_RenderFillRect(renderer, &inact_gut);
+            SDL_SetRenderDrawColor(renderer, LN_R, 255);
+            SDL_RenderDrawLine(renderer, inact_x + GUTTER_W, 0, inact_x + GUTTER_W, edit_h);
+
+            /* Contenido */
+            SDL_Rect inact_clip = { inact_x, 0, p_w, edit_h };
+            SDL_RenderSetClipRect(renderer, &inact_clip);
+            SDL_Color c_ln = { LN_R, 255 };
+            int itx = inact_x + GUTTER_W + 12;
+            int ivis = (edit_h - 8) / lh;
+            for (int i = 0; i < ivis; i++) {
+                int row = ip->offset_row + i;
+                if (row >= ip->n_lines) break;
+                int iy = 8 + i * lh;
+                char num[12];
+                snprintf(num, sizeof(num), "%d", row + 1);
+                int nw; TTF_SizeUTF8(fuente, num, &nw, NULL);
+                SDL_Surface *sn = TTF_RenderUTF8_Blended(fuente, num, c_ln);
+                if (sn) {
+                    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, sn);
+                    SDL_Rect pos = { inact_x + GUTTER_W - nw - 8, iy, sn->w, sn->h };
+                    SDL_RenderCopy(renderer, t, NULL, &pos);
+                    SDL_FreeSurface(sn); SDL_DestroyTexture(t);
+                }
+                if (ip->buf[row][0] != '\0')
+                    render_highlighted(renderer, fuente, ip->buf[row], itx, iy);
+            }
+            SDL_RenderSetClipRect(renderer, NULL);
+
+            /* Divisor entre paneles */
+            SDL_SetRenderDrawColor(renderer, LN_R, 255);
+            SDL_RenderDrawLine(renderer, editor_x + p_w, 0, editor_x + p_w, edit_h);
+        }
+
         /* Nombre de archivo (arriba a la derecha) */
         {
             char titulo[80];
-            if (nombre_arch[0] != '\0') snprintf(titulo, sizeof(titulo), "%s.paed", nombre_arch);
-            else                        snprintf(titulo, sizeof(titulo), "sin guardar");
+            if (ep->nombre_arch[0] != '\0') snprintf(titulo, sizeof(titulo), "%s.paed", ep->nombre_arch);
+            else                            snprintf(titulo, sizeof(titulo), "sin guardar");
             SDL_Color c_arch = { LN_R, 255 };
             int tw; TTF_SizeUTF8(fuente, titulo, &tw, NULL);
             dibujadoTextoSimple(renderer, fuente, titulo, editor_x + editor_w - tw - 12, 4, c_arch);
