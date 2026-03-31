@@ -5,7 +5,13 @@
 !/LICENSE
 !/.github/
 
-# Build output dentro de PseudoGames
+# Build output y binarios
 PseudoGames/build/
 PseudoGames/aed
 PseudoGames/PseudoGames.exe
+PseudoGames/Frankly/paed
+PseudoGames/screenPJ/screenPJ
+PseudoGames/learBash/*.out
+
+# Metadata Windows (Zone.Identifier)
+*:Zone.Identifier
