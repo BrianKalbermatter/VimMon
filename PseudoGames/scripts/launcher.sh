@@ -47,4 +47,5 @@ if [ ! -f "./aed" ]; then
     exit 1
 fi
 
+export LD_LIBRARY_PATH="./lib:$LD_LIBRARY_PATH"
 exec ./aed

@@ -8,6 +8,12 @@ OUTPUT="pseudogames-linux.tar.gz"
 # Crear saves/ vacio si no existe
 mkdir -p saves
 
+# Copiar libs SDL2 necesarias
+mkdir -p lib
+cp /usr/lib/libSDL2-2.0.so.0     lib/
+cp /usr/lib/libSDL2_ttf-2.0.so.0  lib/
+cp /usr/lib/libSDL2_mixer-2.0.so.0 lib/
+
 echo "Empaquetando $OUTPUT..."
 
 tar -czf "../$OUTPUT" \
@@ -15,6 +21,7 @@ tar -czf "../$OUTPUT" \
     --exclude="*.exe" \
     --transform="s|scripts/launcher.sh|launcher.sh|" \
     aed \
+    lib/ \
     assets/ \
     data/ \
     saves/ \
