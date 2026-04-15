@@ -63,7 +63,7 @@ explosion(SDL_Renderer *renderer, TTF_Font *fuente,
             SDL_FreeSurface(s);
             SDL_DestroyTexture(t);
         }
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -559,7 +559,7 @@ screenMenu(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             }
         }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 

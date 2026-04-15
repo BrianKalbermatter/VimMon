@@ -1,25 +1,25 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include <stdlib.h>
 #include "niveles.h"
 #include "progreso.h"
 #include "pomodoro_bg.h"
-#include "ui.h"
-#include "screenPJ.h"
 #include "audio.h"
 #include "config.h"
+#include "shell.h"
+#include "ui.h"
 #include <stdio.h>
-#include <string.h>
 
-/* Muestra un error aunque SDL no este cargado */
+// Helper privado
 static void fatal(const char *titulo, const char *msg) {
     fprintf(stderr, "%s: %s\n", titulo, msg);
 }
 
+// main/start
 int
 main(int argc, char *argv[]) {
     (void)argc; (void)argv;
 
+    SDL_SetHint("SDL_VIDEO_X11_XSHM", "0");
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fatal("Error SDL_Init", SDL_GetError());
@@ -31,9 +31,8 @@ main(int argc, char *argv[]) {
     }
 
     audio_init();
-    /* la musica arranca cuando el usuario cierra la pantalla de bienvenida */
-
     config_cargar();
+    audio_set_volumen(config_get_volumen());
     cargar_niveles("data/niveles.json");
     cargar_progreso("saves/progreso.json");
 
@@ -45,94 +44,46 @@ main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Window *ventana = SDL_CreateWindow(
-            "PseudoGames",
-            SDL_WINDOWPOS_CENTERED,
-            SDL_WINDOWPOS_CENTERED,
-            800, 600,
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
-            );
+    /* Detectar pantalla principal: buscar el display en coordenada (0,0)
+       SDL no garantiza que el índice 0 sea el principal en multi-monitor */
+    SDL_Rect display = {0, 0, 1280, 720};
+    int n_displays = SDL_GetNumVideoDisplays();
+    for (int d = 0; d < n_displays; d++) {
+        SDL_Rect r;
+        if (SDL_GetDisplayBounds(d, &r) == 0 && r.x == 0 && r.y == 0) {
+            display = r;
+            break;
+        }
+    }
+
+    SDL_Window *ventana = SDL_CreateWindow("PseudoGames",
+        display.x, display.y,
+        display.w, display.h,
+        SDL_WINDOW_SHOWN | SDL_WINDOW_BORDERLESS);
     if (!ventana) {
         fatal("Error ventana", SDL_GetError());
         return 1;
     }
 
-    /* Intentar GPU primero; si falla (WSLg sin OpenGL) usar software */
-    SDL_Renderer *renderer = SDL_CreateRenderer(ventana, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer)
-        renderer = SDL_CreateRenderer(ventana, -1, SDL_RENDERER_SOFTWARE);
-    if (!renderer) {
-        fatal("Error renderer", SDL_GetError());
-        return 1;
-    }
+    /* WSL2/XWayland usa visual ARGB — SDL_RenderPresent deja alpha=0 (transparente).
+       Solución: renderizar sobre la window surface directamente con SDL_CreateSoftwareRenderer,
+       y usar SDL_UpdateWindowSurface en vez de SDL_RenderPresent. */
+    SDL_Surface *wsurface = SDL_GetWindowSurface(ventana);
+    if (!wsurface) { fatal("Error surface", SDL_GetError()); return 1; }
 
-    SDL_ShowWindow(ventana);
-    SDL_RestoreWindow(ventana);
+    SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(wsurface);
+    if (!renderer) { fatal("Error renderer", SDL_GetError()); return 1; }
+
+    ui_set_ventana(ventana);
     SDL_RaiseWindow(ventana);
     SDL_SetWindowInputFocus(ventana);
 
-    /* aplicar fullscreen guardado */
-    if (config_get_fullscreen() == 0) {  /* 0=Si en el array de opciones */
-        SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP);
-        SDL_RaiseWindow(ventana);
-        SDL_SetWindowInputFocus(ventana);
-    }
-
-    /* Leer el tamaño real de la ventana — sin logical size para evitar
-       el blur del escalado interno de SDL. Cada pantalla dibuja directo
-       en la resolución nativa. Se re-lee al inicio de cada iteración
-       para capturar cambios (maximizar, pantalla completa, resize). */
     int ancho, alto;
     SDL_GetWindowSize(ventana, &ancho, &alto);
-    screen_poweron(renderer, ancho, alto);
 
+    screenShell(renderer, fuente, ancho, alto, ventana);
 
-    /* ── intro: mazmorra 3D, una sola vez en la vida ── */
-    if (!intro_ya_vista()) {
-        screenPJ_intro(renderer, ventana, ancho, alto);
-        marcar_intro_vista();
-        screen_transition(renderer, ancho, alto);
-    }
-
-
-    int opcion = 0;
-    int primera_vez = 1;
-    do {
-        /* Re-leer resolución real en cada vuelta del loop:
-           captura maximize, fullscreen o resize del usuario */
-        SDL_GetWindowSize(ventana, &ancho, &alto);
-
-        audio_tick();  /* reinicio automatico de musica tras 10 min de silencio */
-
-        if (!primera_vez) screen_transition(renderer, ancho, alto);
-        primera_vez = 0;
-        opcion = screenMenu(renderer, fuente, ancho, alto);
-        if (opcion == 0) break;
-        screen_transition(renderer, ancho, alto);
-        switch (opcion){
-            case 1:{
-                   screenTutorial(renderer, fuente, ancho, alto);
-                   screen_transition(renderer, ancho, alto);
-                   int nivel = screenLvLs(renderer, fuente, ancho, alto);
-                   if(nivel > 0) {
-                        screen_transition(renderer, ancho, alto);
-                        screenLvLEditor(renderer, fuente, ancho, alto, nivel);
-                   }
-                   break;
-                   }
-            case 2: screenDoc(renderer, fuente, ancho, alto); break;
-            case 3: screenPomodoro(renderer, fuente, ancho, alto); break;
-            case 4: screenFreeEditor(renderer, fuente, ancho, alto, 0); break;
-            case 5: screenLvLs(renderer, fuente, ancho, alto); break;
-            case 6: screenSoluciones(renderer, fuente, ancho, alto); break;
-            case 7: screenConfig(renderer, fuente, ancho, alto, ventana); break;
-        }
-    }while (opcion != 0);
-
-    SDL_GetWindowSize(ventana, &ancho, &alto);
     audio_fade_out(800);
-    screen_poweroff(renderer, ancho, alto);
 
     pom_cleanup();
     audio_cleanup();

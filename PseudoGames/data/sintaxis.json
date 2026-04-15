@@ -1,36 +1,69 @@
 {
     "categorias": [
       {
-        "nombre": "keywords",
-        "color": "rosa",
-        "palabras": ["HACER", "ABRIR", "CERRAR", "ARCHIVO", "REGISTRO" ,"SI", "FIN_SI", "SINO", "MIENTRAS", "FIN_MIENTRAS", "PARA", "FIN_PARA", "RETORNAR", "FUNCION", "FIN_FUNCION", "SEGUN", "PROCEDIMIENTO", "FIN_PROCEDIMIENTO", "ACCION", "ES", "FIN_ACCION", "PROCESO", "AMBIENTE"]
+        "nombre": "condicionales",
+        "color": "azul",
+        "palabras": ["SI", "FIN_SI", "SINO", "ENTONCES"]
+      },
+      {
+        "nombre": "bucles",
+        "color": "naranja",
+        "palabras": ["MIENTRAS", "FIN_MIENTRAS", "PARA", "FIN_PARA", "REPETIR", "HASTA", "HACER"]
+      },
+      {
+        "nombre": "estructura",
+        "color": "dorado",
+        "palabras": ["ACCION", "ES", "FIN_ACCION", "PROCESO", "AMBIENTE", "FUNCION", "FIN_FUNCION", "PROCEDIMIENTO", "FIN_PROCEDIMIENTO", "RETORNAR", "SEGUN", "ABRIR", "CERRAR", "ARCHIVO", "REGISTRO"]
+      },
+      {
+        "nombre": "salida",
+        "color": "violeta",
+        "palabras": ["ESCRIBIR"]
+      },
+      {
+        "nombre": "entrada",
+        "color": "verde-teal",
+        "palabras": ["LEER"]
       },
       {
         "nombre": "tipos",
-        "color": "azul",
-        "palabras": ["ENTERO", "REAL", "CARACTER", "BOOLEANO", "SECUENCIA_DE_CARACTERES", "SECUENCIA_DE_ENTEROS", "ARREGLO", "CONSTANTE", "VAR", "DE"]
+        "color": "azul-claro",
+        "palabras": ["ENTERO", "REAL", "CARACTER", "BOOLEANO", "SECUENCIA_DE_CARACTERES", "SECUENCIA_DE_ENTEROS", "ARREGLO", "CONSTANTE", "VAR", "DE", "AN", "N"]
       },
       {
-         "nombre": "operadores",
-         "color": "verde",
-         "palabras": ["Y", "O", "NO", "*", "/"]
+        "nombre": "operadores",
+        "color": "verde-lima",
+        "palabras": ["Y", "O", "NO", "*", "/"]
       },
       {
-         "nombre": "funciones secundarias precreadas",
-         "color": "amarillo",
-         "palabras": ["MOD", "RETURN", "TRUNC", "ABSO", "REDOND"]
+        "nombre": "funciones_builtin",
+        "color": "amarillo",
+        "palabras": ["MOD", "DIV", "TRUNC", "ABSO", "REDOND"]
       },
       {
-         "nombre": "comentario",
-         "color": "gris",
-         "palabras": ["//"]
+        "nombre": "secuencias",
+        "color": "aqua",
+        "palabras": ["ARR", "AVZ", "VENTANA", "NFDS", "FDS"]
       },
       {
-         "nombre": "inputs/outputs",
-         "color": "celeste",
-         "palabras": ["ESCRIBIR", "LEER"]
+        "nombre": "comentario",
+        "color": "gris",
+        "patron": "//"
+      },
+      {
+        "nombre": "strings",
+        "color": "naranja",
+        "patron": "\".*\""
+      },
+      {
+        "nombre": "numeros",
+        "color": "rosa-lila",
+        "patron": "[0-9]+"
+      },
+      {
+        "nombre": "variables",
+        "color": "blanco-crema",
+        "descripcion": "identificadores no reservados"
       }
-      
-      
     ]
 }

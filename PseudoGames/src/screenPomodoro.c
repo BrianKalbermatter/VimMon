@@ -170,7 +170,7 @@ pom_menu(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fuente, int ancho, int 
         int hw; TTF_SizeUTF8(fuente, h, &hw, NULL);
         pom_txt(renderer, fuente, h, cx - hw/2, py + ph - 24, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -235,7 +235,7 @@ pom_modo_pomodoro(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fr,
         int hw; TTF_SizeUTF8(fuente, help, &hw, NULL);
         pom_txt(renderer, fuente, help, cx-hw/2, py+ph-28, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -289,7 +289,7 @@ pom_modo_cronometro(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fr,
         int hw; TTF_SizeUTF8(fuente, help, &hw, NULL);
         pom_txt(renderer, fuente, help, cx-hw/2, py+ph-28, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -344,7 +344,7 @@ pom_modo_timer(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fr,
         int hw; TTF_SizeUTF8(fuente, h, &hw, NULL);
         pom_txt(renderer, fuente, h, cx-hw/2, py+ph-28, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
     SDL_StopTextInput();
@@ -391,7 +391,7 @@ pom_modo_timer(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fr,
         int hw; TTF_SizeUTF8(fuente, help, &hw, NULL);
         pom_txt(renderer, fuente, help, cx-hw/2, py+ph-28, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -447,7 +447,7 @@ pom_modo_stats(SDL_Renderer *renderer, TTF_Font *ft, TTF_Font *fuente,
         int hw; TTF_SizeUTF8(fuente, h, &hw, NULL);
         pom_txt(renderer, fuente, h, cx-hw/2, py+ph-28, c_dim);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }

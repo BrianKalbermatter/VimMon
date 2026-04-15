@@ -15,6 +15,7 @@ static inline void audio_pausar(void)           {}
 static inline void audio_reanudar(void)         {}
 static inline int  audio_reproduciendo(void)    { return 0; }
 static inline void audio_tick(void)             {}
+static inline void audio_set_volumen(int v)     { (void)v; }
 #else
 
 /* Inicializa SDL2_mixer. Llamar una sola vez en main(). */
@@ -52,6 +53,9 @@ int audio_reproduciendo(void);
 /* Llamar cada frame desde el game loop. Gestiona el reinicio automatico
    despues de 10 min de silencio cuando la musica por defecto termina. */
 void audio_tick(void);
+
+/* Cambia el volumen global (0-100). */
+void audio_set_volumen(int vol);
 
 #endif /* SIN_AUDIO */
 #endif /* AUDIO_H */

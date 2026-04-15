@@ -352,7 +352,7 @@ screenTutorial(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
             return 1;
         }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         /* Si vsync esta activo, RenderPresent ya esperó ~16ms.
            Solo dormimos lo que falta para no doblar la espera. */
         Uint32 frame_ms = SDL_GetTicks() - frame_t0;

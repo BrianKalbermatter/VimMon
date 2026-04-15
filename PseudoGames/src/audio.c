@@ -189,4 +189,14 @@ audio_reproduciendo(void)
     return Mix_PlayingMusic() && !Mix_PausedMusic();
 }
 
+void
+audio_set_volumen(int vol)
+{
+    if (vol < 0)   vol = 0;
+    if (vol > 100) vol = 100;
+    int v = vol * MIX_MAX_VOLUME / 100;
+    Mix_VolumeMusic(v);
+    Mix_Volume(-1, v);
+}
+
 #endif /* SIN_AUDIO */

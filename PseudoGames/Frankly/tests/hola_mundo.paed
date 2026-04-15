@@ -1,7 +1,9 @@
-ACCION hola_mundo ES
-    AMBIENTE
-        mensaje: AN(20);
-    PROCESO
-        mensaje := "Hola Mundo";
-        ESCRIBIR(mensaje);
+ACCION test ES
+      AMBIENTE
+          a: AN(5);
+          b: AN(5);
+      PROCESO
+          a := "Hola";
+          b := "Mundo";
+          ESCRIBIR(a,b);
 FIN_ACCION

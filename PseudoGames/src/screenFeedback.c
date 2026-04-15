@@ -569,7 +569,7 @@ screenFeedback(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto)
                 cx - tw/2 - 10, alto - 40, c_esc);
         }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 

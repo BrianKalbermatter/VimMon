@@ -1,32 +1,9 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <stdio.h>
 #include "ui.h"
 #include "config.h"
-
-/* Intenta SDL_WINDOW_FULLSCREEN_DESKTOP; si falla (renderer SOFTWARE)
-   usa el truco de borderless+maximize como fallback */
-static void
-aplicar_fullscreen(SDL_Window *ventana, int activar)
-{
-    if (activar) {
-        if (SDL_SetWindowFullscreen(ventana, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
-            SDL_SetWindowBordered(ventana, SDL_FALSE);
-            SDL_MaximizeWindow(ventana);
-        }
-    } else {
-        SDL_SetWindowFullscreen(ventana, 0);
-        SDL_SetWindowBordered(ventana, SDL_TRUE);
-        SDL_RestoreWindow(ventana);
-    }
-    /* Forzar foco: RaiseWindow + InputFocus + warp del mouse al centro.
-       El warp es necesario en Linux/Wayland donde el WM ignora InputFocus. */
-    SDL_RaiseWindow(ventana);
-    SDL_SetWindowInputFocus(ventana);
-    int w, h;
-    SDL_GetWindowSize(ventana, &w, &h);
-    SDL_WarpMouseInWindow(ventana, w / 2, h / 2);
-    SDL_PumpEvents();  /* procesar el warp para que el WM actualice el foco */
-}
+#include "audio.h"
 
 // Opciones de configuracion disponibles
 typedef struct {
@@ -45,12 +22,15 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
 
     // --- definir opciones ---
     OpcionConfig opciones[] = {
-        { "Pantalla completa",  {"Si", "No"},       2, config_get_fullscreen() },
         { "Velocidad lluvia",   {"Lenta", "Normal", "Rapida"}, 3, config_get_lluvia() },
         { "Brillo",             {"Bajo", "Normal", "Alto"},    3, config_get_brillo() },
     };
     int n_opciones = (int)(sizeof(opciones) / sizeof(opciones[0]));
     int seleccionada = 0;  // fila seleccionada con el teclado
+
+    int vol        = config_get_volumen();
+    int drag_vol   = 0;   /* 1 = arrastrando el handle del slider */
+    int tab_config = 0;   /* 0 = General, 1 = Atajos */
 
     SDL_Event evento;
     int corriendo = 1;
@@ -65,9 +45,10 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
             if (evento.type == SDL_KEYDOWN) {
                 switch (evento.key.keysym.sym) {
                     case SDLK_ESCAPE:
-                        config_set_fullscreen(opciones[0].seleccion);
-                        config_set_lluvia(opciones[1].seleccion);
-                        config_set_brillo(opciones[2].seleccion);
+                        config_set_lluvia(opciones[0].seleccion);
+                        config_set_brillo(opciones[1].seleccion);
+                        config_set_volumen(vol);
+                        audio_set_volumen(vol);
                         config_guardar();
                         corriendo = 0;
                         break;
@@ -92,8 +73,6 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
                     default: break;
                 }
 
-                // aplicar pantalla completa en tiempo real
-                aplicar_fullscreen(ventana, opciones[0].seleccion == 0);
             }
             if (evento.type == SDL_MOUSEBUTTONDOWN &&
                 evento.button.button == SDL_BUTTON_LEFT) {
@@ -101,17 +80,33 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
                 click_x  = evento.button.x;
                 click_y  = evento.button.y;
             }
+            if (evento.type == SDL_MOUSEBUTTONUP &&
+                evento.button.button == SDL_BUTTON_LEFT) {
+                if (drag_vol) {
+                    config_set_volumen(vol);
+                    config_guardar();
+                }
+                drag_vol = 0;
+            }
+            if (evento.type == SDL_MOUSEMOTION && drag_vol) {
+                int panel_x2 = (ancho - 520) / 2;
+                int track_x2 = panel_x2 + 140;
+                int track_w2 = 520 - 160;
+                int handle_w2 = 14;
+                int rel = evento.motion.x - track_x2;
+                vol = rel * 100 / (track_w2 - handle_w2);
+                if (vol < 0)   vol = 0;
+                if (vol > 100) vol = 100;
+                audio_set_volumen(vol);
+            }
         }
-
-        // aplicar también al hacer click en < >
-        if (clicked) aplicar_fullscreen(ventana, opciones[0].seleccion == 0);
 
         // --- render ---
         SDL_SetRenderDrawColor(renderer, 12, 12, 18, 255);
         SDL_RenderClear(renderer);
 
         // panel central
-        int panel_w = 520, panel_h = 400;
+        int panel_w = 520, panel_h = 460;
         int panel_x = (ancho - panel_w) / 2;
         int panel_y = (alto  - panel_h) / 2;
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -122,23 +117,54 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
         SDL_RenderDrawRect(renderer, &panel);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-        // titulo
-        SDL_Color c_titulo = {180, 180, 220, 255};
-        dibujadoTextoColor(renderer, fuente, "Configuracion",
-            panel_x + 20, panel_y + 16, c_titulo);
+        // titulo + tabs General / Atajos
+        {
+            SDL_Color c_titulo = {180, 180, 220, 255};
+            dibujadoTextoColor(renderer, fuente, "Configuracion",
+                panel_x + 20, panel_y + 10, c_titulo);
 
-        // linea divisoria bajo el titulo
-        SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
-        SDL_RenderDrawLine(renderer,
-            panel_x + 16, panel_y + 48,
-            panel_x + panel_w - 16, panel_y + 48);
+            const char *tabs_lbl[] = { "General", "Atajos" };
+            int tab_btn_w = 90, tab_btn_h = 24;
+            int tab_btn_x = panel_x + panel_w - tab_btn_w * 2 - 20;
+            int tab_btn_y = panel_y + 8;
+            for (int t = 0; t < 2; t++) {
+                int tx = tab_btn_x + t * (tab_btn_w + 4);
+                int is_act = (t == tab_config);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer,
+                    is_act ? 60 : 25, is_act ? 60 : 25, is_act ? 110 : 50, 220);
+                SDL_Rect tr = {tx, tab_btn_y, tab_btn_w, tab_btn_h};
+                SDL_RenderFillRect(renderer, &tr);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+                SDL_SetRenderDrawColor(renderer,
+                    is_act ? 120 : 60, is_act ? 120 : 60, is_act ? 220 : 100, 255);
+                SDL_RenderDrawRect(renderer, &tr);
+                SDL_Color c_tlbl = is_act
+                    ? (SDL_Color){220, 220, 255, 255}
+                    : (SDL_Color){100, 100, 140, 255};
+                int tlw; TTF_SizeUTF8(fuente, tabs_lbl[t], &tlw, NULL);
+                dibujadoTextoColor(renderer, fuente, tabs_lbl[t],
+                    tx + (tab_btn_w - tlw) / 2 - 10, tab_btn_y - 2, c_tlbl);
 
-        // opciones
+                if (clicked &&
+                    click_x >= tx && click_x <= tx + tab_btn_w &&
+                    click_y >= tab_btn_y && click_y <= tab_btn_y + tab_btn_h)
+                    tab_config = t;
+            }
+
+            SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
+            SDL_RenderDrawLine(renderer,
+                panel_x + 16, panel_y + 44,
+                panel_x + panel_w - 16, panel_y + 44);
+        }
+
         int mx, my;
         SDL_GetMouseState(&mx, &my);
 
+        if (tab_config == 0) {  /* ── General ── */
+
         for (int i = 0; i < n_opciones; i++) {
-            int oy = panel_y + 80 + i * 100;
+            int oy = panel_y + 70 + i * 90;
             int hover_row = (mx >= panel_x + 16 && mx <= panel_x + panel_w - 16 &&
                              my >= oy - 10   && my <= oy + 60);
 
@@ -193,6 +219,103 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
             }
         }
 
+        /* ── Slider de volumen ── */
+        {
+            int sl_y      = panel_y + 345;
+            int track_x   = panel_x + 140;
+            int track_w   = panel_w - 160;
+            int handle_w  = 14;
+            int handle_h  = 22;
+            int handle_x  = track_x + vol * (track_w - handle_w) / 100;
+            int track_cy  = sl_y + 8;   /* centro vertical del track */
+
+            /* etiqueta */
+            SDL_Color c_lbl = {140, 140, 160, 255};
+            dibujadoTextoColor(renderer, fuente, "Volumen:", panel_x + 20, sl_y, c_lbl);
+
+            /* track fondo */
+            SDL_SetRenderDrawColor(renderer, 40, 40, 65, 255);
+            SDL_Rect track_bg = {track_x, track_cy - 4, track_w, 8};
+            SDL_RenderFillRect(renderer, &track_bg);
+
+            /* fill hasta el handle */
+            SDL_SetRenderDrawColor(renderer, 80, 130, 255, 255);
+            SDL_Rect track_fill = {track_x, track_cy - 4, handle_x - track_x + handle_w / 2, 8};
+            SDL_RenderFillRect(renderer, &track_fill);
+
+            /* handle */
+            int hov_handle = (mx >= handle_x && mx <= handle_x + handle_w &&
+                              my >= sl_y      && my <= sl_y + handle_h);
+            SDL_SetRenderDrawColor(renderer,
+                (drag_vol || hov_handle) ? 160 : 220,
+                (drag_vol || hov_handle) ? 200 : 220,
+                255, 255);
+            SDL_Rect handle = {handle_x, sl_y, handle_w, handle_h};
+            SDL_RenderFillRect(renderer, &handle);
+
+            /* porcentaje */
+            char vol_str[8];
+            snprintf(vol_str, sizeof(vol_str), "%d%%", vol);
+            SDL_Color c_val = {200, 255, 200, 255};
+            dibujadoTextoColor(renderer, fuente, vol_str,
+                track_x + track_w + 8, sl_y, c_val);
+
+            /* click en el track o handle → iniciar drag */
+            if (clicked &&
+                click_x >= track_x && click_x <= track_x + track_w &&
+                click_y >= sl_y    && click_y <= sl_y + handle_h) {
+                drag_vol = 1;
+                vol = (click_x - track_x) * 100 / (track_w - handle_w);
+                if (vol < 0)   vol = 0;
+                if (vol > 100) vol = 100;
+                audio_set_volumen(vol);
+            }
+        }
+
+        } /* end if (tab_config == 0) General */
+
+        if (tab_config == 1) {  /* ── Atajos ── */
+            typedef struct { const char *key; const char *desc; } Atajo;
+            static const Atajo atajos[] = {
+                { "Ctrl + T",     "Nueva tab"              },
+                { "Ctrl + W",     "Cerrar tab"             },
+                { "Ctrl + Tab",   "Siguiente tab"          },
+                { "F9",           "Guardar archivo"        },
+                { "F5",           "Ejecutar codigo"        },
+                { "F8",           "Abrir Wiki"             },
+                { "F10",          "Volver al menu"         },
+                { "Tab",          "Indentar (4 espacios)"  },
+                { "Ctrl + C",     "Copiar linea"           },
+                { "Ctrl + X",     "Cortar linea"           },
+                { "Ctrl + V",     "Pegar"                  },
+                { "Ctrl + Z",     "Deshacer (proximamente)"},
+            };
+            int n_atajos = (int)(sizeof(atajos) / sizeof(atajos[0]));
+            int row_h    = 28;
+            int ay       = panel_y + 58;
+
+            SDL_Color c_key  = {100, 160, 255, 255};
+            SDL_Color c_sep  = { 60,  60, 100, 255};
+            SDL_Color c_desc = {160, 160, 180, 255};
+
+            for (int i = 0; i < n_atajos; i++) {
+                int ry = ay + i * row_h;
+                if (i % 2 == 0) {
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                    SDL_SetRenderDrawColor(renderer, 30, 30, 55, 80);
+                    SDL_Rect stripe = {panel_x + 12, ry - 2, panel_w - 24, row_h - 2};
+                    SDL_RenderFillRect(renderer, &stripe);
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+                }
+                dibujadoTextoColor(renderer, fuente, atajos[i].key,
+                    panel_x + 20, ry, c_key);
+                dibujadoTextoColor(renderer, fuente, "->",
+                    panel_x + 170, ry, c_sep);
+                dibujadoTextoColor(renderer, fuente, atajos[i].desc,
+                    panel_x + 210, ry, c_desc);
+            }
+        } /* end Atajos */
+
         // boton feedback fuera del panel, centrado abajo
         int fb_w = 130, fb_h = 28;
         int fb_x = (ancho - fb_w) / 2;
@@ -225,10 +348,10 @@ screenConfig(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto,
         // ayuda abajo a la izquierda
         SDL_Color c_help = {70, 70, 90, 255};
         dibujadoTextoColor(renderer, fuente,
-            "[flechas] navegar   [</>] cambiar   [ESC] volver",
+            "[flechas] navegar   [</>] cambiar   [drag] volumen   [ESC] guardar",
             panel_x + 20, panel_y + panel_h - 34, c_help);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 

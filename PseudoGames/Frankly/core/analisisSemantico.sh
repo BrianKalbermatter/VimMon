@@ -4,5 +4,3 @@ echo ${variables["mensaje"]} #Imprimer el hola
 
 
 
-
-

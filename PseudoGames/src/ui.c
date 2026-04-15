@@ -5,6 +5,18 @@
 #include <stdlib.h>
 #include <math.h>
 
+static SDL_Window *g_ventana = NULL;
+
+void ui_set_ventana(SDL_Window *v) { g_ventana = v; }
+
+void
+presente(SDL_Renderer *renderer)
+{
+    SDL_RenderPresent(renderer);
+    if (g_ventana)
+        SDL_UpdateWindowSurface(g_ventana);
+}
+
 /* ── Rellena un cuadrilatero convexo con scanlines ── */
 static void
 fill_quad(SDL_Renderer *r, SDL_Point p[4])
@@ -346,7 +358,7 @@ screen_poweron(SDL_Renderer *renderer, int ancho, int alto)
         SDL_RenderFillRect(renderer, &linea);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(14);
     }
 
@@ -413,7 +425,7 @@ screen_poweron(SDL_Renderer *renderer, int ancho, int alto)
             SDL_RenderFillRect(renderer, &bb);
         }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(14);
     }
 
@@ -442,7 +454,7 @@ screen_poweron(SDL_Renderer *renderer, int ancho, int alto)
         }
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 }
@@ -505,7 +517,7 @@ screen_transition(SDL_Renderer *renderer, int ancho, int alto)
         if (top > 0)    { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,0,ancho,top};     SDL_RenderFillRect(renderer,&b); }
         if (bot < alto) { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,bot,ancho,alto-bot}; SDL_RenderFillRect(renderer,&b); }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(9);
     }
 
@@ -523,7 +535,7 @@ screen_transition(SDL_Renderer *renderer, int ancho, int alto)
         SDL_Rect linea = {0, cy - 1, ancho, 3};
         SDL_RenderFillRect(renderer, &linea);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(10);
     }
 
@@ -565,7 +577,7 @@ screen_transition(SDL_Renderer *renderer, int ancho, int alto)
         if (top > 0)    { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,0,ancho,top};      SDL_RenderFillRect(renderer,&b); }
         if (bot < alto) { SDL_SetRenderDrawColor(renderer, 0,0,0,255); SDL_Rect b={0,bot,ancho,alto-bot}; SDL_RenderFillRect(renderer,&b); }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(9);
     }
 }
@@ -643,7 +655,7 @@ screen_poweroff(SDL_Renderer *renderer, int ancho, int alto)
             SDL_RenderFillRect(renderer, &bb);
         }
 
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(10);
     }
 
@@ -674,7 +686,7 @@ screen_poweroff(SDL_Renderer *renderer, int ancho, int alto)
         SDL_RenderFillRect(renderer, &linea);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(12);
     }
 
@@ -700,14 +712,14 @@ screen_poweroff(SDL_Renderer *renderer, int ancho, int alto)
         }
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        SDL_RenderPresent(renderer);
+        presente(renderer);
         SDL_Delay(16);
     }
 
     /* negro final */
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-    SDL_RenderPresent(renderer);
+    presente(renderer);
     SDL_Delay(80);
 }
 

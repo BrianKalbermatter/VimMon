@@ -70,7 +70,7 @@ screenSoluciones(SDL_Renderer *renderer, TTF_Font *fuente, int ancho, int alto){
                 return 0;
   }
         
-        SDL_RenderPresent(renderer);
+        presente(renderer);
     }
     return 0;
 }

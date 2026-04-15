@@ -6,6 +6,8 @@
 #include "niveles.h"
 
 #define MAX_LINES 500
+#define MAX_TABS  8
+#define TAB_H     32
 
 typedef struct {
     char buf[MAX_LINES][512];
@@ -28,5 +30,17 @@ int screenEditorText(SDL_Renderer *renderer, TTF_Font *fuente,
                      int ancho, int alto, const char *nombre_fijo,
                      const char *cons_titulo, const char *cons_texto,
                      Nivel *nivel, int nivel_num);
+
+/* API de panel para el shell de tabs (Editor Libre) */
+#define EDITOR_MAX_SAVES 50
+#define EDITOR_OUT_MAX    6
+
+typedef struct EditorLibreState EditorLibreState;
+EditorLibreState *editor_libre_crear   (TTF_Font *fuente);
+void              editor_libre_destruir(EditorLibreState *s);
+void              editor_libre_evento  (EditorLibreState *s, TTF_Font *fuente,
+                                        SDL_Event *e, SDL_Rect area);
+void              editor_libre_dibujar (EditorLibreState *s, SDL_Renderer *r,
+                                        TTF_Font *fuente, SDL_Rect area);
 
 #endif
