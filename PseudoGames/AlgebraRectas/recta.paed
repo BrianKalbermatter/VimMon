@@ -60,7 +60,7 @@ ACCION calcular_recta ES
         pori.vx := 0;
         pori.vy := 0;
         dir.vx  := 1;
-        dir.vy  := 1;
+        dir.vy  := -4;
 
         // Calcular t para los bordes del dominio visible
         // despejando: x = P0.vx + t * D.vx  →  t = (x - P0.vx) / D.vx
