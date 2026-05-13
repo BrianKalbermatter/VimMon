@@ -5,5 +5,5 @@ ACCION test ES
       PROCESO
           a := "Hola";
           b := "Mundo";
-          ESCRIBIR(a,b);
+          ESCRIBIR("ei,",a,b);
 FIN_ACCION

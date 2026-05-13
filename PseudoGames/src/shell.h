@@ -28,6 +28,7 @@ typedef enum {
     PANEL_SOLUCIONES,
     PANEL_CONFIG,
     PANEL_MAZMORRA,
+    PANEL_C_EDITOR,
     PANEL_COUNT             /* siempre al final: dice cuantos hay en total   */
 } PanelID;
 

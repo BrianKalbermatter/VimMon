@@ -2,7 +2,8 @@
 #include "ui.h"
 #include "audio.h"
 #include "config.h"
-#include "editorText.h"
+#include "editorBim.h"
+#include "screenCEditor.h"
 #include "screenPJ.h"
 #include "pomodoro_bg.h"
 #include <SDL2/SDL_image.h>
@@ -61,6 +62,21 @@ static const char *SIDEBAR_LABELS[PANEL_COUNT] = {
     "Soluciones",
     "Config",
     "Mazmorra",
+    "Editor C",
+};
+
+/* Whitelist: 1 = panel habilitado, 0 = WIP (gris, no clickeable).
+ * Indices coinciden con el enum PanelID. Para habilitar un panel,
+ * cambiar su 0 por 1 — la UI y el hit-test se actualizan solos. */
+static const int PANEL_HABILITADO[PANEL_COUNT] = {
+    1,  /* DOC          */
+    0,  /* Pomodoro     */
+    0,  /* Editor Libre */
+    0,  /* Niveles      */
+    0,  /* Soluciones   */
+    1,  /* Config       */
+    0,  /* Mazmorra     */
+    0,  /* Editor C     */
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -127,6 +143,15 @@ draw_sidebar(ShellCtx *ctx)
 
     for (int i = 0; i < PANEL_COUNT; i++) {
         int iy = items_y + i * item_h;
+
+        /* Panel deshabilitado (WIP): gris dim + sufijo [WIP], sin hover */
+        if (!PANEL_HABILITADO[i]) {
+            char label[64];
+            snprintf(label, sizeof(label), "  %s [WIP]", SIDEBAR_LABELS[i]);
+            SDL_Color tc_wip = {70, 70, 70, 255};
+            sh_text(r, f, label, 12, iy + (item_h - 16) / 2, tc_wip);
+            continue;
+        }
 
         /* Detectar si este panel tiene un tab abierto */
         int is_open   = 0;
@@ -330,7 +355,11 @@ sidebar_hit(ShellCtx *ctx, int cx, int cy)
 
     for (int i = 0; i < PANEL_COUNT; i++) {
         int iy = items_y + i * item_h;
-        if (cy >= iy && cy < iy + item_h) return i;
+        if (cy >= iy && cy < iy + item_h) {
+            /* Panel deshabilitado (WIP): el click muere aca */
+            if (!PANEL_HABILITADO[i]) return -1;
+            return i;
+        }
     }
 
     /* Salir */
@@ -955,38 +984,10 @@ config_cleanup(ShellCtx *ctx, Tab *tab)
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- *  PANEL: EDITOR LIBRE
- *
- *  El editor completo (screenEditorText) tiene su propio event loop y 1500+
- *  Editor Libre portado al patron Panel — igual que DOC.
- *  EditorLibreState vive en tab->state (heap, ~2MB via calloc).
+ *  PANEL: EDITOR LIBRE → editorBim (PTY)
+ *  Lanza scripts/editorBim/bim.sh en un pseudo-terminal embebido en SDL.
+ *  Ver src/editorBim.c para la implementacion completa.
  * ════════════════════════════════════════════════════════════════════════════ */
-
-static void editor_libre_init(ShellCtx *ctx, Tab *tab)
-{
-    tab->state = editor_libre_crear(ctx->fuente);
-}
-
-static void editor_libre_cleanup(ShellCtx *ctx, Tab *tab)
-{
-    (void)ctx;
-    editor_libre_destruir((EditorLibreState *)tab->state);
-    tab->state = NULL;
-}
-
-static void editor_libre_event(ShellCtx *ctx, Tab *tab, SDL_Event *e)
-{
-    if (!tab->state) return;
-    SDL_Rect area = { ctx->sidebar_w, TAB_BAR_H,
-                      ctx->ancho - ctx->sidebar_w, ctx->alto - TAB_BAR_H };
-    editor_libre_evento((EditorLibreState *)tab->state, ctx->fuente, e, area);
-}
-
-static void editor_libre_draw(ShellCtx *ctx, Tab *tab, SDL_Rect area)
-{
-    if (!tab->state) return;
-    editor_libre_dibujar((EditorLibreState *)tab->state, ctx->renderer, ctx->fuente, area);
-}
 
 /* ════════════════════════════════════════════════════════════════════════════
  *  PANEL: MAZMORRA
@@ -1093,15 +1094,20 @@ registrar_paneles(ShellCtx *ctx)
     ctx->defs[PANEL_CONFIG].draw         = config_draw;
     ctx->defs[PANEL_CONFIG].cleanup      = config_cleanup;
 
-    ctx->defs[PANEL_EDITOR_LIBRE].init         = editor_libre_init;
-    ctx->defs[PANEL_EDITOR_LIBRE].handle_event = editor_libre_event;
-    ctx->defs[PANEL_EDITOR_LIBRE].draw         = editor_libre_draw;
-    ctx->defs[PANEL_EDITOR_LIBRE].cleanup      = editor_libre_cleanup;
+    ctx->defs[PANEL_EDITOR_LIBRE].init         = editor_bim_init;
+    ctx->defs[PANEL_EDITOR_LIBRE].handle_event = editor_bim_handle_event;
+    ctx->defs[PANEL_EDITOR_LIBRE].draw         = editor_bim_draw;
+    ctx->defs[PANEL_EDITOR_LIBRE].cleanup      = editor_bim_cleanup;
 
     ctx->defs[PANEL_MAZMORRA].init         = mazmorra_init;
     ctx->defs[PANEL_MAZMORRA].handle_event = mazmorra_event;
     ctx->defs[PANEL_MAZMORRA].draw         = mazmorra_draw;
     ctx->defs[PANEL_MAZMORRA].cleanup      = mazmorra_cleanup;
+
+    ctx->defs[PANEL_C_EDITOR].init         = ceditor_init;
+    ctx->defs[PANEL_C_EDITOR].handle_event = ceditor_handle_event;
+    ctx->defs[PANEL_C_EDITOR].draw         = ceditor_draw;
+    ctx->defs[PANEL_C_EDITOR].cleanup      = ceditor_cleanup;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
