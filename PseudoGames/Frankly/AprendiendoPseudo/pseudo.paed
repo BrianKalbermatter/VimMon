@@ -1,0 +1,12 @@
+// Ejercicio 1
+
+ACCION 
+AMBIENTE
+    a: ENTERO;
+    b: ENTERO;
+PROCESO
+    a:= 1;
+    a:= 2;
+    b:= a;
+    c:= b; 
+    MIENTRAS

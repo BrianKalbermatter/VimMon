@@ -1,0 +1,10 @@
+*.o
+*.win.o
+aed
+PseudoGames.exe
+PseudoGames-Windows.zip
+win-libs/
+saves/
+.idea/
+tags
+tmpSintaxis/

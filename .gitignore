@@ -1,0 +1,18 @@
+# Ignorar todo excepto PseudoGames
+/*
+!/PseudoGames/
+!/.gitignore
+!/LICENSE
+!/.github/
+
+# Build output y binarios
+PseudoGames/build/
+PseudoGames/aed
+PseudoGames/PseudoGames.exe
+PseudoGames/Frankly/paed
+PseudoGames/screenPJ/screenPJ
+PseudoGames/learBash/*.out
+PseudoGames/lib/
+
+# Metadata Windows (Zone.Identifier)
+*:Zone.Identifier
