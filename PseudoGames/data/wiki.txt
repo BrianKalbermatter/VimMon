@@ -426,6 +426,41 @@ CAPITULO 2: Funciones y Procedimientos
       // 3 y 5 son los ARGUMENTOS (llamada):
       resultado := sumar(3, 5);   // resultado = 8
 
+  PARAMETROS FICTICIOS vs PARAMETROS FORMALES:
+  .............................................
+  Tu catedra nombra estos conceptos de otra manera (equivalente):
+
+  Ficticio:  el nombre que le das al parametro en la DEFINICION
+             de la funcion o procedimiento. Es "ficticio" porque
+             es solo un placeholder, un nombre inventado.
+             → equivale a lo que arriba llamamos PARAMETRO.
+
+  Formal:    el valor o variable que pasas en la LLAMADA,
+             desde el ambiente del que invoca.
+             → equivale a lo que arriba llamamos ARGUMENTO.
+
+  Ejemplo:
+
+      // "a" y "b" son los FICTICIOS (en la definicion):
+      FUNCION sumar(a: ENTERO; b: ENTERO): ENTERO
+          PROCESO
+              sumar := a + b;
+      FIN_FUNCION
+
+      // 3 y 5 son los FORMALES (en la llamada, valores directos):
+      resultado := sumar(3, 5);
+
+      // x e y tambien son FORMALES (en la llamada, variables del ambiente):
+      AMBIENTE
+          x, y: ENTERO;
+      PROCESO
+          x := 10;
+          y := 20;
+          resultado := sumar(x, y);   // x e y son formales
+
+  Regla clave: la cantidad y el TIPO de los formales debe
+  coincidir exactamente con los ficticios, en el mismo orden.
+
   MODOS DE LOS PARAMETROS (E / S / ES):
   ........................................
   Cada parametro tiene un modo que indica como se usa:

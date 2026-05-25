@@ -28,12 +28,12 @@
       {
         "nombre": "tipos",
         "color": "azul-claro",
-        "palabras": ["ENTERO", "REAL", "CARACTER", "BOOLEANO", "SECUENCIA_DE_CARACTERES", "SECUENCIA_DE_ENTEROS", "ARREGLO", "CONSTANTE", "VAR", "DE", "AN", "N"]
+        "palabras": ["ENTEROS", "ENTERO", "REAL", "CARACTER", "BOOLEANO", "SECUENCIA", "CARACTERES", "ARREGLO", "CONSTANTE", "VAR", "DE", "AN", "N"]
       },
       {
         "nombre": "operadores",
         "color": "verde-lima",
-        "palabras": ["Y", "O", "NO", "*", "/"]
+        "palabras": ["Y", "O", "NO", "*", "/", "+", "-"]
       },
       {
         "nombre": "funciones_builtin",

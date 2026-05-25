@@ -1,6 +1,8 @@
 #!/bin/bash
 
-#Esta funcion valida al final lo que la otra funcion leyo que esta ahora en paed. Probablemente la cambie a una funcion aparte para ser mas legible
+#Esta funcion valida al final lo que la otra funcion leyo que
+# esta ahora en paed. Probablemente la cambie a una funcion
+# aparte para ser mas legible.
 validacion_end(){
     if [ $find_ACCION -eq 0 ]; 
     then
