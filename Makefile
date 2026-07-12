@@ -1,16 +1,27 @@
-# Makefile simple
-# Uso: make NombreArchivo (sin extensión)
+CC     = clang
+CFLAGS = -Wall -Wextra -I.
+LIBS   = -lcurl
 
-CC = clang
-CFLAGS = -Wall -Wextra -I./include
-LIBS = -lraylib -lGL -lm -lpthread -ldl
-SRC_DIR = src
-BIN_DIR = bin
+BUILD  = build
+TARGET = $(BUILD)/vimmon
 
-# Regla genérica: make nombre → compila src/nombre.c → bin/nombre
-%:
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(SRC_DIR)/$@.c $(LIBS) -o $(BIN_DIR)/$@
+SRCS = main.c \
+       bus/bus.c \
+       cjson/cJSON.c \
+       plugins/ai/ai.c \
+       plugins/ide/ide.c \
+       plugins/ide/parser.c \
+       plugins/ide/interpreter.c \
+       plugins/monitor/monitor.c \
+       plugins/renderer/renderer.c
+
+$(TARGET): $(SRCS) | $(BUILD)
+	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o $(TARGET)
+
+$(BUILD):
+	mkdir -p $(BUILD)
 
 clean:
-	rm -f $(BIN_DIR)/*
+	rm -rf $(BUILD)
+
+.PHONY: clean
