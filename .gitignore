@@ -5,8 +5,17 @@
 !/LICENSE
 !/.github/
 
+# Core del OS (userspace)
+!/main.c
+!/bus/
+!/plugins/
+!/cjson/
+!/docs/
+!/KANBAN.md
+!/framebuffer.md
+
 # Build output y binarios
-PseudoGames/build/
+PseudoGames/build_o/
 PseudoGames/aed
 PseudoGames/PseudoGames.exe
 PseudoGames/Frankly/paed
