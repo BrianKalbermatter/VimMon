@@ -50,6 +50,10 @@ TABLA DE CONTENIDOS
   29. Generar una Secuencia de Salida
   30. Conjuntos y el Operador EN
 
+  REFERENCIA RAPIDA
+  ──────────────────────────────────────────────────
+  31. Mapa de Decision — Que herramienta usar y cuando
+
 
 ══════════════════════════════════════════════════════
 01. HARDWARE QUE EJECUTA EL CODIGO
@@ -1198,5 +1202,155 @@ Regla practica:
   El problema habla de PALABRAS, BLOQUES o GRUPOS → dos MIENTRAS anidados.
   El problema habla de elementos SUELTOS              → un solo MIENTRAS.
   EN sirve para preguntar pertenencia a un conjunto del MISMO TIPO.
+
+
+══════════════════════════════════════════════════════
+31. MAPA DE DECISION — QUE HERRAMIENTA USAR Y CUANDO
+══════════════════════════════════════════════════════
+
+Cuando el parcial te describe una situacion, hacete estas preguntas
+en orden. Cada respuesta te lleva directo a la herramienta correcta.
+
+
+¿CUANTAS VECES TENGO QUE REPETIR?
+  ──────────────────────────────────────────────────
+  ¿Sabes cuantas veces?
+    SI  → PARA (ciclo por contador)
+
+    NO  → ¿Hay un valor especial que marca el fin?
+            SI  → MIENTRAS con centinela    (v <> "*")
+            NO  → MIENTRAS con NFDS         (fin de archivo)
+
+  ¿Necesito ejecutar el bloque al menos una vez si o si?
+            → REPETIR...HASTA (post-test)
+
+  Resumen:
+    Cantidad CONOCIDA de antemano          → PARA
+    Cantidad DESCONOCIDA + centinela       → MIENTRAS  (v <> marca)
+    Cantidad DESCONOCIDA + fin de archivo  → MIENTRAS  (NFDS)
+    Minimo una ejecucion garantizada       → REPETIR...HASTA
+
+
+¿NECESITO TOMAR UNA DECISION?
+  ──────────────────────────────────────────────────
+  ¿Solo actuo si algo es verdadero (sin caso contrario)?
+    → SI simple
+
+  ¿Tengo dos caminos: si pasa / si no pasa?
+    → SI...SINO
+
+  ¿Tengo muchos casos sobre la misma variable?
+    → SEGUN...HACER
+
+
+¿DONDE VIVEN LOS DATOS?
+  ──────────────────────────────────────────────────
+  Temporales — existen solo mientras corre el programa
+    → RAM → Variables
+
+  Permanentes — persisten aunque el programa termine
+    → Disco → Archivos / Secuencias
+
+
+¿QUE TIPO DE SECUENCIA ES?
+  ──────────────────────────────────────────────────
+  ¿La cantidad de elementos se conoce antes de procesar?
+    SI  → Definida    → recorrer con PARA
+    NO  → Indefinida  → recorrer con MIENTRAS
+
+  ¿Todos los elementos son del mismo tipo logico?
+    SI  → Pura
+    NO  → Impura  → siempre pre-test (MIENTRAS)
+
+  Las 3 combinaciones validas:
+    Definida   + Pura   → PARA
+    Indefinida + Pura   → MIENTRAS / REPETIR
+    Indefinida + Impura → MIENTRAS (pre-test obligatorio)
+    Definida   + Impura → NO EXISTE
+
+
+¿COMO ESTA ORGANIZADO EL ARCHIVO?
+  ──────────────────────────────────────────────────
+  Registros almacenados uno tras otro en orden
+    → Organizacion SECUENCIAL
+
+  Acceso por numero de posicion del registro
+    → Organizacion RELATIVA
+
+  Tiene un indice separado que mapea claves a posiciones
+    → Organizacion INDEXADA
+
+  Ojo: organizacion (como se GUARDA) es distinto de
+       acceso (como se LEE). No son sinonimos.
+
+
+¿NECESITO AGRUPAR DATOS DE UN ARCHIVO?
+  ──────────────────────────────────────────────────
+  Un solo campo de agrupacion (ej: por vendedor)
+    → Corte de control SIMPLE
+
+  Multiples niveles anidados (ej: pais → provincia → ciudad)
+    → Corte de control JERARQUICO
+      Cada nivel tiene sus propios acumuladores.
+      Al cambiar la clave, se procesan los totales del nivel
+      que termino y se reinician sus acumuladores.
+
+
+¿NECESITO UNA SUBACCION?
+  ──────────────────────────────────────────────────
+  ¿El resultado se usa en una expresion?
+    SI  → FUNCION     (retorna un valor, tiene tipo de retorno)
+    NO  → PROCEDIMIENTO (ejecuta acciones, no retorna nada)
+
+  ¿Como paso el dato?
+    Solo necesito leerlo dentro de la subaccion
+      → Por VALOR      (recibe una copia — el original no cambia)
+
+    Necesito que la subaccion modifique el original
+      → Por REFERENCIA (recibe el original — VAR en pseudocodigo,
+                        puntero * en C)
+
+
+¿QUE VARIABLE NECESITO DENTRO DEL BUCLE?
+  ──────────────────────────────────────────────────
+  Contar cuantas veces ocurre algo
+    → CONTADOR     (siempre incrementa en 1 exacto)
+      cont := cont + 1
+
+  Sumar valores que cambian en cada iteracion
+    → ACUMULADOR   (suma lo que corresponda)
+      total := total + valor
+
+  Registrar si algo ocurrio o no en algun momento
+    → BANDERA / FLAG  (booleano: V o F)
+      encontrado := Verdadero
+
+  Diferencia clave:
+    Contador  → siempre +1
+    Acumulador → +variable
+    Bandera   → cambia de estado (no suma)
+
+
+COMO LEER LAS PREGUNTAS TRAMPA DEL PARCIAL
+  ──────────────────────────────────────────────────
+  El parcial no siempre usa las palabras exactas de la teoria.
+  Aprende a mapear las descripciones a los conceptos:
+
+  "valor especial que indica el fin"     → centinela
+  "ejecuta al menos una vez"             → post-test (REPETIR)
+  "puede no ejecutarse nunca"            → pre-test (MIENTRAS)
+  "cantidad conocida de antemano"        → definida → PARA
+  "termina cuando encuentra X"           → centinela
+  "agrupa por un campo"                  → corte de control simple
+  "agrupa por niveles"                   → corte de control jerarquico
+  "retorna un valor"                     → FUNCION
+  "no retorna nada"                      → PROCEDIMIENTO
+  "modifica el original"                 → por referencia
+  "no modifica el original"              → por valor
+
+  Cuidado con las palabras absolutas:
+    SIEMPRE / NUNCA / SOLO / OBLIGATORIAMENTE
+    → si ves una de estas en una opcion, verificala con cuidado.
+      Suelen ser la trampa.
 
 
