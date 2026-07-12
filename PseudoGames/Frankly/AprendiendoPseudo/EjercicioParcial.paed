@@ -85,3 +85,22 @@ ACCION Ejercicio de Parcial ES
         CERRAR(sec1, recorrido);
         CERRAR(secSalida);
 FIN_ACCION
+
+
+
+
+
+
+
+Dada una secuencia de 100 letras minúsculas se desea convertirlas en mayúsculas. ¿Que tipo de secuencia es y con que ciclo de control lo resolverías?
+Pregunta 14 Respuesta
+a.
+Secuencia Definida, Ciclo manejado por contador
+b.
+Secuencia Impura. Ciclo Post-test
+c.
+Secuencia Indefinida. Ciclo manejado por contador
+d.
+Secuencia pura. Ciclo pre-test
+e.
+Secuencia definida. Ciclo indefinido
