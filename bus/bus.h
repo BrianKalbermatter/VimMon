@@ -4,14 +4,17 @@
 
 // Los eventos que existen en mi OS
 typedef enum { // Para que defino un enumerador aca?
-  // Aca van todos los eventos que voy a utilizar
-  // Comparar los strings es lento y el compilador no avisa, solo revienta cuando esta ejecutado.
-  EVENTO_TECLA, //0
-  EVENTO_GUARDAR, //1
-  EVENTO_SALIR //2
-}TipoEvento;
+  // EVENTOS:
+  // Comparar los strings es lento y el compilador no avisa, solo revienta
+  // cuando esta ejecutado.
+  EVENTO_TECLA,   // 0
+  EVENTO_GUARDAR, // 1
+  EVENTO_SALIR,   // 2
+  EVENTO_CONT     // centinela
+} TipoEvento;
 
-// Un evento: QUE paso + un mensaje, porque quiero mandar un mensaje? y que paso?
+// Un evento: QUE paso + un mensaje, porque quiero mandar un mensaje? y que
+// paso?
 typedef struct {
   TipoEvento tipo;
   char mensaje[64];

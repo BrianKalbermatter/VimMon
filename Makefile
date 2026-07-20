@@ -5,15 +5,13 @@ LIBS   = -lcurl
 BUILD  = build
 TARGET = $(BUILD)/vimmon
 
-SRCS = main.c \
-       bus/bus.c \
-       cjson/cJSON.c \
-       plugins/ai/ai.c \
-       plugins/ide/ide.c \
-       plugins/ide/parser.c \
-       plugins/ide/interpreter.c \
-       plugins/monitor/monitor.c \
-       plugins/renderer/renderer.c
+SRCS_BUS = bus/bus.c # bus de eventos
+SRCS_AI = plugins/ai/ai.c # plugin de IA (Ollama)
+SRCS_IDE = plugins/ide/ide.c plugins/ide/parser.c plugins/ide/interpreter.c # plugin IDE/PAED
+SRCS_MONITOR = plugins/monitor/monitor.c # plugin monitor
+SRCS_RENDERER = plugins/renderer/renderer.c # plugin renderer
+
+SRCS = main.c $(SRCS_BUS) cjson/cJSON.c $(SRCS_AI) $(SRCS_IDE) $(SRCS_MONITOR) $(SRCS_RENDERER)
 
 $(TARGET): $(SRCS) | $(BUILD)
 	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o $(TARGET)
