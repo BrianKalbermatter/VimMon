@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define PLUGIN_MAX 20 // maximo de plugins suscriptos por tipo de evento
+
 // ============================================================
 // VimMon — PLUGIN CONTRACT v1.0
 // Todos los plugins implementan esta interfaz.
@@ -18,6 +20,7 @@ typedef enum {
     EVENT_RENDER_FRAME,    // es momento de renderizar
     EVENT_MONITOR_TICK,    // actualización de stats del sistema
     EVENT_SHUTDOWN,        // el OS se está apagando
+    EVENT_COUNT,           // centinela: cantidad total de tipos de evento
 } EventType; //typedef
 
 // Contenedor genérico de evento
@@ -43,8 +46,10 @@ typedef struct {
 // ============================================================
 // BUS API — lo que los plugins pueden llamar
 // ============================================================
+int  bus_init(void);
 void bus_send(EventType type, void *data, uint32_t size);
 int  bus_register(Plugin *plugin, EventType *inputs, int input_count);
 void bus_unregister(Plugin *plugin);
+void bus_shutdown(void);
 
 #endif // VIMMON_PLUGIN_H

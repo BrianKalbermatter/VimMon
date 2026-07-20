@@ -1,48 +1,89 @@
-#include "bus.h"
+#include "plugin.h"
 #include <stdio.h>
 
-// Fijarse de esto si esta bien, creo que no
+// El bus tiene una lista de plugins suscriptos a cada tipo de evento.
+// Cuando alguien publica (bus_send) un evento, el bus busca quienes estan
+// suscriptos a ESE tipo y les entrega el evento via su on_event().
+// Plugin -> bus -> plugins suscriptos.
+
 typedef struct {
-  PluginCallback callbacks[PLUGIN_MAX];
-  int contadorEvent; // Contador de Eventos de cuantos ingresan al bus = 0;
-} eventos;
-static eventos lista[EVENTO_CONT];
+  Plugin *plugins[PLUGIN_MAX];
+  int cantidad;
+} suscriptores;
+
+static suscriptores lista[EVENT_COUNT];
 
 int bus_init(void) {
   printf("Iniciando bus!\n");
-  for (int i = 0; i < EVENTO_CONT; i++) {
-    lista[i].contadorEvent = 0;
+  for (int i = 0; i < EVENT_COUNT; i++) {
+    lista[i].cantidad = 0;
   }
   return 0;
 }
 
-int bus_suscribe(TipoEvento tipo, PluginCallback callback) {
-  if (lista[tipo].contadorEvent < PLUGIN_MAX) {
-    // lista[tipo] = filas
-    lista[tipo].callbacks[lista[tipo].contadorEvent] = callback;
-    lista[tipo].contadorEvent = lista[tipo].contadorEvent + 1;
-    return 0;
-  } else {
-    printf("Lista LLENA\n");
-    return -1;
+int bus_register(Plugin *plugin, EventType *inputs, int input_count) {
+  for (int i = 0; i < input_count; i++) {
+    EventType tipo = inputs[i];
+
+    if (lista[tipo].cantidad >= PLUGIN_MAX) {
+      printf("bus_register: lista llena para el tipo %d\n", tipo);
+      return -1;
+    }
+
+    lista[tipo].plugins[lista[tipo].cantidad] = plugin;
+    lista[tipo].cantidad++;
+  }
+
+  return 0;
+}
+
+void bus_send(EventType type, void *data, uint32_t size) {
+  Event evento = { .type = type, .data = data, .size = size };
+
+  for (int i = 0; i < lista[type].cantidad; i++) {
+    lista[type].plugins[i]->on_event(&evento);
   }
 }
 
-// bus_publish: Recorre las suscripcioses de UN tipo puntual, el que se esta
-// publicando.
-void bus_publish(Evento *evento) {
-  int fila = evento->tipo;
-  // lista[fila].callbacks[i](evento);
-  for (int i = 0; i < lista[fila].contadorEvent; i++) {
-    lista[fila].callbacks[i](evento);
+void bus_unregister(Plugin *plugin) {
+  for (int t = 0; t < EVENT_COUNT; t++) {
+    for (int i = 0; i < lista[t].cantidad; i++) {
+      if (lista[t].plugins[i] == plugin) {
+        lista[t].plugins[i] = lista[t].plugins[lista[t].cantidad - 1];
+        lista[t].cantidad--;
+        i--;
+      }
+    }
   }
 }
 
-// Bus: Eventos -> Contine 2 Funciones: Revisar/Recibir y Entrega -> Lo que hace
-// es traerlo de una LISTA, llamada en este caso LISTA, con el plugins
-// =plugin_max Lo que hace es: El bus tiene una lista de plugins que estan
-// suscriptos o que el usuario elijio a mi OS integrar, cuando el plugin quiere
-// algo, le manda una seÑal al bus y le dice, quiero algo!. El bus lo recibe y
-// dice: "¿QUIÉNES están suscriptos a ESTE TIPO de evento?" y se los entrega a
-// todos -> busca en la lista de plugins y se fija que plugins es el que se lo
-// pidio -> Lo rebisa. Plugin → bus → plugins suscriptos.
+void bus_shutdown(void) {
+  Plugin *ya_apagados[PLUGIN_MAX];
+  int cantidad_apagados = 0;
+
+  for (int t = 0; t < EVENT_COUNT; t++) {
+    for (int i = 0; i < lista[t].cantidad; i++) {
+      Plugin *p = lista[t].plugins[i];
+
+      int ya_esta = 0;
+      for (int j = 0; j < cantidad_apagados; j++) {
+        if (ya_apagados[j] == p) {
+          ya_esta = 1;
+          break;
+        }
+      }
+
+      if (!ya_esta) {
+        p->shutdown();
+        ya_apagados[cantidad_apagados] = p;
+        cantidad_apagados++;
+      }
+    }
+  }
+
+  for (int t = 0; t < EVENT_COUNT; t++) {
+    lista[t].cantidad = 0;
+  }
+
+  printf("Bus apagado.\n");
+}
