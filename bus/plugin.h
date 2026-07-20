@@ -14,6 +14,7 @@
 typedef enum {
     EVENT_NONE = 0,
     EVENT_KEYBOARD,        // tecla presionada/liberada
+    EVENT_MOUSE,           // click o movimiento de mouse
     EVENT_AI_REQUEST,      // prompt enviado a la IA
     EVENT_AI_RESPONSE,     // respuesta de la IA (PAED delta)
     EVENT_SCENE_UPDATE,    // escena cambió (nuevo delta en scene.paed)
