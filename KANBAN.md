@@ -6,10 +6,8 @@ kanban-plugin: board
 
 ## Backlog
 
-- [ ] Instalar libsdl2-dev #fase3
-- [ ] `plugins/renderer/renderer.h` — interfaz abstracta de render #fase3
-- [ ] `plugins/renderer/sdl_fb.c` — ventana SDL2 + textura como framebuffer #fase3
-- [ ] Primitivas a mano: put_pixel, línea (Bresenham), rectángulo #fase3
+- [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
+- [ ] Conectar el mundo 2D del motor (`Entity`/`World`) con el `SceneState` de PAED — hoy son dos mundos separados #fase3
 - [ ] Dibujar cubo desde PAED (proyección 3D→2D simple, sin GPU) #fase3
 - [ ] Split screen: panel izquierdo (AI chat) + panel derecho (viewport) #fase3
 - [ ] Test: scene.paed con cubo → aparece en pantalla #fase3
@@ -46,14 +44,17 @@ kanban-plugin: board
 ## En progreso
 
 - [ ] Aprendiendo C
+- [ ] Crear el primer juego en `game/game.c` (usando el motor 2D)
 
 
 ## Hecho
 
 - [x] Limpiar directorios → _void #fase0
 - [x] Crear estructura de carpetas del OS #fase0
-- [x] `bus/plugin.h` — el contrato que nunca cambia #fase0
-- [x] `bus/bus.c` + `bus/bus.h` — el bus de plugins #fase0
+- [x] `bus/plugin.h` — contrato del bus: `Plugin`, `EventType` (con `EVENT_MOUSE` y centinela `EVENT_COUNT`), `PLUGIN_MAX` #fase0
+- [x] `bus/bus.c` — bus real: `bus_init`, `bus_register` (un plugin puede suscribirse a varios `EventType`), `bus_send`, `bus_unregister` (swap-con-el-ultimo), `bus_shutdown` (deduplicado) #fase0
+- [x] Loop principal en `main.c` con manejo de `SIGINT` (Ctrl+C apaga limpio, no mata el proceso) #fase0
+- [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
 - [x] `docs/paed_spec.md` — spec del lenguaje PAED v1.0 #fase0
 - [x] `docs/plugin_spec.md` — cómo crear plugins #fase0
 - [x] `KANBAN.md` — este archivo #fase0
@@ -70,6 +71,15 @@ kanban-plugin: board
 - [x] `plugins/ide/scene.paed` — archivo de estado de la escena #fase2
 - [x] Integrar: AI response → append a scene.paed → re-parsear #fase2
 - [x] Test: scene.paed con un cubo → interprete lo lee sin crash #fase2
+- [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
+- [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
+- [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL2 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3
+- [x] Primitivas a mano: `put_pixel` (con guard de límites), `fill_rect`, `draw_line` (Bresenham, solo enteros) #fase3
+- [x] `engine/engine.{h,c}` — motor 2D de entidades: `Entity` con callbacks `update`/`draw`, `World` (pool estático), game loop dueño del tiempo (`dt`, ~60fps), colisión AABB (`entity_overlaps`) #fase3
+- [x] `game/game.{h,c}` — seam del juego del usuario: `game_setup(World*)` donde vive el juego (starter: cuadrado movible con flechas/WASD) #fase3
+- [x] `examples/hello_entity.c` — plantilla ejecutable (rectángulo que rebota) #fase3
+- [x] Consola de comandos en `main.c` (`engine`/`scene`/`ai`/`help`/`quit`); "engine" publica `EVENT_RENDER_FRAME` → el renderer lanza el motor con `game_setup` #fase3
+- [x] `plugins/renderer/renderer.c` — puente bus↔motor: `on_event(EVENT_RENDER_FRAME)` abre el motor y le cede el loop #fase3
 
 
 
