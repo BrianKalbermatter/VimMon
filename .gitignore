@@ -14,6 +14,11 @@
 !/KANBAN.md
 !/framebuffer.md
 
+# Motor grafico 2D
+!/engine/
+!/game/
+!/examples/
+
 # Build output y binarios
 PseudoGames/build_o/
 PseudoGames/aed
@@ -25,3 +30,6 @@ PseudoGames/lib/
 
 # Metadata Windows (Zone.Identifier)
 *:Zone.Identifier
+
+# Cache de tooling
+bus/.atl/
