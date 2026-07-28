@@ -19,6 +19,9 @@
 !/game/
 !/examples/
 
+# Mazmorra ASCII con hot reload
+!/dungeon/
+
 # Build output y binarios
 PseudoGames/build_o/
 PseudoGames/aed

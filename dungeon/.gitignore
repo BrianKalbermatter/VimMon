@@ -1,0 +1,7 @@
+# Binarios y objetos generados por `make` (ver Makefile: target `clean`)
+host
+game.so
+game_live.so
+
+# Cache de tooling local
+.atl/
