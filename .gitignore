@@ -20,7 +20,7 @@
 !/examples/
 
 # Mazmorra ASCII con hot reload
-!/dungeon/
+!/hot-Reload/
 
 # Build output y binarios
 PseudoGames/build_o/
@@ -30,6 +30,19 @@ PseudoGames/Frankly/paed
 PseudoGames/screenPJ/screenPJ
 PseudoGames/learBash/*.out
 PseudoGames/lib/
+
+# Aprendizaje y contenido personal
+!/documentacion/
+!/pizarronInfinito/
+!/ejUno_V1/
+!/src/
+!/learnC/
+!/_void/
+!/CUDA/
+!/ProyectoVimMon/
+
+_void/*.tar.gz
+ProyectoVimMon/.obsidian/
 
 # Metadata Windows (Zone.Identifier)
 *:Zone.Identifier

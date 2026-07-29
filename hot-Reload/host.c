@@ -25,12 +25,13 @@
 // todo tu estado sale de este bloque, y por eso sobrevive las recargas.
 #define GAME_MEM_SIZE (16u * 1024u * 1024u)
 
-#define FPS 30
+#define FPS 120
 #define FRAME_NS (1000000000L / FPS)
 
 // Cada cuantos frames revisamos si game.so cambio. Ya no hay una espera
 // bloqueante donde meter el chequeo, asi que lo hacemos periodico.
-#define RELOAD_CHECK_FRAMES 15
+// Se calcula sobre FPS para que siga siendo medio segundo si cambias el ritmo.
+#define RELOAD_CHECK_FRAMES (FPS / 2)
 
 typedef struct {
   void *handle;

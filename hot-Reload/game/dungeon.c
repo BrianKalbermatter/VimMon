@@ -17,7 +17,7 @@
 
 #define MAX_ITEMS 50
 #define MAX_ROOMS 8
-#define MAX_DESC 200
+#define MAX_DESC 200 // Maxima descripcion [MAX_DESC]
 
 // Estructura de Datos
 typedef struct {
@@ -96,17 +96,7 @@ int main() {
   while (playing) {
     display_room();
     display_stats();
-    printf(CYAN "\nQue quieres hacer?: \n" RESET);
-    printf(" " BOLD "[1]" RESET " Mover Norte\n");
-    printf(" " BOLD "[2]" RESET " Mover para el Sur\n");
-    printf(" " BOLD "[3]" RESET " Mover para el Este\n");
-    printf(" " BOLD "[4]" RESET " Mover Oeste\n");
-    printf(" " BOLD "[5]" RESET " Agarrar Item\n");
-    printf(" " BOLD "[6]" RESET " Usar Item\n");
-    printf(" " BOLD "[7]" RESET " Ver Inventario");
-    printf(" " BOLD "[8]" RESET " Ataque de Enemigo");
-    printf(" " BOLD "[9]" RESET " Quit\n");
-    printf(CYAN " Enter choice: " RESET);
+ 
 
     int choice = get_input(); // <- Este va a ser una funcion de que tiene que
                               // colocar algo el usuario.
@@ -175,9 +165,18 @@ void init_game() {
 
   init_rooms();
 }
+void display_room(){
+  printRooms();
+}
 void printRooms() {
-  char pared[40] = "#";
-  printf();
+  char dx = 40;
+  char dy = 40;
+  int i;
+  int n;
+  for (i=0;n == dx; i++)
+  {
+    printf("#");
+  }
 }
 
 void init_rooms() {
@@ -187,7 +186,7 @@ void init_rooms() {
   printf("----------------------------------------------------------\n");
   printRooms();
 }
-
+/*
 void move_player(int direction) {
 
   // Estaba pensando en colocarlo en un switch cases
@@ -202,3 +201,4 @@ void move_player(int direction) {
     }
   }
 }
+*/

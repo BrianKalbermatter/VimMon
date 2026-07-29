@@ -2,6 +2,8 @@
 host
 game.so
 game_live.so
+*.o
+*.d
 
 # Cache de tooling local
 .atl/
