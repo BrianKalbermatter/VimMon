@@ -3,8 +3,11 @@
 // Separacion entre unidades. En X es el doble que en Y a proposito: una celda
 // de terminal es como el doble de alta que de ancha, asi que con el mismo
 // numero en los dos ejes la formacion se ve aplastada.
-#define ESPACIO_X 2
-#define ESPACIO_Y 1
+//
+// El 2 en Y no es solo estetico: encima de cada soldado se dibuja su barra de
+// vida, y con filas pegadas la barra taparia al de arriba.
+#define ESPACIO_X 4
+#define ESPACIO_Y 2
 
 // Cuantas columnas tiene la rejilla: la primera cuyo cuadrado alcanza para
 // todos. Con 9 unidades da 3, con 10 da 4. Es la forma mas cuadrada posible sin

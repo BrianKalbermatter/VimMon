@@ -19,6 +19,13 @@ typedef struct {
   int moviendose;   // 0 = quieto, ya llego (o nunca le ordenaron nada)
   float velocidad;  // celdas por segundo
   int seleccionado; // 1 si entro en la ultima seleccion por area
+
+  // --- Combate ---
+  int hp, max_hp;
+  int vivo;      // 0 = muerto: deja de dibujarse y de ser un objetivo valido
+  int ataque;    // dania por golpe
+  float cadencia; // segundos entre golpe y golpe
+  float espera;   // cuenta regresiva hasta poder golpear de nuevo
 } Soldado;
 
 // Lo planta en (x, y) quieto y sin destino pendiente.

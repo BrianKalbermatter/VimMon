@@ -35,7 +35,7 @@
 
 typedef struct {
   void *handle;
-  void (*init)(void *, size_t);
+  void (*init)(void *, size_t, int, int);
   int (*update)(void *, size_t, Input, float);
   void (*render)(void *, size_t, Framebuffer *);
   time_t stamp; // mtime de game.so cuando lo cargamos
@@ -148,9 +148,13 @@ static void mouse_parsear(Input *in) {
     if (tipo == 'm') { // 'm' minuscula = se solto el boton
       if (boton == 0)
         in->mouse.izq_soltado = 1;
+      else if (boton == 2)
+        in->mouse.der_soltado = 1;
     } else if (movimiento) {
       if (boton == 0)
         in->mouse.arrastrando = 1;
+      else if (boton == 2)
+        in->mouse.der_arrastrando = 1;
     } else if (boton == 0) {
       in->mouse.izq_apretado = 1;
     } else if (boton == 2) {
@@ -162,15 +166,36 @@ static void mouse_parsear(Input *in) {
   }
 }
 
-static void aviso_tamanio(void) {
+// Mide la terminal y decide el tamanio del framebuffer.
+//
+// Al alto se le resta SIEMPRE una fila. Cada frame se escribe un '\n' al final
+// de cada linea: si dibujaramos tantas lineas como filas tiene la terminal, ese
+// ultimo salto la haria scrollear un renglon por frame y el dibujo se iria para
+// arriba. Se ve la pantalla en negro y parece que no dibuja.
+//
+// Devuelve 0 si la terminal es demasiado chica para jugar.
+static int medir_terminal(int *ancho, int *alto) {
   struct winsize ws;
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0)
-    return;
-  if (ws.ws_col < FB_ANCHO || ws.ws_row < FB_ALTO + 1)
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0 || ws.ws_col == 0 ||
+      ws.ws_row == 0) {
+    // Sin medida confiable, un tamanio prudente que entra en casi cualquier
+    // terminal.
+    *ancho = FB_MIN_ANCHO;
+    *alto = FB_MIN_ALTO;
+    return 1;
+  }
+
+  *ancho = ws.ws_col < FB_ANCHO ? ws.ws_col : FB_ANCHO;
+  *alto = (ws.ws_row - 1) < FB_ALTO ? (ws.ws_row - 1) : FB_ALTO;
+
+  if (*ancho < FB_MIN_ANCHO || *alto < FB_MIN_ALTO) {
     fprintf(stderr,
-            "[host] la terminal es de %dx%d y el juego necesita %dx%d. "
-            "Se va a ver cortado.\n",
-            ws.ws_col, ws.ws_row, FB_ANCHO, FB_ALTO + 1);
+            "[host] la terminal es de %dx%d y el juego necesita al menos "
+            "%dx%d. Agrandala o achica la fuente.\n",
+            ws.ws_col, ws.ws_row, FB_MIN_ANCHO, FB_MIN_ALTO + 1);
+    return 0;
+  }
+  return 1;
 }
 
 static long ahora_ns(void) {
@@ -194,8 +219,16 @@ static void fb_volcar(const Framebuffer *fb, char *salida, size_t cap) {
     for (int x = 0; x < fb->ancho; x++) {
       Cell c = fb->cells[y * fb->ancho + x];
       if ((int)c.color != actual) {
-        n += (size_t)snprintf(salida + n, cap - n,
-                              c.color ? "\033[%um" : RESET, c.color);
+        // Los codigos ANSI clasicos son un solo numero (\033[33m). La paleta de
+        // 256 usa otra forma (\033[38;5;208m) y no se puede meter en la
+        // primera: \033[208m no es un color, es un codigo invalido que la
+        // terminal ignora o interpreta como cualquier otra cosa.
+        if (c.color == 0)
+          n += (size_t)snprintf(salida + n, cap - n, RESET);
+        else if (c.color <= 107)
+          n += (size_t)snprintf(salida + n, cap - n, "\033[%um", c.color);
+        else
+          n += (size_t)snprintf(salida + n, cap - n, "\033[38;5;%um", c.color);
         actual = c.color;
       }
       salida[n++] = c.ch;
@@ -301,9 +334,17 @@ int main(void) {
   // El estado es del host: sobrevive a todas las recargas. El host no sabe
   // que hay adentro, y justamente por eso podes cambiarle la forma sin
   // recompilarlo.
+  int fb_ancho, fb_alto;
+  if (!medir_terminal(&fb_ancho, &fb_alto)) {
+    unload_game(&code);
+    return 1;
+  }
+
   void *mem = calloc(1, GAME_MEM_SIZE);
-  Cell *cells = calloc((size_t)FB_ANCHO * FB_ALTO, sizeof(Cell));
-  size_t cap = (size_t)FB_ALTO * (FB_ANCHO * 12 + 8) + 64;
+  Cell *cells = calloc((size_t)fb_ancho * fb_alto, sizeof(Cell));
+  // 16 bytes por celda: alcanza para la secuencia mas larga que emitimos,
+  // "\033[38;5;208m" (11) mas el caracter, con aire de sobra.
+  size_t cap = (size_t)fb_alto * (fb_ancho * 16 + 8) + 64;
   char *salida = malloc(cap);
   if (!mem || !cells || !salida) {
     fprintf(stderr, "[host] sin memoria\n");
@@ -313,9 +354,8 @@ int main(void) {
     return 1;
   }
 
-  Framebuffer fb = {FB_ANCHO, FB_ALTO, cells};
+  Framebuffer fb = {fb_ancho, fb_alto, cells};
 
-  aviso_tamanio();
   if (!term_raw()) {
     free(mem);
     free(cells);
@@ -323,7 +363,7 @@ int main(void) {
     return 1;
   }
 
-  code.init(mem, GAME_MEM_SIZE);
+  code.init(mem, GAME_MEM_SIZE, fb.ancho, fb.alto);
 
   int playing = 1;
   long frames = 0;
@@ -337,7 +377,7 @@ int main(void) {
     // Si no hay nada, n queda en 0 y el frame sigue igual.
     char teclas[32];
     ssize_t leidos = read(STDIN_FILENO, teclas, sizeof teclas);
-    Input in = {teclas, leidos > 0 ? (int)leidos : 0, {0, 0, 0, 0, 0, 0}};
+    Input in = {teclas, leidos > 0 ? (int)leidos : 0, {0, 0, 0, 0, 0, 0, 0, 0}};
     mouse_parsear(&in);
 
     playing = code.update(mem, GAME_MEM_SIZE, in, dt);
@@ -345,10 +385,10 @@ int main(void) {
     code.render(mem, GAME_MEM_SIZE, &fb);
 
     // HUD del host, encima de lo que dibujo el juego: FPS y estado de recarga.
-    char hud[FB_ANCHO + 1];
+    char hud[FB_ANCHO + 1]; // el techo alcanza: fb.ancho nunca lo supera
     snprintf(hud, sizeof hud, " %2d fps  q=salir  %s", (int)(1.0f / dt),
              estado);
-    fb_texto(&fb, 0, FB_ALTO - 1, hud, 90);
+    fb_texto(&fb, 0, fb.alto - 1, hud, 90);
 
     fb_volcar(&fb, salida, cap);
 

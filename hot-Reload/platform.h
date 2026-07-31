@@ -25,22 +25,37 @@
 #define CYAN "\033[36m"
 
 // --- Tamanio del campo de juego ---
-// Fijo a proposito: si el area de juego cambiara de tamanio, tendrias que
-// recalcular posiciones de enemigos y proyectiles en pleno frame.
+// Estos son TECHOS, no el tamanio real. El host mide la terminal al arrancar y
+// arma el framebuffer del tamanio que entre, sin pasarse de estos numeros.
 //
-// FB_ALTO tiene que ser MENOR que las filas de tu terminal (`tput lines`).
-// Cada frame se escriben FB_ALTO lineas terminadas en \n: si son mas que la
-// terminal, esta scrollea y el dibujo se va para arriba, fuera de la vista.
-// Se ve la pantalla en negro y parece que no dibuja, pero dibuja perfecto.
-#define FB_ANCHO 80
-#define FB_ALTO 20
+// Por que un techo y no la terminal a secas: para acotar la memoria del
+// framebuffer y del buffer de salida, que se reservan una sola vez.
+//
+// El alto real SIEMPRE es menor que las filas de la terminal. Cada frame se
+// escribe una linea terminada en \n por fila: si fueran tantas como la
+// terminal, esta scrollea y el dibujo se va para arriba, fuera de la vista. Se
+// ve la pantalla en negro y parece que no dibuja, pero dibuja perfecto.
+#define FB_ANCHO 200
+#define FB_ALTO 80
+
+// Abajo de esto el juego no entra y el host se niega a arrancar.
+#define FB_MIN_ANCHO 80
+#define FB_MIN_ALTO 20
 
 // --- Framebuffer ---
 // Una celda = un caracter + su color. Un char solo no alcanza porque no
 // guarda color, y vos ya venias usando ANSI.
+// Naranja de verdad. No existe en los 8 colores basicos de ANSI: el mas cercano
+// es el amarillo (33), que segun el tema de la terminal se ve mostaza. El 208
+// es de la paleta de 256, que el host emite con otra secuencia (ver Cell.color).
+#define NARANJA 208
+
 typedef struct {
   char ch;
-  unsigned char color; // 0 = color por defecto; si no, 31..36 o 91..96
+  // 0        = color por defecto
+  // 1..107   = codigo ANSI clasico (31..37 normales, 90..97 brillantes)
+  // 108..255 = indice de la paleta de 256 colores, como NARANJA
+  unsigned char color;
 } Cell;
 
 typedef struct {
@@ -71,7 +86,9 @@ typedef struct {
   int izq_soltado;  // se solto el boton izquierdo
   int arrastrando;  // se movio el cursor con el izquierdo apretado
 
-  int der_apretado; // se apreto el boton derecho
+  int der_apretado;    // se apreto el boton derecho
+  int der_soltado;     // se solto el boton derecho
+  int der_arrastrando; // se movio el cursor con el derecho apretado
 } Mouse;
 
 typedef struct {
@@ -87,8 +104,10 @@ typedef struct {
 // mem: bloque de GAME_MEM_SIZE bytes, en cero la primera vez, y que sobrevive
 //      todas las recargas en caliente. Ahi vive tu estado.
 
-// Corre una sola vez, antes del primer frame.
-void game_init(void *mem, size_t size);
+// Corre una sola vez, antes del primer frame. ancho y alto son los del
+// framebuffer que el host acaba de armar: el juego arma su terreno con esos
+// numeros, no con FB_ANCHO/FB_ALTO, que son solo el techo.
+void game_init(void *mem, size_t size, int ancho, int alto);
 
 // Corre una vez por frame. dt son los segundos que paso desde el frame
 // anterior: usalo para que la velocidad no dependa de los FPS.

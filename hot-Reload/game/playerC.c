@@ -20,6 +20,12 @@ void soldado_init(Soldado *s, float x, float y) {
   s->moviendose = 0;
   s->velocidad = 12.0f; // celdas por segundo
   s->seleccionado = 0;
+
+  s->hp = s->max_hp = 100;
+  s->vivo = 1;
+  s->ataque = 8;
+  s->cadencia = 0.6f;
+  s->espera = 0.0f;
 }
 
 void soldado_ordenar_ir(Soldado *s, int x, int y) {
