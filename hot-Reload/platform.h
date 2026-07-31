@@ -55,9 +55,29 @@ typedef struct {
 // Ojo: las flechas NO son un byte. Llegan como la secuencia ESC '[' 'A'
 // (arriba), 'B' (abajo), 'C' (derecha), 'D' (izquierda). Si vas a usarlas,
 // tenes que detectar los tres bytes juntos. WASD es un byte y es mas simple.
+//
+// El mouse tambien lo resuelve el host. La terminal reporta los clicks como
+// una secuencia de escape (ESC [ < boton ; columna ; fila M), pero eso es
+// ruido de plataforma: el host la parsea y te deja el resultado ya masticado
+// en coordenadas del framebuffer.
+//
+// Los flags valen 1 SOLO en el frame en que ocurre el evento, no mientras se
+// mantiene. arrastrando es la excepcion: vale 1 en cada frame que el cursor se
+// mueve con el boton izquierdo apretado.
+typedef struct {
+  int x, y; // ultima posicion conocida, en celdas del framebuffer
+
+  int izq_apretado; // se apreto el boton izquierdo
+  int izq_soltado;  // se solto el boton izquierdo
+  int arrastrando;  // se movio el cursor con el izquierdo apretado
+
+  int der_apretado; // se apreto el boton derecho
+} Mouse;
+
 typedef struct {
   const char *bytes;
   int n;
+  Mouse mouse;
 } Input;
 
 // --- API que game.so tiene que exportar ---

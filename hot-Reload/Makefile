@@ -31,8 +31,13 @@ host: host.c platform.h
 # mueve solo si salio bien: si compilaras directo sobre game.so, un error te
 # deja un archivo trunco y el host muere con "file too short" en la proxima
 # recarga.
+#
+# -lm: la biblioteca matematica (sqrtf y companiia). Sin esto compila igual,
+# porque un .so admite simbolos sin resolver, y el error recien aparece cuando
+# el host hace dlopen: "undefined symbol: sqrtf". Se linkea aca y no en el host
+# para que game.so se banque solo sus dependencias.
 game.so: $(GAME_OBJS)
-	$(CC) $(CFLAGS) -shared -fPIC -o game.so.tmp $(GAME_OBJS) && mv game.so.tmp game.so
+	$(CC) $(CFLAGS) -shared -fPIC -o game.so.tmp $(GAME_OBJS) -lm && mv game.so.tmp game.so
 
 # Recompila solo al guardar, como el plugin de Unity. Corre en otro panel.
 # Vigila todo el arbol de game/, no un solo archivo.

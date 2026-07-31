@@ -52,6 +52,10 @@ static void term_restaurar(void) {
   if (!term_modificada)
     return;
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &term_original);
+  // El reporte de mouse se apaga en el orden inverso al que se prendio. Si el
+  // proceso muere sin apagarlo, la terminal te sigue escupiendo secuencias de
+  // escape cada vez que hacer click, incluso en la shell.
+  fputs("\033[?1006l\033[?1002l\033[?1000l", stdout);
   fputs("\033[?25h" RESET "\n", stdout); // cursor visible de nuevo
   fflush(stdout);
   term_modificada = 0;
@@ -88,7 +92,74 @@ static int term_raw(void) {
   }
   term_modificada = 1;
   fputs("\033[?25l\033[2J", stdout); // cursor invisible, pantalla limpia
+  // 1000h: reportar apretado y soltado de botones.
+  // 1002h: ademas, reportar el movimiento MIENTRAS un boton esta apretado.
+  //        Sin esto no existe el arrastre: la terminal te avisa donde empezo y
+  //        donde termino, pero nada del recorrido, y no podes dibujar el
+  //        recuadro de seleccion mientras se arrastra.
+  // 1006h: modo SGR, que manda las coordenadas en decimal separadas por ';'.
+  //        Sin esto la terminal usa el modo viejo, que codifica cada
+  //        coordenada en UN byte y se rompe pasada la columna 223.
+  fputs("\033[?1000h\033[?1002h\033[?1006h", stdout);
   return 1;
+}
+
+// --- Mouse -------------------------------------------------------------------
+// Busca en el buffer crudo una secuencia SGR de click izquierdo y la traduce a
+// coordenadas del framebuffer. Formato: ESC [ < boton ; columna ; fila M
+// La 'M' final es apretado; una 'm' minuscula es soltado y la ignoramos, si no
+// cada click contaria doble.
+//
+// Limitacion conocida: si la secuencia queda partida entre dos read(), este
+// frame la pierde. Con un buffer de 32 bytes y clicks de ~12 es raro, y el
+// costo de arreglarlo (mantener un buffer entre frames) no se justifica todavia.
+static void mouse_parsear(Input *in) {
+  for (int i = 0; i + 3 < in->n; i++) {
+    if (in->bytes[i] != '\033' || in->bytes[i + 1] != '[' ||
+        in->bytes[i + 2] != '<')
+      continue;
+
+    // Lo que viene de read() NO termina en '\0', asi que la cola se copia a un
+    // buffer propio y se cierra a mano. Pasarle el buffer crudo a sscanf seria
+    // leer fuera del array hasta encontrar un cero por casualidad.
+    char seq[32];
+    int largo = in->n - (i + 3);
+    if (largo > (int)sizeof seq - 1)
+      largo = (int)sizeof seq - 1;
+    memcpy(seq, in->bytes + i + 3, (size_t)largo);
+    seq[largo] = '\0';
+
+    int cb = 0, col = 0, fila = 0;
+    char tipo = 0;
+    // %c al final captura la M o la m que cierra la secuencia.
+    if (sscanf(seq, "%d;%d;%d%c", &cb, &col, &fila, &tipo) != 4)
+      continue;
+
+    // El primer numero empaqueta varias cosas en un solo entero:
+    //   bits 0-1 -> que boton: 0 izquierdo, 1 rueda, 2 derecho
+    //   bit 5    -> si es un movimiento del cursor y no un apretado
+    int boton = cb & 3;
+    int movimiento = cb & 32;
+
+    // La terminal cuenta filas y columnas desde 1; el framebuffer desde 0.
+    in->mouse.x = col - 1;
+    in->mouse.y = fila - 1;
+
+    if (tipo == 'm') { // 'm' minuscula = se solto el boton
+      if (boton == 0)
+        in->mouse.izq_soltado = 1;
+    } else if (movimiento) {
+      if (boton == 0)
+        in->mouse.arrastrando = 1;
+    } else if (boton == 0) {
+      in->mouse.izq_apretado = 1;
+    } else if (boton == 2) {
+      in->mouse.der_apretado = 1;
+    }
+    // Sin return: en un mismo read() pueden venir varios eventos (sobre todo
+    // arrastrando). Se procesan todos y gana la ultima posicion, que es la
+    // actual. Cortar en el primero dejaria el cursor atrasado.
+  }
 }
 
 static void aviso_tamanio(void) {
@@ -266,7 +337,8 @@ int main(void) {
     // Si no hay nada, n queda en 0 y el frame sigue igual.
     char teclas[32];
     ssize_t leidos = read(STDIN_FILENO, teclas, sizeof teclas);
-    Input in = {teclas, leidos > 0 ? (int)leidos : 0};
+    Input in = {teclas, leidos > 0 ? (int)leidos : 0, {0, 0, 0, 0, 0, 0}};
+    mouse_parsear(&in);
 
     playing = code.update(mem, GAME_MEM_SIZE, in, dt);
 
