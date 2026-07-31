@@ -12,6 +12,7 @@ void enemigo_init(Enemigo *e, float x, float y) {
   e->cuerpo.velocidad = 7.0f; // mas lento que un soldado (12)
   e->cuerpo.ataque = 5;
   e->cuerpo.cadencia = 0.9f;
+  e->cuerpo.alcance = ALCANCE_ENEMIGO;
   e->objetivo = -1;
   e->puesto_x = x; // hasta que le digan otra cosa, custodia donde nacio
   e->puesto_y = y;
@@ -89,7 +90,7 @@ void combate_enemigos(Enemigo *es, int cant_e, Soldado *ss, int cant_s,
 
     // Dispara desde donde esta. Sin acercarse: el que decide la distancia de la
     // pelea es el jugador, que puede elegir entrar o quedarse afuera.
-    if (d <= ALCANCE_ENEMIGO && e->cuerpo.espera <= 0.0f) {
+    if (d <= e->cuerpo.alcance && e->cuerpo.espera <= 0.0f) {
       proyectil_disparar(ps, cant_p, e->cuerpo.x, e->cuerpo.y, victima->x,
                          victima->y, e->cuerpo.ataque, BANDO_ENEMIGO);
       e->cuerpo.espera = e->cuerpo.cadencia;
@@ -118,7 +119,7 @@ void combate_soldados(Soldado *ss, int cant_s, Enemigo *es, int cant_e,
       if (!es[j].cuerpo.vivo)
         continue;
       float d = distancia(s->x, s->y, es[j].cuerpo.x, es[j].cuerpo.y);
-      if (d > ALCANCE_SOLDADO)
+      if (d > s->alcance)
         continue;
       if (blanco == -1 || d < mejor) {
         blanco = j;

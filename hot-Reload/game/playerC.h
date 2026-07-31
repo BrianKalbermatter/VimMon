@@ -22,10 +22,20 @@ typedef struct {
 
   // --- Combate ---
   int hp, max_hp;
-  int vivo;      // 0 = muerto: deja de dibujarse y de ser un objetivo valido
-  int ataque;    // dania por golpe
+  int vivo;       // 0 = muerto: deja de dibujarse y de ser un objetivo valido
+  int ataque;     // dania por golpe
   float cadencia; // segundos entre golpe y golpe
   float espera;   // cuenta regresiva hasta poder golpear de nuevo
+
+  // Hasta donde llega su tiro. Es un CAMPO y no una constante porque cada tipo
+  // de unidad alcanza distinto: el espadachin tiene que pegarse encima y el
+  // fusilero le tira desde mas lejos de lo que el enemigo puede contestar.
+  float alcance;
+
+  // Que clase de unidad es. El Soldado no sabe que significa cada numero: la
+  // tabla que le da sentido es cosa del juego (UNIDAD en dungeon.h), no de la
+  // mecanica de caminar y disparar que vive en este archivo.
+  int tipo;
 } Soldado;
 
 // Lo planta en (x, y) quieto y sin destino pendiente.

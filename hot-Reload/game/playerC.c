@@ -26,6 +26,8 @@ void soldado_init(Soldado *s, float x, float y) {
   s->ataque = 8;
   s->cadencia = 0.6f;
   s->espera = 0.0f;
+  s->alcance = 12.0f;
+  s->tipo = 0;
 }
 
 void soldado_ordenar_ir(Soldado *s, int x, int y) {

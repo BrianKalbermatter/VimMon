@@ -53,10 +53,6 @@ typedef struct {
 typedef struct {
   int x0, y0; // esquina superior izquierda
   int x1, y1; // esquina inferior derecha
-
-  // El hueco en la pared derecha por donde entran los enemigos. Son las filas
-  // en las que NO se dibuja pared: entre apertura_y0 y apertura_y1, inclusive.
-  int apertura_y0, apertura_y1;
 } Terreno;
 
 // El estado COMPLETO de la partida. Esto es lo que el host guarda en `mem` y lo
@@ -73,13 +69,34 @@ typedef struct {
 //
 // Las posiciones de todo (soldados, tesoros, balas) son coordenadas de MUNDO.
 // La conversion a pantalla es una resta, y pasa solo al dibujar.
-#define MUNDO_ANCHO 240
-#define MUNDO_ALTO 80
+#define MUNDO_ANCHO 400
+#define MUNDO_ALTO 140
 
-#define MAX_SOLDADOS 4
 #define MAX_ENEMIGOS 24
 #define MAX_CUARTELES 4
 #define MAX_PROYECTILES 96
+
+// --- Poblacion ---------------------------------------------------------------
+//
+// Con cuantos lugares arrancas y cuantos suma cada casa. El techo YA NO ES UNA
+// CONSTANTE: vive en Recursos.poblacion_max y sube cada vez que plantas una.
+#define POBLACION_INICIAL 10
+#define CASA_POBLACION 5
+
+#define MAX_CASAS 48
+
+// El tope de soldados dejo de ser una regla del juego y paso a ser lo que
+// siempre fue de verdad: el tamanio del arreglo, o sea una decision de MEMORIA.
+//
+// En C no existe "sin limite" mientras el arreglo sea de tamanio fijo: el host
+// te presta un bloque de 16MB y ahi entra todo. Lo que si se puede hacer es que
+// el techo del arreglo NO PUEDA quedarse corto, derivandolo de la poblacion
+// maxima alcanzable. Si maniana subis MAX_CASAS o CASA_POBLACION, el arreglo
+// crece con ellos y no hay forma de desincronizarlos.
+//
+// Quien limita la tropa ahora es la poblacion, que es lo que vos controlas
+// plantando casas. A 52 bytes por soldado, 250 son 13KB: nada.
+#define MAX_SOLDADOS (POBLACION_INICIAL + MAX_CASAS * CASA_POBLACION)
 
 // Segundos entre la aparicion de un enemigo y el siguiente.
 #define SPAWN_CADA 2.5f
@@ -94,8 +111,43 @@ typedef struct {
 // estanque: la oleada 0 trae 5, la 1 trae 6, y asi.
 #define ENEMIGOS_OLEADA_BASE 5
 
-// Cada cuanto un cuartel saca un soldado nuevo.
-#define CUARTEL_ENTRENA_CADA 5.0f
+// Cuantas celdas corre la camara por cada tecla de WASD. La vertical es la
+// mitad porque una celda de terminal es como el doble de alta que ancha: con el
+// mismo numero, subir y bajar se sentiria el doble de rapido que ir al costado.
+#define CAMARA_PASO_X 4
+#define CAMARA_PASO_Y 2
+
+// --- Tipos de unidad ---------------------------------------------------------
+//
+// Mismo truco que TipoRecurso: el enum ordena y UNIDAD_CANTIDAD queda valiendo
+// solo lo que hay. La tabla UNIDAD de abajo tiene una fila por cada uno, asi que
+// agregar un tipo es agregar el enum y su fila; no hay ningun switch que
+// actualizar ni ningun if por tipo desparramado por el codigo.
+typedef enum {
+  UNIDAD_ESPADACHIN,
+  UNIDAD_ARQUERO,
+  UNIDAD_FUSILERO,
+  UNIDAD_CANTIDAD // no es un tipo: es cuantos hay
+} TipoUnidad;
+
+// La ficha de cada tipo. Todo lo que diferencia a un espadachin de un fusilero
+// esta ACA ADENTRO y en ningun otro lado: si el balance se siente mal, se toca
+// esta tabla y nada mas.
+typedef struct {
+  const char *nombre;
+  const char *corto;  // etiqueta de 3 letras para el panel
+  char ch;            // como se dibuja en el mapa
+  unsigned char color; // solo para el panel: en el mapa manda el color de vida
+  int hp;
+  int ataque;
+  float cadencia;  // segundos entre tiro y tiro
+  float alcance;   // celdas
+  float velocidad; // celdas por segundo
+} UnidadDef;
+
+// Se declara aca y se define en dungeon.c, igual que RECURSO_NOMBRE: si la
+// tabla viviera en el header, cada .c que lo incluya tendria su propia copia.
+extern const UnidadDef UNIDAD[UNIDAD_CANTIDAD];
 
 // --- Recursos ----------------------------------------------------------------
 
@@ -116,13 +168,13 @@ typedef enum {
   REC_CANTIDAD // no es un recurso: es cuantos hay
 } TipoRecurso;
 
-// Techo duro de poblacion. Ningun soldado se entrena si llegar a ese numero lo
-// haria pasar.
-#define POBLACION_MAX 200
-
 typedef struct {
   int cantidad[REC_CANTIDAD]; // todos arrancan en 0
   int poblacion;              // unidades vivas ocupando lugar
+
+  // Techo de poblacion. Arranca en POBLACION_INICIAL y sube CASA_POBLACION por
+  // cada casa. Ningun soldado se entrena si pasarlo lo haria superar.
+  int poblacion_max;
 } Recursos;
 
 // Los nombres viven al lado del enum para que se lean juntos. Se declara aca y
@@ -148,12 +200,31 @@ typedef struct {
 #define RADIO_CUSTODIA 6.0f
 #define RADIO_RECOGIDA 1.8f
 
+// El cuartel ya NO entrena solo: es el lugar desde donde salen las unidades que
+// vos pedis con 1/2/3. Por eso perdio el temporizador y le queda solo la cuenta
+// de los que saco, que sirve para no apilarlos todos en la misma celda.
 typedef struct {
   int x, y;
   int activo;
-  float entrena_espera; // segundos hasta el proximo soldado
-  int entrenados;       // cuantos saco; sirve para no apilarlos al salir
+  int entrenados;
 } Cuartel;
+
+// La casa no hace nada por si misma: existe para SUBIR EL TECHO de poblacion.
+// Por eso no tiene temporizador ni estado propio, solo donde esta parada.
+typedef struct {
+  int x, y;
+  int activo;
+} Casa;
+
+// Que planta el proximo click izquierdo. Antes esto era un int 0/1 que solo
+// sabia decir "cuartel si o no"; con dos edificios ya no alcanzaba, y un
+// segundo flag suelto habilitaria el estado imposible de tener los dos
+// prendidos a la vez. El enum hace que eso no se pueda ni escribir.
+typedef enum {
+  CONSTRUIR_NADA,
+  CONSTRUIR_CUARTEL,
+  CONSTRUIR_CASA
+} ModoConstruir;
 
 // El recuadro que se dibuja mientras arrastras el mouse. Se guarda el punto
 // donde empezo el arrastre y donde esta ahora: el rectangulo se arma con los
@@ -170,16 +241,12 @@ typedef struct {
   // Tamanio real del framebuffer, que el host mide de la terminal y pasa a
   // game_init. TODO el layout sale de aca; FB_ANCHO/FB_ALTO son solo el techo.
   int ancho, alto;
-  int piso_alto; // primera fila del panel: el mapa va de 0 a piso_alto-1
+  int piso_alto;  // primera fila del panel: el mapa va de 0 a piso_alto-1
+  int panel_alto; // filas del panel; sale del minimapa, no de una constante
 
   // Esquina superior izquierda del mundo que se esta viendo. La ventana mide
   // ancho x piso_alto.
   int cam_x, cam_y;
-
-  // Paneo: arrastrar con el izquierdo cuando no hay nada seleccionado.
-  int pan_activo;
-  int pan_x, pan_y; // donde estaba el cursor en el frame anterior
-  int hubo_arrastre; // 1 si el cursor se movio entre apretar y soltar
 
   Terreno terreno;
 
@@ -199,8 +266,11 @@ typedef struct {
   Cuartel cuarteles[MAX_CUARTELES];
   int cant_cuarteles;
 
+  Casa casas[MAX_CASAS];
+  int cant_casas;
+
   float preparacion;  // segundos que faltan para la invasion; 0 = ya empezo
-  int modo_construir; // 1 = el proximo click izquierdo planta un cuartel
+  ModoConstruir modo_construir; // que planta el proximo click izquierdo
 
   // La partida va por oleadas: preparacion -> invasion -> preparacion.
   // La invasion termina cuando ya aparecieron todos los de la oleada Y no
