@@ -15,26 +15,16 @@ Dos fases:
   2. ejecutar()  - solo corre si analizar() no dio errores (return 0)
 
 
-Estructura valida de un archivo .paed
---------------------------------------
-  ACCION nombre_algoritmo ES
-      AMBIENTE
-          variable: TIPO;
-      PROCESO
-          instrucciones
-  FIN_ACCION
+Sintaxis del lenguaje
+----------------------
+NO esta documentada aca. Este archivo es el diario de aprendizaje del
+interprete; la sintaxis vive en UN SOLO lugar:
 
-Tipos de datos:
-  ENTERO       numero entero
-  REAL         numero con decimales
-  BOOLEANO     Verdadero o Falso
-  AN(n)        texto de hasta n caracteres
-  N(n)         numero de hasta n cifras
+  docs/PAED.md          la spec para leer
+  data/sintaxis.json    la definicion formal para las herramientas
 
-Operador de asignacion:  :=
-Comentarios:             //
-Entrada:                 LEER(variable)
-Salida:                  ESCRIBIR(variable)
+Todo lo que necesite palabras clave se genera desde sintaxis.json con
+tools/generar.sh. Nunca copiar una lista de keywords a mano.
 
 
 Lo avanzado hoy (2026-03-07)
