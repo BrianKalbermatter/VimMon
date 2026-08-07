@@ -38,16 +38,21 @@ static void cmd_engine(void) {
 
 // scene: parsea scene.paed y lo ejecuta en el intérprete PAED.
 static void cmd_scene(void) {
-    PAEDScene paed;
-    SceneState scene;
+    PAEDProgram prog;
+    SceneState  scene;
     interp_init(&scene);
-    if (paed_parse_file(SCENE_PATH, &paed) == 0) {
-        interp_exec(&scene, &paed);
-        interp_print(&scene);
-        printf("[scene] OK\n");
-    } else {
-        printf("[scene] ERROR — no se pudo leer %s\n", SCENE_PATH);
+
+    // Analisis primero: si hay un solo error, no se ejecuta nada.
+    if (paed_parse_file(SCENE_PATH, &prog) != 0) {
+        paed_print_errors(&prog);
+        printf("[scene] ERROR — %d error(es), no se ejecuto\n", prog.error_count);
+        return;
     }
+
+    int ok = interp_exec(&scene, &prog) == 0;
+    interp_print(&scene);
+    printf("[scene] %s — %s (%d instrucciones)\n",
+           ok ? "OK" : "con errores de ejecucion", prog.name, prog.instr_count);
 }
 
 // ai: manda un request al plugin de IA por el bus (procesa en on_event).
