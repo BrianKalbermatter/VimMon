@@ -49,3 +49,6 @@ ProyectoVimMon/.obsidian/
 
 # Cache de tooling
 bus/.atl/
+
+# Binario temporal del generador de sintaxis PAED
+PseudoGames/Frankly/tools/gen_sintaxis

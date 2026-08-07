@@ -3,69 +3,33 @@
     "name": "Paed",
     "scopeName": "source.paed",
     "fileTypes": ["paed"],
+    "_generado": "NO EDITAR A MANO — sale de data/sintaxis.json via tools/generar.sh",
     "patterns": [
-        { "include": "#comentarios" },
-        { "include": "#strings" },
-        { "include": "#numeros" },
-        { "include": "#estructura" },
         { "include": "#condicionales" },
         { "include": "#bucles" },
-        { "include": "#tipos" },
-        { "include": "#secuencias" },
-        { "include": "#funciones_builtin" },
-        { "include": "#entrada" },
+        { "include": "#estructura" },
         { "include": "#salida" },
-        { "include": "#operadores" }
+        { "include": "#entrada" },
+        { "include": "#tipos" },
+        { "include": "#operadores" },
+        { "include": "#funciones_builtin" },
+        { "include": "#secuencias" },
+        { "include": "#comentario" },
+        { "include": "#strings" },
+        { "include": "#numeros" }
     ],
     "repository": {
-        "comentarios": {
-            "match": "//.*$",
-            "name": "comment.line.double-slash.paed"
-        },
-        "strings": {
-            "begin": "\"",
-            "end": "\"",
-            "name": "string.quoted.double.paed"
-        },
-        "numeros": {
-            "match": "\\b[0-9]+(\\.[0-9]+)?\\b",
-            "name": "constant.numeric.paed"
-        },
-        "estructura": {
-            "match": "\\b(ACCION|ES|FIN_ACCION|PROCESO|AMBIENTE|FUNCION|FIN_FUNCION|PROCEDIMIENTO|FIN_PROCEDIMIENTO|RETORNAR|SEGUN|ABRIR|CERRAR|ARCHIVO|REGISTRO)\\b",
-            "name": "keyword.other.estructura.paed"
-        },
-        "condicionales": {
-            "match": "\\b(SI|FIN_SI|SINO|ENTONCES)\\b",
-            "name": "keyword.control.condicional.paed"
-        },
-        "bucles": {
-            "match": "\\b(MIENTRAS|FIN_MIENTRAS|PARA|FIN_PARA|REPETIR|HASTA|HACER)\\b",
-            "name": "keyword.control.bucle.paed"
-        },
-        "tipos": {
-            "match": "\\b(ENTERO|ENTEROS|REAL|CARACTER|CARACTERES|BOOLEANO|SECUENCIA|ARREGLO|CONSTANTE|VAR|DE|AN|N)\\b",
-            "name": "storage.type.paed"
-        },
-        "secuencias": {
-            "match": "\\b(ARR|AVZ|VENTANA|NFDS|FDS)\\b",
-            "name": "support.function.secuencia.paed"
-        },
-        "funciones_builtin": {
-            "match": "\\b(MOD|DIV|TRUNC|ABSO|REDOND)\\b",
-            "name": "support.function.builtin.paed"
-        },
-        "entrada": {
-            "match": "\\b(LEER)\\b",
-            "name": "support.function.entrada.paed"
-        },
-        "salida": {
-            "match": "\\b(ESCRIBIR)\\b",
-            "name": "support.function.salida.paed"
-        },
-        "operadores": {
-            "match": "\\b(Y|O|NO)\\b",
-            "name": "keyword.operator.logico.paed"
-        }
+        "condicionales": { "match": "\\b(SI|FIN_SI|SINO|ENTONCES)\\b", "name": "keyword.control.condicional.paed" },
+        "bucles": { "match": "\\b(MIENTRAS|FIN_MIENTRAS|PARA|FIN_PARA|REPETIR|HASTA|HACER)\\b", "name": "keyword.control.bucle.paed" },
+        "estructura": { "match": "\\b(ACCION|ES|FIN_ACCION|PROCESO|AMBIENTE|FUNCION|FIN_FUNCION|PROCEDIMIENTO|FIN_PROCEDIMIENTO|RETORNAR|SEGUN|FIN_SEGUN|ABRIR|CERRAR|ARCHIVO|REGISTRO|FIN_REGISTRO)\\b", "name": "keyword.other.estructura.paed" },
+        "salida": { "match": "\\b(ESCRIBIR)\\b", "name": "support.function.salida.paed" },
+        "entrada": { "match": "\\b(LEER)\\b", "name": "support.function.entrada.paed" },
+        "tipos": { "match": "\\b(ENTEROS|ENTERO|REAL|CARACTER|CARACTERES|BOOLEANO|SECUENCIA|VENTANA|SALIDA|ARREGLO|CONSTANTE|VAR|DE|AN|N)\\b", "name": "storage.type.paed" },
+        "operadores": { "match": "\\b(Y|O|NO)\\b", "name": "keyword.operator.logico.paed" },
+        "funciones_builtin": { "match": "\\b(MOD|DIV|TRUNC|ABSO|REDOND)\\b", "name": "support.function.builtin.paed" },
+        "secuencias": { "match": "\\b(ARR|AVZ|CREAR|VENTANA|NFDS|FDS)\\b", "name": "support.function.secuencia.paed" },
+        "comentario": { "match": "//.*$", "name": "comment.line.double-slash.paed" },
+        "strings": { "begin": "\"", "end": "\"", "name": "string.quoted.double.paed" },
+        "numeros": { "match": "\\b[0-9]+(\\.[0-9]+)?\\b", "name": "constant.numeric.paed" }
     }
 }
