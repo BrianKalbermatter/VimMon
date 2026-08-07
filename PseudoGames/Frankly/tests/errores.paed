@@ -1,0 +1,14 @@
+// Fixture de errores: cada linea de PROCESO tiene exactamente un error.
+// Sirve para verificar que el parser NUNCA ignora en silencio.
+ACCION errores ES
+    AMBIENTE
+        cubo1: CUBO;
+    PROCESO
+        CUBO(nombre = cubo1, posicion = (0,0,0), color = #ff0000);
+        MOVER(cubo1, posicion = (1,1,1));
+        MOVERR(nombre = cubo1, posicion = (1,1,1));
+        COLOR(nombre = cubo1, valor = #00ff00);
+        MOVER(nombre = cubo1, posicion = 1,1,1);
+        ESCALAR(nombre = cubo1)
+        MOVER(nombre = fantasma, posicion = (2,2,2));
+FIN_ACCION
