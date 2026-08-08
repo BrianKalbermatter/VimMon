@@ -12,10 +12,11 @@ kanban-plugin: board
 - [ ] Interprete PAED: implementar `ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` (hoy parsean pero no ejecutan) #fase2
 - [ ] Corroborar contra la wiki: `RETORNAR`, `TRUNC`, `ABSO`, `REDOND` — 0 apariciones en los apuntes #fase2
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
-- [ ] Conectar el mundo 2D del motor (`Entity`/`World`) con el `SceneState` de PAED — hoy son dos mundos separados #fase3
-- [ ] Dibujar cubo desde PAED (proyección 3D→2D simple, sin GPU) #fase3
+- [ ] Recortar contra el plano cercano: hoy `scene_view.c` acota las coordenadas de las esquinas en vez de generar vértices en el borde, y un objeto que abraza la cámara (el suelo) queda mal #fase3
+- [ ] Z-buffer por píxel: hoy el orden del pintor usa la profundidad del CENTRO, así que dos cuerpos que se cruzan se ordenan mal #fase3
+- [ ] Caras del cubo con sombreado: hoy se rellena el rectángulo que contiene las 8 esquinas, no las 6 caras #fase3
+- [ ] `LUZ` que ilumine de verdad: hoy solo se dibuja una cruz donde está #fase3
 - [ ] Split screen: panel izquierdo (AI chat) + panel derecho (viewport) #fase3
-- [ ] Test: scene.paed con cubo → aparece en pantalla #fase3
 - [ ] `plugins/raycaster/map.c` — mapa como grilla 2D hardcodeada #fase3b (no arrancar hasta tener renderer.h + put_pixel de FASE 3)
 - [ ] `plugins/raycaster/ray.c` — DDA: un rayo por columna, paredes sólidas de color #fase3b
 - [ ] Input por el bus: mover/rotar jugador + colisión contra la grilla #fase3b
@@ -89,6 +90,10 @@ kanban-plugin: board
 - [x] `examples/hello_entity.c` — plantilla ejecutable (rectángulo que rebota) #fase3
 - [x] Consola de comandos en `main.c` (`engine`/`scene`/`ai`/`help`/`quit`); "engine" publica `EVENT_RENDER_FRAME` → el renderer lanza el motor con `game_setup` #fase3
 - [x] `plugins/renderer/renderer.c` — puente bus↔motor: `on_event(EVENT_RENDER_FRAME)` abre el motor y le cede el loop #fase3
+- [x] `plugins/ide/scene_view.{h,c}` — el `SceneState` de PAED se dibuja en el motor: base de cámara (derecha/arriba/adelante con producto vectorial), perspectiva dividiendo por la profundidad, orden del pintor. Se monta como UNA entidad del pool, así `engine.c` no se tocó #fase3
+- [x] Recarga en caliente de la ESCENA: `scene_view.c` vigila el mtime (en nanosegundos) de `scene.paed` cada ~0.5s y re-parsea sola. Si el archivo nuevo tiene errores, conserva la última escena buena #fase3
+- [x] Renombrar el `Entity` de PAED a `Cuerpo`: chocaba con el `Entity` del motor, que son cosas distintas #fase3
+- [x] Test: `scene.paed` con cubo → aparece en pantalla. Verificado con un `Renderer` falso que anota las llamadas: cubo de 1×1×1 a distancia 5 → rect de 115px centrado; a distancia 10 → 55px #fase3
 
 
 
