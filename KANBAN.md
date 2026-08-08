@@ -6,6 +6,11 @@ kanban-plugin: board
 
 ## Backlog
 
+- [ ] Parser PAED: soportar `:=`, `SI`/`MIENTRAS`/`PARA`/`REPETIR`/`SEGUN` (necesita pila de bloques, no la maquina de estados plana) #fase2
+- [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
+- [ ] Parser PAED: nombre de `ACCION` con espacios (`ACCION Ejercicio de Parcial ES`) #fase2
+- [ ] Interprete PAED: implementar `ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` (hoy parsean pero no ejecutan) #fase2
+- [ ] Corroborar contra la wiki: `RETORNAR`, `TRUNC`, `ABSO`, `REDOND` — 0 apariciones en los apuntes #fase2
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
 - [ ] Conectar el mundo 2D del motor (`Entity`/`World`) con el `SceneState` de PAED — hoy son dos mundos separados #fase3
 - [ ] Dibujar cubo desde PAED (proyección 3D→2D simple, sin GPU) #fase3
@@ -55,7 +60,7 @@ kanban-plugin: board
 - [x] `bus/bus.c` — bus real: `bus_init`, `bus_register` (un plugin puede suscribirse a varios `EventType`), `bus_send`, `bus_unregister` (swap-con-el-ultimo), `bus_shutdown` (deduplicado) #fase0
 - [x] Loop principal en `main.c` con manejo de `SIGINT` (Ctrl+C apaga limpio, no mata el proceso) #fase0
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
-- [x] `docs/paed_spec.md` — spec del lenguaje PAED v1.0 #fase0
+- [x] `PseudoGames/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED v2.0, fuente unica de verdad (reemplaza `docs/paed_spec.md`) #fase0
 - [x] `docs/plugin_spec.md` — cómo crear plugins #fase0
 - [x] `KANBAN.md` — este archivo #fase0
 - [x] `Makefile` raíz — compila bus + plugins juntos #fase0
@@ -71,6 +76,10 @@ kanban-plugin: board
 - [x] `plugins/ide/scene.paed` — archivo de estado de la escena #fase2
 - [x] Integrar: AI response → append a scene.paed → re-parsear #fase2
 - [x] Test: scene.paed con un cubo → interprete lo lee sin crash #fase2
+- [x] PAED = pseudocodigo AED puro: `data/sintaxis.json` solo tiene lo corroborado contra `wiki.txt`, `TEORIA_COMPLETA.txt` y los `.paed` de la catedra #fase2
+- [x] La escena 3D salio del lenguaje: es una libreria aparte en `data/escena.json`, se carga ademas de `sintaxis.json` #fase2
+- [x] `PseudoGames/Frankly/tools/generar.sh` — genera `paed.tmLanguage.json` y `core/palabras.sh` desde `sintaxis.json` (se acabo copiar keywords a mano) #fase2
+- [x] `plugins/ide/parser.c` — parser de PAED real (ACCION/AMBIENTE/PROCESO) que reporta errores con archivo:linea y NUNCA ignora en silencio #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
 - [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL2 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3
