@@ -163,9 +163,14 @@ BLOQUE 6: Asignacion
       Es el operador mas usado de todo AED.
 
   PARSER
-      NO IMPLEMENTADO. El parser la detecta y avisa:
-          error: asignacion ':=' todavia no implementada
-      No la ignora, pero no la ejecuta.
+      PARSEA, NO EJECUTA. El destino tiene que ser un identificador simple y
+      la expresion de la derecha se guarda CRUDA, sin analizar: todavia no
+      hay evaluador de expresiones.
+
+      LIMITACION CONOCIDA: no acepta acceso a campos de registro. 13
+      asignaciones del corpus fallan solo por esto:
+          pori.vx := 0;    -> error: destino de asignacion invalido
+      Es es_identificador() que no admite el punto. Ver bloque 16.
 
   A COMPARAR
       - El '=' solo tambien asigna, o siempre es ':='?
@@ -236,11 +241,18 @@ BLOQUE 8: Condicionales
       la copie de como la escribis vos. No hay gramatica formal definida.
 
   PARSER
-      NO IMPLEMENTADO. Y encima hoy exigiria un ';' al final de cada una de
-      esas lineas, cosa que en AED no lleva.
+      PARSEA, NO EJECUTA. Hay pila de bloques: SI/SINO/FIN_SI se anidan con
+      MIENTRAS y entre si, y las cabeceras ya NO exigen ';'.
+
+      Los parentesis quedaron OPCIONALES, porque el corpus tiene las dos
+      formas: "SI (recorrido == P) ENTONCES" y "SI coord <> 0 ENTONCES".
+
+      La condicion se guarda cruda. Seguir los saltos necesita un evaluador
+      de expresiones, que todavia no existe.
 
   A COMPARAR
-      - Los parentesis de la condicion son obligatorios?
+      - Existe "SINO SI" encadenado? Hoy hay que anidar un SI adentro del
+        SINO, que es como lo escribis en EjercicioParcial.paed.
       - Existe "SINO SI" encadenado o siempre se anida un SI adentro del
         SINO? En tu EjercicioParcial.paed anidas.
 
@@ -291,11 +303,26 @@ BLOQUE 10: Ciclos
       REPETIR 8 · HASTA 7. La forma del MIENTRAS sale de tus ejercicios.
 
   PARSER
-      NO IMPLEMENTADO.
+      MIENTRAS: PARSEA, NO EJECUTA. Hay pila de bloques, se anida consigo
+      mismo y con SI, y la cabecera ya no exige ';'. La condicion se guarda
+      cruda: falta el evaluador de expresiones.
+
+      PARA, REPETIR y HASTA: NO IMPLEMENTADOS, A PROPOSITO.
+
+      Ojo con los numeros de arriba: cuentan la PALABRA en cualquier lugar,
+      incluidos comentarios y prosa. Contando solo CABECERAS DE BUCLE reales
+      al principio de una linea en los *.paed, el corpus tiene:
+          PARA      1 cabecera:  "PARA coord := -4 a 4 HACER"
+          MIENTRAS  5 cabeceras, todas con parentesis
+          REPETIR   0 cabeceras
+      Con una sola muestra de PARA y ninguna de REPETIR no alcanza para
+      fijar la gramatica, y se decidio no inventarla.
 
   A COMPARAR
       - La cabecera completa del PARA. Frankly tiene "PARA ... HACER" con
         puntos suspensivos porque NO SE cual es la forma exacta.
+      - La unica muestra usa la palabra "a" como separador de rango
+        ("-4 a 4"). Existe un PASO/incremento?
         ESTE BLOQUE ESTA INCOMPLETO A PROPOSITO. Hay que sacarlo de la wiki.
       - El REPETIR/HASTA lleva ';' al final del HASTA?
 

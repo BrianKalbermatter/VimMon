@@ -6,7 +6,11 @@ kanban-plugin: board
 
 ## Backlog
 
-- [ ] Parser PAED: soportar `:=`, `SI`/`MIENTRAS`/`PARA`/`REPETIR`/`SEGUN` (necesita pila de bloques, no la maquina de estados plana) #fase2
+- [ ] Parser PAED: `pori.vx := ...` — acceso a campos de registro. 13 asignaciones del corpus fallan solo por esto (`es_identificador` no acepta el punto) #fase2
+- [ ] Parser PAED: `PARA` — el corpus tiene UNA sola cabecera (`PARA coord := -4 a 4 HACER`). Hay que confirmar la forma contra la cátedra antes de implementarla #fase2
+- [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir: el ejercicio escribe `Según c HACER` (con acento y minúsculas) y `sintaxis.json` declara `SEGUN` #fase2
+- [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
+- [ ] Interprete PAED: seguir los saltos de `SI`/`MIENTRAS` (el parser ya los calculó). Necesita evaluador de expresiones y tabla de variables #fase2
 - [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
 - [ ] Parser PAED: nombre de `ACCION` con espacios (`ACCION Ejercicio de Parcial ES`) #fase2
 - [ ] Interprete PAED: implementar `ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` (hoy parsean pero no ejecutan) #fase2
@@ -81,6 +85,11 @@ kanban-plugin: board
 - [x] La escena 3D salio del lenguaje: es una libreria aparte en `data/escena.json`, se carga ademas de `sintaxis.json` #fase2
 - [x] `paed/Frankly/tools/generar.sh` — genera `paed.tmLanguage.json` y `core/palabras.sh` desde `sintaxis.json` (se acabo copiar keywords a mano) #fase2
 - [x] `plugins/ide/parser.c` — parser de PAED real (ACCION/AMBIENTE/PROCESO) que reporta errores con archivo:linea y NUNCA ignora en silencio #fase2
+- [x] Pila de bloques en el parser: `SI`/`SINO`/`FIN_SI` y `MIENTRAS`/`FIN_MIENTRAS` anidados. Una variable no puede representar un CAMINO de anidamiento, y es pila porque los bloques cierran en orden inverso al que se abren #fase2
+- [x] Saltos parcheados al cerrar el bloque (backpatching): cada `SI`/`MIENTRAS` guarda a dónde ir, igual que el bytecode. `instrs[]` sigue siendo plano #fase2
+- [x] Asignación `:=` con destino simple: se parsea y se guarda la expresión cruda (todavía sin evaluador) #fase2
+- [x] Errores de bloque que citan la línea de APERTURA: "FIN_SI cierra un MIENTRAS abierto en la linea 3", "falta FIN_MIENTRAS: el MIENTRAS de la linea 3 quedo abierto" #fase2
+- [x] Test: `ejercicio2_1_11.paed` (MIENTRAS > MIENTRAS > SI/SINO) parsea entero y cada `FIN_MIENTRAS` vuelve al suyo #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
 - [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL2 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3
