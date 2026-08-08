@@ -5,7 +5,6 @@
 
 #define AI_PROMPT_MAX    512
 #define AI_RESPONSE_MAX  4096
-#define SCENE_PATH       "plugins/ide/scene.paed"
 
 // El modelo y el endpoint ya NO viven aca: los define la tabla de provider.c y
 // se eligen en runtime con 'ai use'. Tener una sola fuente de verdad evita que

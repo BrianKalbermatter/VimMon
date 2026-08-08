@@ -25,7 +25,8 @@ void manejar_señal(int señal) {
 
 static void cmd_help(void) {
     printf("\nComandos disponibles:\n");
-    printf("  engine   abre el motor gráfico con tu juego (game/game.c)\n");
+    printf("  engine   abre la ventana y dibuja plugins/ide/scene.paed\n");
+    printf("           (se recarga sola al guardar el archivo)\n");
     printf("  scene    carga y ejecuta plugins/ide/scene.paed (intérprete PAED)\n");
     printf("  ai       menú de proveedores de IA (llama/qwen/claude/kimi...)\n");
     printf("  ai use <id|nº>   cambia de proveedor\n");
@@ -46,7 +47,7 @@ static void cmd_scene(void) {
     interp_init(&scene);
 
     // Analisis primero: si hay un solo error, no se ejecuta nada.
-    if (paed_parse_file(SCENE_PATH, &prog) != 0) {
+    if (paed_parse_file(PAED_SCENE_PATH, &prog) != 0) {
         paed_print_errors(&prog);
         printf("[scene] ERROR — %d error(es), no se ejecuto\n", prog.error_count);
         return;

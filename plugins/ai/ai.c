@@ -28,7 +28,7 @@ static size_t curl_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata
 
 // ── Leer scene.paed completo ──────────────────────────────────
 static char *read_scene(void) {
-    FILE *f = fopen(SCENE_PATH, "r");
+    FILE *f = fopen(PAED_SCENE_PATH, "r");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);

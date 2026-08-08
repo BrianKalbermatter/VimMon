@@ -21,6 +21,11 @@
 // raiz del repo. Aca no hay nada que no este en los apuntes de la catedra.
 #define PAED_SYNTAX_PATH "paed/Frankly/data/sintaxis.json"
 
+// Archivo de estado de la escena: lo que el interprete ejecuta y lo que el
+// motor dibuja. Vive al lado del resto de las rutas de PAED, no en ai.h: la
+// escena es del IDE, la IA es solo uno de los que la escribe.
+#define PAED_SCENE_PATH "plugins/ide/scene.paed"
+
 // Libreria opcional que agrega procedimientos propios de VimMon (escena 3D).
 // NO es parte del lenguaje: se carga ADEMAS de sintaxis.json. Si el archivo no
 // existe, PAED sigue funcionando como AED puro.

@@ -57,14 +57,14 @@ static void ide_on_event(Event *e) {
 
     AIResponse *resp = (AIResponse *)e->data;
 
-    if (insertar_delta(SCENE_PATH, resp->paed_delta) != 0) {
-        fprintf(stderr, "[ide] no se pudo escribir el delta en %s\n", SCENE_PATH);
+    if (insertar_delta(PAED_SCENE_PATH, resp->paed_delta) != 0) {
+        fprintf(stderr, "[ide] no se pudo escribir el delta en %s\n", PAED_SCENE_PATH);
         return;
     }
 
     PAEDProgram prog;
-    if (paed_parse_file(SCENE_PATH, &prog) != 0) {
-        fprintf(stderr, "[ide] %s tiene errores, la escena NO se actualizo:\n", SCENE_PATH);
+    if (paed_parse_file(PAED_SCENE_PATH, &prog) != 0) {
+        fprintf(stderr, "[ide] %s tiene errores, la escena NO se actualizo:\n", PAED_SCENE_PATH);
         paed_print_errors(&prog);
         return;
     }
