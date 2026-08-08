@@ -3,7 +3,7 @@
 
 #include "parser.h"
 
-#define SCENE_MAX_ENTITIES 64
+#define SCENE_MAX_CUERPOS 64
 
 typedef struct { float x, y, z; } Vec3;
 
@@ -26,11 +26,11 @@ typedef struct {
     float giro_velocidad;
     float osc_amplitud;          // comportamiento OSCILAR
     float osc_frecuencia;
-} Entity;
+} Cuerpo;
 
 typedef struct {
-    Entity entities[SCENE_MAX_ENTITIES];
-    int    entity_count;
+    Cuerpo cuerpos[SCENE_MAX_CUERPOS];
+    int    cuerpo_count;
     char   bg_color[16];
     Vec3   cam_pos;
     Vec3   cam_target;

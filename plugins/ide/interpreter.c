@@ -29,23 +29,23 @@ static void runtime_error(const PAEDProgram *prog, const PAEDInstr *in, const ch
     fprintf(stderr, "%s:%d: error: %s\n", prog->path, in->line, msg);
 }
 
-static Entity *find_entity(SceneState *scene, const char *id) {
+static Cuerpo *find_cuerpo(SceneState *scene, const char *id) {
     if (!id) return NULL;
-    for (int i = 0; i < scene->entity_count; i++)
-        if (strcmp(scene->entities[i].id, id) == 0)
-            return &scene->entities[i];
+    for (int i = 0; i < scene->cuerpo_count; i++)
+        if (strcmp(scene->cuerpos[i].id, id) == 0)
+            return &scene->cuerpos[i];
     return NULL;
 }
 
-static Entity *find_or_create(SceneState *scene, const char *id, const char *kind) {
-    Entity *e = find_entity(scene, id);
+static Cuerpo *find_or_create(SceneState *scene, const char *id, const char *kind) {
+    Cuerpo *e = find_cuerpo(scene, id);
     if (e) {
         strncpy(e->kind, kind, sizeof(e->kind) - 1);
         return e;
     }
-    if (scene->entity_count >= SCENE_MAX_ENTITIES) return NULL;
+    if (scene->cuerpo_count >= SCENE_MAX_CUERPOS) return NULL;
 
-    e = &scene->entities[scene->entity_count++];
+    e = &scene->cuerpos[scene->cuerpo_count++];
     memset(e, 0, sizeof(*e));
     strncpy(e->id,   id,   sizeof(e->id)   - 1);
     strncpy(e->kind, kind, sizeof(e->kind) - 1);
@@ -58,7 +58,7 @@ static Entity *find_or_create(SceneState *scene, const char *id, const char *kin
 // nombre=<x> puede referirse a UNA entidad o a un GRUPO entero. Resolverlo en
 // un solo lugar evita que cada procedimiento invente su propia regla.
 typedef struct {
-    Entity *items[SCENE_MAX_ENTITIES];
+    Cuerpo *items[SCENE_MAX_CUERPOS];
     int     count;
     int     es_grupo;   // 1 si <x> nombro un grupo, 0 si nombro una pieza suelta
 } Objetivo;
@@ -71,16 +71,16 @@ static int resolver(SceneState *scene, const PAEDProgram *prog,
     obj->count = 0;
     obj->es_grupo = 0;
 
-    Entity *e = find_entity(scene, id);
+    Cuerpo *e = find_cuerpo(scene, id);
     if (e) {
         obj->items[obj->count++] = e;
         return 0;
     }
 
     if (id) {
-        for (int i = 0; i < scene->entity_count; i++)
-            if (strcmp(scene->entities[i].grupo, id) == 0)
-                obj->items[obj->count++] = &scene->entities[i];
+        for (int i = 0; i < scene->cuerpo_count; i++)
+            if (strcmp(scene->cuerpos[i].grupo, id) == 0)
+                obj->items[obj->count++] = &scene->cuerpos[i];
     }
 
     if (obj->count > 0) { obj->es_grupo = 1; return 0; }
@@ -163,7 +163,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
             runtime_error(prog, in, "falta nombre = <id>");
             return -1;
         }
-        Entity *e = find_or_create(scene, id, kind);
+        Cuerpo *e = find_or_create(scene, id, kind);
         if (!e) {
             runtime_error(prog, in, "la escena esta llena, no entran mas entidades");
             return -1;
@@ -222,7 +222,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
 
         Vec3 c = centro(&obj);
         for (int i = 0; i < obj.count; i++) {
-            Entity *e = obj.items[i];
+            Cuerpo *e = obj.items[i];
             // El grupo gira alrededor de su centro; una pieza suelta gira sobre si misma.
             if (obj.es_grupo) e->position = girar_alrededor(e->position, c, eje, grados);
             switch (eje) {
@@ -240,7 +240,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
 
         Vec3 c = centro(&obj);
         for (int i = 0; i < obj.count; i++) {
-            Entity *e = obj.items[i];
+            Cuerpo *e = obj.items[i];
             e->scale.x *= f;
             e->scale.y *= f;
             e->scale.z *= f;
@@ -325,8 +325,8 @@ void interp_print(const SceneState *scene) {
            scene->bg_color,
            scene->cam_pos.x, scene->cam_pos.y, scene->cam_pos.z);
 
-    for (int i = 0; i < scene->entity_count; i++) {
-        const Entity *e = &scene->entities[i];
+    for (int i = 0; i < scene->cuerpo_count; i++) {
+        const Cuerpo *e = &scene->cuerpos[i];
         printf("  [%s] %-10s pos=(%.1f,%.1f,%.1f)  color=%s",
                e->kind, e->id,
                e->position.x, e->position.y, e->position.z,
