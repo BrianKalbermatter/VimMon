@@ -90,6 +90,9 @@ static void gen_tmlanguage(cJSON *raiz, FILE *out) {
             } else if (strcmp(pat, "\".*\"") == 0) {
                 fprintf(out, "        \"%s\": { \"begin\": \"\\\"\", \"end\": \"\\\"\", \"name\": \"%s\" }",
                         nombre->valuestring, scope->valuestring);
+            } else if (strcmp(pat, "'.*'") == 0) {
+                fprintf(out, "        \"%s\": { \"begin\": \"'\", \"end\": \"'\", \"name\": \"%s\" }",
+                        nombre->valuestring, scope->valuestring);
             } else {
                 fprintf(out, "        \"%s\": { \"match\": \"\\\\b[0-9]+(\\\\.[0-9]+)?\\\\b\", \"name\": \"%s\" }",
                         nombre->valuestring, scope->valuestring);

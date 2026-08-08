@@ -53,8 +53,24 @@ cont_pal := 0;
 cont_pal := cont_pal + 1;
 ```
 
-Asignación `:=`. Comparación `=`, `==`, `<>`, `<`, `>`, `<=`, `>=`.
-Lógicos `Y`, `O`, `NO`. Aritméticos `+ - * /`.
+Corroborado contra `TEORIA_COMPLETA.txt:307-371`:
+
+| Grupo | Operadores |
+|---|---|
+| Asignación | `:=` |
+| Aritméticos | `+` `-` `*` `/` `MOD` `DIV` `**` |
+| Relacionales | `=` `<>` `<` `<=` `>` `>=` |
+| Lógicos | `Y` (`AND`) · `O` (`OR`) · `NO` |
+| Literales lógicos | `V` `F` |
+
+`MOD` y `DIV` son operadores **infijos** (`a MOD b`), no funciones.
+`**` es la potencia — **no** `^`.
+
+**`==` no existe en AED.** La igualdad es `=`. Tus `.paed` lo usan 91 veces:
+es un error de escritura arrastrado, no del lenguaje.
+
+Prioridad, de mayor a menor: `+ - NO` · `**` · `* / DIV MOD` · `+ -` ·
+`+` (concatenación) · `< <= > >=` · `= <>` · `Y` · `O`.
 
 ## 4. Estructuras de control
 
