@@ -10,6 +10,9 @@ typedef struct { float x, y, z; } Vec3;
 typedef struct {
     char  id[PAED_NAME_MAX];
     char  kind[PAED_NAME_MAX];   // cubo | esfera | plano | luz
+    char  grupo[PAED_NAME_MAX];  // "" = suelto. Varias piezas con el mismo
+                                 // grupo se mueven, rotan y escalan juntas:
+                                 // asi una "nave" es 8 cubos y UNA sola cosa.
     Vec3  position;
     Vec3  rotation;
     Vec3  scale;
