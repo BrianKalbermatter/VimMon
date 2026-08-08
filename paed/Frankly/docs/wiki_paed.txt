@@ -163,9 +163,9 @@ BLOQUE 6: Asignacion
       Es el operador mas usado de todo AED.
 
   PARSER
-      PARSEA, NO EJECUTA. El destino tiene que ser un identificador simple y
-      la expresion de la derecha se guarda CRUDA, sin analizar: todavia no
-      hay evaluador de expresiones.
+      ANDA. El destino tiene que ser un identificador simple, y la expresion
+      de la derecha se evalua de verdad con expr.c
+      (ver docs/evaluador_expresiones.md).
 
       LIMITACION CONOCIDA: no acepta acceso a campos de registro. 13
       asignaciones del corpus fallan solo por esto:
@@ -204,7 +204,18 @@ BLOQUE 7: Operadores
       [CORROBORADO] Tabla textual en TEORIA_COMPLETA.txt:307-371.
 
   PARSER
-      NO. No hay evaluacion de expresiones.
+      ANDA. plugins/ide/expr.c evalua con descenso recursivo, y la prioridad
+      de arriba es el ORDEN EN QUE LAS FUNCIONES SE LLAMAN, no una tabla de
+      numeros. Los tres ejemplos de la teoria dan lo que la teoria dice:
+          (A-2) < (B-4)      -> F    (con A=4, B=3)
+          'A' < 'K'          -> V
+          'MARIA' < 'JUAN'   -> F
+      El cortocircuito de Y y O tambien esta, porque la teoria lo exige
+      textualmente. Ver docs/evaluador_expresiones.md.
+
+      OJO CON EL MENOS UNARIO: por esta tabla, -2 ** 2 da 4 y no -4, porque
+      los unarios estan ARRIBA de la potencia. En casi todos los lenguajes
+      da -4. Se siguio la tabla de la catedra; queda para confirmar.
 
   RESUELTO EN LA COMPARACION
       - FALTABAN '<' y '>' solos. AGREGADOS.
@@ -241,7 +252,7 @@ BLOQUE 8: Condicionales
       la copie de como la escribis vos. No hay gramatica formal definida.
 
   PARSER
-      PARSEA, NO EJECUTA. Hay pila de bloques: SI/SINO/FIN_SI se anidan con
+      ANDA. Hay pila de bloques: SI/SINO/FIN_SI se anidan con
       MIENTRAS y entre si, y las cabeceras ya NO exigen ';'.
 
       Los parentesis quedaron OPCIONALES, porque el corpus tiene las dos
@@ -307,7 +318,7 @@ BLOQUE 10: Ciclos
       REPETIR 8 · HASTA 7. La forma del MIENTRAS sale de tus ejercicios.
 
   PARSER
-      MIENTRAS y PARA: PARSEAN, NO EJECUTAN. Hay pila de bloques: se anidan
+      MIENTRAS y PARA: ANDAN. Se parsean Y se ejecutan. Hay pila de bloques: se anidan
       entre si y con SI, y las cabeceras ya no exigen ';'. La condicion del
       MIENTRAS y los limites del PARA se guardan crudos: falta el evaluador
       de expresiones.

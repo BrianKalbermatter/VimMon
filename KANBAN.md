@@ -9,7 +9,12 @@ kanban-plugin: board
 - [ ] Parser PAED: `pori.vx := ...` — acceso a campos de registro. 13 asignaciones del corpus fallan solo por esto (`es_identificador` no acepta el punto) #fase2
 - [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir antes de implementar #fase2
 - [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
-- [ ] Interprete PAED: seguir los saltos de `SI`/`MIENTRAS` (el parser ya los calculó). Necesita evaluador de expresiones y tabla de variables #fase2
+- [ ] Evaluador: guardar un árbol de la expresión en vez de re-parsear el texto en CADA vuelta del bucle. Hoy es simple y correcto, pero un `MIENTRAS` largo paga el costo en cada iteración #fase2
+- [ ] Evaluador: usar el `AMBIENTE` para chequear tipos. Hoy se parsea pero no se usa: asignarle un texto a algo declarado `ENTERO` no da error #fase2
+- [ ] Evaluador: arreglos (`A[i]`) y campos de registro (`pori.vx`) en expresiones y como destino de asignación #fase2
+- [ ] Evaluador: `NFDS`/`FDS` necesitan SECUENCIAS, que el intérprete no tiene. Hoy avisan en vez de inventar un valor #fase2
+- [ ] Avisar cuando se usa `==`: ya está resuelto que NO existe en AED (`TEORIA_COMPLETA.txt:324` define `=`, y la wiki lo marca como error de escritura arrastrado, 91 usos). Hoy se acepta callado para no romper los archivos; debería avisar sin frenar la ejecución #fase2
+- [ ] Confirmar contra la cátedra: `-2 ** 2` da 4 porque la tabla de prioridad pone los unarios ARRIBA de la potencia. En casi todos los lenguajes da -4. ¿Es lo que quiere AED? #fase2
 - [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
 - [ ] Parser PAED: nombre de `ACCION` con espacios (`ACCION Ejercicio de Parcial ES`) #fase2
 - [ ] Interprete PAED: implementar `ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` (hoy parsean pero no ejecutan) #fase2
@@ -89,6 +94,13 @@ kanban-plugin: board
 - [x] Asignación `:=` con destino simple: se parsea y se guarda la expresión cruda (todavía sin evaluador) #fase2
 - [x] Errores de bloque que citan la línea de APERTURA: "FIN_SI cierra un MIENTRAS abierto en la linea 3", "falta FIN_MIENTRAS: el MIENTRAS de la linea 3 quedo abierto" #fase2
 - [x] Test: `ejercicio2_1_11.paed` (MIENTRAS > MIENTRAS > SI/SINO) parsea entero y cada `FIN_MIENTRAS` vuelve al suyo #fase2
+- [x] `plugins/ide/expr.{h,c}` — evaluador de expresiones por descenso recursivo. La prioridad NO es una tabla de números: es el orden en que las funciones se llaman entre sí (`TEORIA_COMPLETA.txt:361-371`) #fase2
+- [x] Cortocircuito en `Y` y `O`, que la teoría exige textualmente ("En AND, si el primer operando es Falso, el segundo no se evalúa"). Cambia el comportamiento, no solo la velocidad #fase2
+- [x] Tabla de variables (`Entorno`) sin malloc, y `ESCRIBIR` que EVALÚA sus argumentos: antes `ESCRIBIR(cont_pal)` imprimía el nombre en vez del valor #fase2
+- [x] `interp_exec` sigue los saltos con un índice en vez de recorrer el array: es un contador de programa. `SI`/`SINO`/`MIENTRAS`/`PARA` se ejecutan de verdad #fase2
+- [x] Guarda de bucle infinito (2M pasos): el intérprete corre DENTRO del game loop, así que un programa colgado colgaba la ventana entera #fase2
+- [x] Bug: `parse_instruction` buscaba el `=` de `clave = valor` con `strchr`, sin respetar comillas, y `ESCRIBIR("a = b")` quedaba destrozado #fase2
+- [x] Test: programa con `PARA`, `PARA` en reversa, `MIENTRAS` acumulador, `SI/SINO` y `PARA` anidado corre entero y da los valores correctos #fase2
 - [x] `PARA <var> := <desde> HASTA <hasta>[; <paso>] HACER` / `FIN_PARA`. El paso es OPCIONAL y por defecto 1, corroborado en `TEORIA_COMPLETA.txt:565-571` ("Si el incremento es distinto de 1, debe indicarse"). En reversa se usa paso negativo, no una palabra tipo `downto`. `recta.paed:47` decía `a` en vez de `HASTA` y se corrigió #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
