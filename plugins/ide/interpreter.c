@@ -1,4 +1,5 @@
 #include "interpreter.h"
+#include "expr.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,10 @@
 
 // El parser ya valido nombres, tipos y obligatorios contra sintaxis.json.
 // Aca solo queda ejecutar: buscar la entidad y aplicar el efecto.
+
+// Las variables del programa. A nivel de archivo y no dentro de interp_exec
+// porque ESCRIBIR, que vive en exec_instr, tambien necesita leerlas.
+static Entorno env;
 
 static Vec3 parse_vec3(const char *s) {
     Vec3 v = {0, 0, 0};
@@ -295,10 +300,23 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         for (int i = 0; i < in->arg_count; i++) {
             const char *v = in->args[i].val;
             size_t n = strlen(v);
-            if (n >= 2 && v[0] == '"' && v[n - 1] == '"')
+
+            if (n >= 2 && v[0] == '"' && v[n - 1] == '"') {
                 printf("%.*s", (int)(n - 2), v + 1);   // texto literal, sin comillas
-            else
-                printf("%s", v);
+                continue;
+            }
+
+            // Lo que no es literal se EVALUA: antes ESCRIBIR(cont_pal)
+            // imprimia "cont_pal", el nombre, en vez del valor.
+            Valor val;
+            char  buf[PAED_VAL_MAX];
+            if (expr_eval(v, &env, &val) == 0) {
+                valor_a_texto(&val, buf, sizeof(buf));
+                printf("%s", buf);
+            } else {
+                runtime_error(prog, in, env.error);
+                return -1;
+            }
         }
         printf("\n");
         return 0;
@@ -313,26 +331,149 @@ void interp_init(SceneState *scene) {
     strncpy(scene->bg_color, "#000000", sizeof(scene->bg_color) - 1);
 }
 
-int interp_exec(SceneState *scene, const PAEDProgram *prog) {
-    int fallos       = 0;
-    int sin_ejecutar = 0;
+// Un programa mal escrito puede quedar dando vueltas para siempre, y el
+// interprete corre DENTRO del game loop: colgarlo cuelga la ventana entera.
+// Se corta y se avisa, que es infinitamente mejor que tener que matar el
+// proceso sin saber por que.
+#define PAED_MAX_PASOS 2000000
 
-    for (int i = 0; i < prog->instr_count; i++) {
-        const PAEDInstr *in = &prog->instrs[i];
-
-        // El parser ya entiende SI/MIENTRAS/:= y les calculo los saltos, pero
-        // seguirlos necesita evaluar condiciones, y no hay evaluador de
-        // expresiones todavia. Se cuentan y se avisa UNA vez, en vez de escupir
-        // un error por linea que no dice nada nuevo.
-        if (in->kind != PAED_LLAMADA) { sin_ejecutar++; continue; }
-
-        if (exec_instr(scene, prog, in) != 0) fallos++;
+// ¿La condicion de un SI/MIENTRAS es verdadera? Deja el motivo en el entorno
+// si no se pudo evaluar.
+static int condicion(Entorno *env, const PAEDProgram *prog, const PAEDInstr *in, int *ok) {
+    Valor v;
+    if (expr_eval(in->cond, env, &v) != 0) {
+        runtime_error(prog, in, env->error);
+        *ok = 0;
+        return 0;
     }
+    *ok = 1;
+    return valor_verdadero(&v);
+}
 
-    if (sin_ejecutar > 0)
-        printf("[paed] %d instruccion(es) de control (SI/MIENTRAS/:=) parsearon bien "
-               "pero todavia no se ejecutan: falta el evaluador de expresiones\n",
-               sin_ejecutar);
+int interp_exec(SceneState *scene, const PAEDProgram *prog) {
+    env_init(&env);
+
+    // Un PARA tiene que inicializar su variable la PRIMERA vez que se entra,
+    // pero no cada vuelta. Como el FIN_PARA salta de vuelta al PARA, hace
+    // falta recordar cual ya arranco. Es por instruccion y no una sola bandera
+    // para que dos PARA anidados no se pisen.
+    static char para_activo[PAED_MAX_INSTRS];
+    memset(para_activo, 0, sizeof(para_activo));
+
+    int fallos = 0;
+    int pasos  = 0;
+    int i      = 0;
+
+    // Se sigue el hilo con un indice en vez de recorrer el array de punta a
+    // punta: el flujo ya no es lineal. Esto es, literalmente, un contador de
+    // programa.
+    while (i >= 0 && i < prog->instr_count) {
+        if (++pasos > PAED_MAX_PASOS) {
+            fprintf(stderr, "%s: error: el programa paso los %d pasos sin terminar "
+                            "(bucle infinito?)\n", prog->path, PAED_MAX_PASOS);
+            fallos++;
+            break;
+        }
+
+        const PAEDInstr *in = &prog->instrs[i];
+        int ok = 1;
+
+        switch (in->kind) {
+            case PAED_LLAMADA:
+                if (exec_instr(scene, prog, in) != 0) fallos++;
+                i++;
+                break;
+
+            case PAED_ASIGNA: {
+                Valor v;
+                if (expr_eval(in->cond, &env, &v) != 0) {
+                    runtime_error(prog, in, env.error);
+                    fallos++;
+                } else if (env_set(&env, in->proc, v) != 0) {
+                    runtime_error(prog, in, "no entran mas variables");
+                    fallos++;
+                }
+                i++;
+                break;
+            }
+
+            case PAED_SI:
+                // Verdadera: se sigue derecho al cuerpo. Falsa: al SINO, o a
+                // la instruccion de despues del FIN_SI.
+                i = condicion(&env, prog, in, &ok) ? i + 1 : in->salto;
+                if (!ok) { fallos++; i = in->salto; }
+                break;
+
+            case PAED_SINO:
+                // Llegar aca EJECUTANDO significa que se termino la rama
+                // verdadera, asi que hay que saltearse la rama del SINO.
+                i = in->salto;
+                break;
+
+            case PAED_FIN_SI:
+                i++;
+                break;
+
+            case PAED_MIENTRAS:
+                i = condicion(&env, prog, in, &ok) ? i + 1 : in->salto;
+                if (!ok) { fallos++; i = in->salto; }
+                break;
+
+            case PAED_PARA: {
+                Valor desde, hasta, paso;
+                const char *sd = paed_get_arg(in, "desde");
+                const char *sh = paed_get_arg(in, "hasta");
+                const char *sp = paed_get_arg(in, "paso");
+
+                if (expr_eval(sd ? sd : "0", &env, &desde) != 0 ||
+                    expr_eval(sh ? sh : "0", &env, &hasta) != 0 ||
+                    expr_eval(sp ? sp : "1", &env, &paso)  != 0) {
+                    runtime_error(prog, in, env.error);
+                    fallos++;
+                    i = in->salto;
+                    break;
+                }
+
+                if (!para_activo[i]) {
+                    para_activo[i] = 1;
+                    env_set(&env, in->proc, desde);
+                }
+
+                Valor *v = env_buscar(&env, in->proc);
+                // Con paso positivo se corta al pasarse del final; con paso
+                // negativo, al bajar de el. Sin esto, un PARA en reversa
+                // nunca terminaria.
+                int sigue = (paso.num >= 0) ? (v->num <= hasta.num)
+                                            : (v->num >= hasta.num);
+                if (sigue) {
+                    i++;
+                } else {
+                    // Se apaga la marca: si este PARA esta adentro de otro
+                    // bucle, la proxima vuelta tiene que volver a arrancar.
+                    para_activo[i] = 0;
+                    i = in->salto;
+                }
+                break;
+            }
+
+            case PAED_FIN_PARA: {
+                const PAEDInstr *cab = &prog->instrs[in->salto];
+                Valor *v = env_buscar(&env, cab->proc);
+                Valor  paso;
+                const char *sp = paed_get_arg(cab, "paso");
+                if (v && expr_eval(sp ? sp : "1", &env, &paso) == 0)
+                    v->num += paso.num;
+                i = in->salto;   // volver al PARA a re-chequear
+                break;
+            }
+
+            case PAED_FIN_MIENTRAS:
+                i = in->salto;   // volver a evaluar la condicion
+                break;
+        }
+
+        if (!ok && fallos > PAED_MAX_ERRORS) break;
+    }
 
     return fallos == 0 ? 0 : -1;
 }
