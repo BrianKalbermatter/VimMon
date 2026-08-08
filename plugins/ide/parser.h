@@ -16,6 +16,10 @@
 #define PAED_MAX_ERRORS    32
 #define PAED_MSG_MAX      192
 #define PAED_PATH_MAX     256
+#define PAED_COND_MAX     192
+// Cuantos bloques se pueden anidar. 32 niveles de SI dentro de MIENTRAS dentro
+// de SI es mucho mas de lo que aguanta leer un humano.
+#define PAED_MAX_BLOQUES   32
 
 // Fuente unica de verdad del LENGUAJE (pseudocodigo AED puro), relativa a la
 // raiz del repo. Aca no hay nada que no este en los apuntes de la catedra.
@@ -45,12 +49,39 @@ typedef struct {
     int  line;
 } PAEDDecl;
 
-// Instruccion del bloque PROCESO: PROCEDIMIENTO(clave = valor, ...);
+// Que clase de instruccion es. Antes toda linea del PROCESO era una llamada;
+// con los bloques hay lineas que no llaman a nada (SINO, FIN_SI) y otras que
+// llevan una condicion en vez de argumentos.
+typedef enum {
+    PAED_LLAMADA = 0,     // PROCEDIMIENTO(clave = valor, ...);
+    PAED_ASIGNA,          // destino := expresion;
+    PAED_SI,              // SI (condicion) ENTONCES
+    PAED_SINO,            // SINO
+    PAED_FIN_SI,          // FIN_SI
+    PAED_MIENTRAS,        // MIENTRAS (condicion) HACER
+    PAED_FIN_MIENTRAS,    // FIN_MIENTRAS
+} PAEDKind;
+
+// Instruccion del bloque PROCESO.
 typedef struct {
-    char    proc[PAED_NAME_MAX];
+    PAEDKind kind;
+    char    proc[PAED_NAME_MAX];   // LLAMADA: nombre del proc. ASIGNA: destino.
     PAEDArg args[PAED_MAX_ARGS];
     int     arg_count;
     int     line;
+
+    // Condicion de SI/MIENTRAS, o la expresion de la derecha de un ':='.
+    // Se guarda CRUDA: todavia no hay evaluador de expresiones.
+    char    cond[PAED_COND_MAX];
+
+    // A donde salta el flujo. Lo completa el parser cuando CIERRA el bloque,
+    // porque al abrirlo todavia no sabe donde termina (esto se llama
+    // "backpatching"). Vale -1 en las instrucciones que no saltan.
+    //   SI            -> primera instruccion del SINO, o la de despues del FIN_SI
+    //   SINO          -> la de despues del FIN_SI
+    //   MIENTRAS      -> la de despues del FIN_MIENTRAS (cuando la condicion es falsa)
+    //   FIN_MIENTRAS  -> el MIENTRAS de arriba (para volver a evaluar)
+    int     salto;
 } PAEDInstr;
 
 typedef struct {

@@ -314,9 +314,26 @@ void interp_init(SceneState *scene) {
 }
 
 int interp_exec(SceneState *scene, const PAEDProgram *prog) {
-    int fallos = 0;
-    for (int i = 0; i < prog->instr_count; i++)
-        if (exec_instr(scene, prog, &prog->instrs[i]) != 0) fallos++;
+    int fallos       = 0;
+    int sin_ejecutar = 0;
+
+    for (int i = 0; i < prog->instr_count; i++) {
+        const PAEDInstr *in = &prog->instrs[i];
+
+        // El parser ya entiende SI/MIENTRAS/:= y les calculo los saltos, pero
+        // seguirlos necesita evaluar condiciones, y no hay evaluador de
+        // expresiones todavia. Se cuentan y se avisa UNA vez, en vez de escupir
+        // un error por linea que no dice nada nuevo.
+        if (in->kind != PAED_LLAMADA) { sin_ejecutar++; continue; }
+
+        if (exec_instr(scene, prog, in) != 0) fallos++;
+    }
+
+    if (sin_ejecutar > 0)
+        printf("[paed] %d instruccion(es) de control (SI/MIENTRAS/:=) parsearon bien "
+               "pero todavia no se ejecutan: falta el evaluador de expresiones\n",
+               sin_ejecutar);
+
     return fallos == 0 ? 0 : -1;
 }
 
