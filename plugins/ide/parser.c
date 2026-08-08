@@ -227,6 +227,20 @@ static void parse_asignacion(PAEDProgram *p, char *linea, int lineno, char *op) 
     strncpy(in->cond, expr,    PAED_COND_MAX - 1);
 }
 
+// Busca el '=' que separa clave de valor, SALTEANDO lo que este entre
+// comillas. Con strchr pelado, ESCRIBIR("a = b") se partia por el '=' de
+// adentro del texto y el literal quedaba destrozado.
+static char *igual_separador(char *s) {
+    int en_texto = 0;
+    char comilla = 0;
+    for (char *c = s; *c; c++) {
+        if (!en_texto && (*c == '"' || *c == '\'')) { en_texto = 1; comilla = *c; continue; }
+        if (en_texto) { if (*c == comilla) en_texto = 0; continue; }
+        if (*c == '=') return c;
+    }
+    return NULL;
+}
+
 static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
     // 1. Toda instruccion termina en ';'
     size_t len = strlen(linea);
@@ -302,7 +316,7 @@ static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
     int   hubo_error = 0;
 
     for (int i = 0; i < n_partes; i++) {
-        char *igual = strchr(partes[i], '=');
+        char *igual = igual_separador(partes[i]);
 
         if (!igual) {
             // Nada se ignora en silencio: o es variadico, o es un error.
