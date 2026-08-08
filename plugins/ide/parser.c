@@ -401,7 +401,25 @@ typedef struct {
 } Pila;
 
 static const char *nombre_kind(PAEDKind k) {
-    return k == PAED_SI ? "SI" : "MIENTRAS";
+    switch (k) {
+        case PAED_SI:       return "SI";
+        case PAED_MIENTRAS: return "MIENTRAS";
+        case PAED_PARA:     return "PARA";
+        default:            return "?";
+    }
+}
+
+// Busca una palabra clave SUELTA dentro de una linea. "Suelta" = sin letras ni
+// digitos pegados a los costados, para que un identificador como 'hastaFin' no
+// se confunda con la palabra HASTA.
+static char *palabra_en(char *s, const char *kw) {
+    size_t n = strlen(kw);
+    for (char *c = s; (c = strstr(c, kw)) != NULL; c += n) {
+        int izq = (c == s) || (!isalnum((unsigned char)c[-1]) && c[-1] != '_');
+        int der = !isalnum((unsigned char)c[n]) && c[n] != '_';
+        if (izq && der) return c;
+    }
+    return NULL;
 }
 
 // Saca la palabra clave del principio y el terminador del final.
@@ -462,6 +480,58 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
         return 1;
     }
 
+    // ── PARA <var> := <desde> HASTA <hasta> HACER ──
+    // Los limites se guardan en args como desde/hasta, asi el interprete los
+    // lee con paed_get_arg igual que cualquier otro argumento.
+    if (empieza_con(linea, "PARA")) {
+        char *cuerpo = cuerpo_cabecera(linea, "PARA", "HACER");
+        if (!cuerpo) {
+            add_error(p, lineno, "se esperaba: PARA <var> := <desde> HASTA <hasta> HACER");
+            return 1;
+        }
+
+        char *asig = strstr(cuerpo, ":=");
+        if (!asig) {
+            add_error(p, lineno, "al PARA le falta ':=' con el valor inicial");
+            return 1;
+        }
+        *asig = '\0';
+        char *var   = trim(cuerpo);
+        char *resto = trim(asig + 2);
+
+        char *h = palabra_en(resto, "HASTA");
+        if (!h) {
+            add_error(p, lineno, "al PARA le falta HASTA con el valor final");
+            return 1;
+        }
+        *h = '\0';
+        char *desde = trim(resto);
+        char *hasta = trim(h + 5);
+
+        if (!es_identificador(var)) {
+            add_error(p, lineno, "variable de PARA invalida: '%s'", var);
+            return 1;
+        }
+        if (!*desde) { add_error(p, lineno, "al PARA le falta el valor inicial"); return 1; }
+        if (!*hasta) { add_error(p, lineno, "al PARA le falta el valor final");   return 1; }
+
+        PAEDInstr *in = nueva_instr(p, PAED_PARA, lineno);
+        if (!in) return 1;
+        strncpy(in->proc, var, PAED_NAME_MAX - 1);
+        strncpy(in->args[0].key, "desde", PAED_KEY_MAX - 1);
+        strncpy(in->args[0].val, desde,   PAED_VAL_MAX - 1);
+        strncpy(in->args[1].key, "hasta", PAED_KEY_MAX - 1);
+        strncpy(in->args[1].val, hasta,   PAED_VAL_MAX - 1);
+        in->arg_count = 2;
+
+        if (pila->tope >= PAED_MAX_BLOQUES) {
+            add_error(p, lineno, "demasiados bloques anidados (maximo %d)", PAED_MAX_BLOQUES);
+            return 1;
+        }
+        pila->items[pila->tope++] = (Abierto){ PAED_PARA, lineno, p->instr_count - 1, -1 };
+        return 1;
+    }
+
     // ── SINO ──
     if (strcmp(linea, "SINO") == 0) {
         if (pila->tope == 0 || pila->items[pila->tope - 1].kind != PAED_SI) {
@@ -507,21 +577,30 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
         return 1;
     }
 
-    // ── FIN_MIENTRAS ──
-    if (strcmp(linea, "FIN_MIENTRAS") == 0) {
-        if (pila->tope == 0) { add_error(p, lineno, "FIN_MIENTRAS sin un MIENTRAS abierto"); return 1; }
-        Abierto *a = &pila->items[pila->tope - 1];
-        if (a->kind != PAED_MIENTRAS) {
-            add_error(p, lineno, "FIN_MIENTRAS cierra un %s abierto en la linea %d",
-                      nombre_kind(a->kind), a->line);
+    // ── FIN_MIENTRAS y FIN_PARA ──
+    // Los dos cierran un bucle y hacen exactamente lo mismo con los saltos, asi
+    // que comparten el cierre en vez de tener dos copias que se desincronicen.
+    if (strcmp(linea, "FIN_MIENTRAS") == 0 || strcmp(linea, "FIN_PARA") == 0) {
+        int      es_para = linea[4] == 'P';
+        PAEDKind abre    = es_para ? PAED_PARA     : PAED_MIENTRAS;
+        PAEDKind cierra  = es_para ? PAED_FIN_PARA : PAED_FIN_MIENTRAS;
+
+        if (pila->tope == 0) {
+            add_error(p, lineno, "%s sin un %s abierto", linea, nombre_kind(abre));
             return 1;
         }
-        PAEDInstr *in = nueva_instr(p, PAED_FIN_MIENTRAS, lineno);
+        Abierto *a = &pila->items[pila->tope - 1];
+        if (a->kind != abre) {
+            add_error(p, lineno, "%s cierra un %s abierto en la linea %d",
+                      linea, nombre_kind(a->kind), a->line);
+            return 1;
+        }
+        PAEDInstr *in = nueva_instr(p, cierra, lineno);
         if (!in) return 1;
         int idx = p->instr_count - 1;
 
-        in->salto                 = a->instr;  // volver a evaluar la condicion
-        p->instrs[a->instr].salto = idx + 1;   // condicion falsa -> salir del bucle
+        in->salto                 = a->instr;  // volver al principio del bucle
+        p->instrs[a->instr].salto = idx + 1;   // terminado -> salir del bucle
 
         pila->tope--;
         return 1;

@@ -290,7 +290,7 @@ BLOQUE 10: Ciclos
           ...
       FIN_MIENTRAS
 
-      PARA ... HACER
+      PARA <var> := <desde> HASTA <hasta> HACER
           ...
       FIN_PARA
 
@@ -303,26 +303,32 @@ BLOQUE 10: Ciclos
       REPETIR 8 · HASTA 7. La forma del MIENTRAS sale de tus ejercicios.
 
   PARSER
-      MIENTRAS: PARSEA, NO EJECUTA. Hay pila de bloques, se anida consigo
-      mismo y con SI, y la cabecera ya no exige ';'. La condicion se guarda
-      cruda: falta el evaluador de expresiones.
+      MIENTRAS y PARA: PARSEAN, NO EJECUTAN. Hay pila de bloques: se anidan
+      entre si y con SI, y las cabeceras ya no exigen ';'. La condicion del
+      MIENTRAS y los limites del PARA se guardan crudos: falta el evaluador
+      de expresiones.
 
-      PARA, REPETIR y HASTA: NO IMPLEMENTADOS, A PROPOSITO.
+      La forma del PARA la CONFIRMO EL USUARIO (2026-08-08):
+          PARA coord := -4 HASTA 4 HACER
+      El separador es HASTA, no "a". recta.paed:47 tenia "a" y se corrigio.
+      El valor inicial va con ':=' y no con DESDE; los comentarios de
+      RevisionParcial2025.paed que dicen "PARA i DESDE 1 HASTA 10 HACER"
+      quedaron desactualizados.
+
+      REPETIR/HASTA: NO IMPLEMENTADO, A PROPOSITO.
 
       Ojo con los numeros de arriba: cuentan la PALABRA en cualquier lugar,
       incluidos comentarios y prosa. Contando solo CABECERAS DE BUCLE reales
       al principio de una linea en los *.paed, el corpus tiene:
-          PARA      1 cabecera:  "PARA coord := -4 a 4 HACER"
+          PARA      1 cabecera
           MIENTRAS  5 cabeceras, todas con parentesis
           REPETIR   0 cabeceras
-      Con una sola muestra de PARA y ninguna de REPETIR no alcanza para
-      fijar la gramatica, y se decidio no inventarla.
+      Por eso el PARA hubo que preguntarlo en vez de deducirlo, y por eso el
+      REPETIR sigue sin implementarse.
 
   A COMPARAR
-      - La cabecera completa del PARA. Frankly tiene "PARA ... HACER" con
-        puntos suspensivos porque NO SE cual es la forma exacta.
-      - La unica muestra usa la palabra "a" como separador de rango
-        ("-4 a 4"). Existe un PASO/incremento?
+      - El PARA tiene PASO/incremento, o siempre avanza de a 1?
+      - El PARA puede ir en reversa (desde mayor que hasta)?
         ESTE BLOQUE ESTA INCOMPLETO A PROPOSITO. Hay que sacarlo de la wiki.
       - El REPETIR/HASTA lleva ';' al final del HASTA?
 

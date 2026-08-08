@@ -60,12 +60,16 @@ typedef enum {
     PAED_FIN_SI,          // FIN_SI
     PAED_MIENTRAS,        // MIENTRAS (condicion) HACER
     PAED_FIN_MIENTRAS,    // FIN_MIENTRAS
+    PAED_PARA,            // PARA <var> := <desde> HASTA <hasta> HACER
+    PAED_FIN_PARA,        // FIN_PARA
 } PAEDKind;
 
 // Instruccion del bloque PROCESO.
 typedef struct {
     PAEDKind kind;
-    char    proc[PAED_NAME_MAX];   // LLAMADA: nombre del proc. ASIGNA: destino.
+    // LLAMADA: nombre del proc. ASIGNA: destino. PARA: la variable del bucle,
+    // con los limites en args como desde/hasta.
+    char    proc[PAED_NAME_MAX];
     PAEDArg args[PAED_MAX_ARGS];
     int     arg_count;
     int     line;

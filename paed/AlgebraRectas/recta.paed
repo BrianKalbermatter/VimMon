@@ -44,7 +44,7 @@ ACCION calcular_recta ES
         ESCRIBIR(t_eje_y);
 
         // --- TICKS Y LABELS: de -4 a 4 ---
-        PARA coord := -4 a 4 HACER
+        PARA coord := -4 HASTA 4 HACER
             ESCRIBIR(t_tick_x,esp,coord);
             ESCRIBIR(t_tick_y,esp,coord);
             SI coord <> 0 ENTONCES
