@@ -14,7 +14,8 @@
         { "nombre": "nombre",    "tipo": "ID",   "requerido": true },
         { "nombre": "posicion",  "tipo": "VEC3" },
         { "nombre": "color",     "tipo": "HEX"  },
-        { "nombre": "tamano",    "tipo": "VEC3", "alias": "tamaño" }
+        { "nombre": "tamano",    "tipo": "VEC3", "alias": "tamaño" },
+        { "nombre": "grupo",     "tipo": "ID"   }
       ]
     },
     {
@@ -25,7 +26,8 @@
         { "nombre": "nombre",    "tipo": "ID",   "requerido": true },
         { "nombre": "posicion",  "tipo": "VEC3" },
         { "nombre": "color",     "tipo": "HEX"  },
-        { "nombre": "radio",     "tipo": "NUM"  }
+        { "nombre": "radio",     "tipo": "NUM"  },
+        { "nombre": "grupo",     "tipo": "ID"   }
       ]
     },
     {
@@ -36,7 +38,8 @@
         { "nombre": "nombre",    "tipo": "ID",   "requerido": true },
         { "nombre": "posicion",  "tipo": "VEC3" },
         { "nombre": "color",     "tipo": "HEX"  },
-        { "nombre": "tamano",    "tipo": "VEC3", "alias": "tamaño" }
+        { "nombre": "tamano",    "tipo": "VEC3", "alias": "tamaño" },
+        { "nombre": "grupo",     "tipo": "ID"   }
       ]
     },
     {
@@ -47,7 +50,8 @@
         { "nombre": "nombre",     "tipo": "ID",   "requerido": true },
         { "nombre": "posicion",   "tipo": "VEC3" },
         { "nombre": "tipo",       "tipo": "ID"   },
-        { "nombre": "intensidad", "tipo": "NUM"  }
+        { "nombre": "intensidad", "tipo": "NUM"  },
+        { "nombre": "grupo",      "tipo": "ID"   }
       ]
     },
     {

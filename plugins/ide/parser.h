@@ -4,7 +4,7 @@
 // Parser de PAED (pseudocodigo). Un solo lenguaje, una sola gramatica.
 //
 // La definicion formal del lenguaje NO vive en este header: vive en
-// PseudoGames/Frankly/data/sintaxis.json y se carga en runtime con cJSON.
+// paed/Frankly/data/sintaxis.json y se carga en runtime con cJSON.
 // Si agregas un procedimiento o un parametro, se agrega ahi y nada mas.
 
 #define PAED_NAME_MAX      64
@@ -19,12 +19,12 @@
 
 // Fuente unica de verdad del LENGUAJE (pseudocodigo AED puro), relativa a la
 // raiz del repo. Aca no hay nada que no este en los apuntes de la catedra.
-#define PAED_SYNTAX_PATH "PseudoGames/Frankly/data/sintaxis.json"
+#define PAED_SYNTAX_PATH "paed/Frankly/data/sintaxis.json"
 
 // Libreria opcional que agrega procedimientos propios de VimMon (escena 3D).
 // NO es parte del lenguaje: se carga ADEMAS de sintaxis.json. Si el archivo no
 // existe, PAED sigue funcionando como AED puro.
-#define PAED_ESCENA_PATH "PseudoGames/Frankly/data/escena.json"
+#define PAED_ESCENA_PATH "paed/Frankly/data/escena.json"
 
 // Argumento con nombre: clave = valor.
 // En procedimientos variadicos (ESCRIBIR) key queda vacio y solo vale val.

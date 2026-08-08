@@ -1,5 +1,5 @@
 // Estado de la escena. El plugin ide inserta los deltas de la IA
-// justo antes de FIN_ACCION. Sintaxis: PseudoGames/Frankly/docs/PAED.md
+// justo antes de FIN_ACCION. Sintaxis: paed/Frankly/docs/PAED.md
 ACCION escena ES
     AMBIENTE
         cubo1: CUBO;

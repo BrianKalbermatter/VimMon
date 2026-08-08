@@ -1,6 +1,6 @@
-# Ignorar todo excepto PseudoGames
+# Ignorar todo excepto lo listado abajo
 /*
-!/PseudoGames/
+!/paed/
 !/.gitignore
 !/LICENSE
 !/.github/
@@ -23,13 +23,13 @@
 !/hot-Reload/
 
 # Build output y binarios
-PseudoGames/build_o/
-PseudoGames/aed
-PseudoGames/PseudoGames.exe
-PseudoGames/Frankly/paed
-PseudoGames/screenPJ/screenPJ
-PseudoGames/learBash/*.out
-PseudoGames/lib/
+paed/build_o/
+paed/aed
+paed/PseudoGames.exe
+paed/Frankly/paed
+paed/screenPJ/screenPJ
+paed/learBash/*.out
+paed/lib/
 
 # Aprendizaje y contenido personal
 !/documentacion/
@@ -51,4 +51,4 @@ ProyectoVimMon/.obsidian/
 bus/.atl/
 
 # Binario temporal del generador de sintaxis PAED
-PseudoGames/Frankly/tools/gen_sintaxis
+paed/Frankly/tools/gen_sintaxis

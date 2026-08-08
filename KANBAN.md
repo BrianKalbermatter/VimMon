@@ -25,7 +25,7 @@ kanban-plugin: board
 - [ ] `plugins/monitor/monitor.c` — leer /proc/meminfo y /proc/stat #fase4
 - [ ] Mostrar RAM, CPU, plugins activos en un panel #fase4
 - [ ] Registrar en el bus (EVT_MONITOR_TICK) #fase4
-- [ ] Mover/adaptar PseudoGames como plugin en `plugins/ide/` #fase5
+- [ ] Mover/adaptar `paed/` como plugin en `plugins/ide/` #fase5
 - [ ] Conectar al bus: teclado, render, AI #fase5
 - [ ] Editor PAED integrado al split screen #fase5
 - [ ] `kernel/boot/entry.asm` — Multiboot2 + request framebuffer #fase6
@@ -60,7 +60,7 @@ kanban-plugin: board
 - [x] `bus/bus.c` — bus real: `bus_init`, `bus_register` (un plugin puede suscribirse a varios `EventType`), `bus_send`, `bus_unregister` (swap-con-el-ultimo), `bus_shutdown` (deduplicado) #fase0
 - [x] Loop principal en `main.c` con manejo de `SIGINT` (Ctrl+C apaga limpio, no mata el proceso) #fase0
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
-- [x] `PseudoGames/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED v2.0, fuente unica de verdad (reemplaza `docs/paed_spec.md`) #fase0
+- [x] `paed/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED v2.0, fuente unica de verdad (reemplaza `docs/paed_spec.md`) #fase0
 - [x] `docs/plugin_spec.md` — cómo crear plugins #fase0
 - [x] `KANBAN.md` — este archivo #fase0
 - [x] `Makefile` raíz — compila bus + plugins juntos #fase0
@@ -78,7 +78,7 @@ kanban-plugin: board
 - [x] Test: scene.paed con un cubo → interprete lo lee sin crash #fase2
 - [x] PAED = pseudocodigo AED puro: `data/sintaxis.json` solo tiene lo corroborado contra `wiki.txt`, `TEORIA_COMPLETA.txt` y los `.paed` de la catedra #fase2
 - [x] La escena 3D salio del lenguaje: es una libreria aparte en `data/escena.json`, se carga ademas de `sintaxis.json` #fase2
-- [x] `PseudoGames/Frankly/tools/generar.sh` — genera `paed.tmLanguage.json` y `core/palabras.sh` desde `sintaxis.json` (se acabo copiar keywords a mano) #fase2
+- [x] `paed/Frankly/tools/generar.sh` — genera `paed.tmLanguage.json` y `core/palabras.sh` desde `sintaxis.json` (se acabo copiar keywords a mano) #fase2
 - [x] `plugins/ide/parser.c` — parser de PAED real (ACCION/AMBIENTE/PROCESO) que reporta errores con archivo:linea y NUNCA ignora en silencio #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
