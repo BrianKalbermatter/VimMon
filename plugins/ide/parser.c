@@ -480,13 +480,22 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
         return 1;
     }
 
-    // ── PARA <var> := <desde> HASTA <hasta> HACER ──
-    // Los limites se guardan en args como desde/hasta, asi el interprete los
-    // lee con paed_get_arg igual que cualquier otro argumento.
+    // ── PARA <var> := <desde> HASTA <hasta>[; <paso>] HACER ──
+    //
+    // La forma sale de TEORIA_COMPLETA.txt:565-571, que dice textual:
+    //     "Si el incremento es distinto de 1, debe indicarse."
+    //     PARA contador := inicialización hasta fin; incremento HACER
+    // O sea que el paso es OPCIONAL y por defecto vale 1. Aca se separa del
+    // for de Pascal, que no tiene clausula de incremento.
+    //
+    // Todo se guarda en args (desde/hasta/paso) para que el interprete lo lea
+    // con paed_get_arg, igual que cualquier otro argumento.
     if (empieza_con(linea, "PARA")) {
         char *cuerpo = cuerpo_cabecera(linea, "PARA", "HACER");
         if (!cuerpo) {
-            add_error(p, lineno, "se esperaba: PARA <var> := <desde> HASTA <hasta> HACER");
+            add_error(p, lineno,
+                      "se esperaba: PARA <var> := <desde> HASTA <hasta> HACER"
+                      " (con '; <paso>' antes de HACER si el incremento no es 1)");
             return 1;
         }
 
@@ -508,6 +517,20 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
         char *desde = trim(resto);
         char *hasta = trim(h + 5);
 
+        // El paso viene despues de un ';', y es opcional: sin el, vale 1.
+        const char *paso = "1";
+        char *puntoycoma = strchr(hasta, ';');
+        if (puntoycoma) {
+            *puntoycoma = '\0';
+            char *pval = trim(puntoycoma + 1);
+            if (!*pval) {
+                add_error(p, lineno, "el PARA tiene ';' pero no dice el incremento");
+                return 1;
+            }
+            paso  = pval;
+            hasta = trim(hasta);
+        }
+
         if (!es_identificador(var)) {
             add_error(p, lineno, "variable de PARA invalida: '%s'", var);
             return 1;
@@ -522,7 +545,9 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
         strncpy(in->args[0].val, desde,   PAED_VAL_MAX - 1);
         strncpy(in->args[1].key, "hasta", PAED_KEY_MAX - 1);
         strncpy(in->args[1].val, hasta,   PAED_VAL_MAX - 1);
-        in->arg_count = 2;
+        strncpy(in->args[2].key, "paso",  PAED_KEY_MAX - 1);
+        strncpy(in->args[2].val, paso,    PAED_VAL_MAX - 1);
+        in->arg_count = 3;
 
         if (pila->tope >= PAED_MAX_BLOQUES) {
             add_error(p, lineno, "demasiados bloques anidados (maximo %d)", PAED_MAX_BLOQUES);

@@ -7,8 +7,7 @@ kanban-plugin: board
 ## Backlog
 
 - [ ] Parser PAED: `pori.vx := ...` — acceso a campos de registro. 13 asignaciones del corpus fallan solo por esto (`es_identificador` no acepta el punto) #fase2
-- [ ] Parser PAED: ¿el `PARA` tiene PASO/incremento, o siempre avanza de a 1? ¿Puede ir en reversa? #fase2
-- [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir: el ejercicio escribe `Según c HACER` (con acento y minúsculas) y `sintaxis.json` declara `SEGUN` #fase2
+- [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir antes de implementar #fase2
 - [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
 - [ ] Interprete PAED: seguir los saltos de `SI`/`MIENTRAS` (el parser ya los calculó). Necesita evaluador de expresiones y tabla de variables #fase2
 - [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
@@ -90,7 +89,7 @@ kanban-plugin: board
 - [x] Asignación `:=` con destino simple: se parsea y se guarda la expresión cruda (todavía sin evaluador) #fase2
 - [x] Errores de bloque que citan la línea de APERTURA: "FIN_SI cierra un MIENTRAS abierto en la linea 3", "falta FIN_MIENTRAS: el MIENTRAS de la linea 3 quedo abierto" #fase2
 - [x] Test: `ejercicio2_1_11.paed` (MIENTRAS > MIENTRAS > SI/SINO) parsea entero y cada `FIN_MIENTRAS` vuelve al suyo #fase2
-- [x] `PARA <var> := <desde> HASTA <hasta> HACER` / `FIN_PARA` — forma confirmada por el usuario (2026-08-08). Los límites se guardan en `args` como `desde`/`hasta`. `recta.paed:47` decía `a` en vez de `HASTA` y se corrigió #fase2
+- [x] `PARA <var> := <desde> HASTA <hasta>[; <paso>] HACER` / `FIN_PARA`. El paso es OPCIONAL y por defecto 1, corroborado en `TEORIA_COMPLETA.txt:565-571` ("Si el incremento es distinto de 1, debe indicarse"). En reversa se usa paso negativo, no una palabra tipo `downto`. `recta.paed:47` decía `a` en vez de `HASTA` y se corrigió #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
 - [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL2 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3

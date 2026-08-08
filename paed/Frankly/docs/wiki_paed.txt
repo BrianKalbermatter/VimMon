@@ -290,7 +290,11 @@ BLOQUE 10: Ciclos
           ...
       FIN_MIENTRAS
 
-      PARA <var> := <desde> HASTA <hasta> HACER
+      PARA <var> := <desde> HASTA <hasta> HACER              (paso = 1)
+          ...
+      FIN_PARA
+
+      PARA <var> := <desde> HASTA <hasta>; <paso> HACER      (paso explicito)
           ...
       FIN_PARA
 
@@ -314,6 +318,21 @@ BLOQUE 10: Ciclos
       El valor inicial va con ':=' y no con DESDE; los comentarios de
       RevisionParcial2025.paed que dicen "PARA i DESDE 1 HASTA 10 HACER"
       quedaron desactualizados.
+
+      EL PASO ES PARTE DEL LENGUAJE. [CORROBORADO]
+      TEORIA_COMPLETA.txt:565-571 dice textual:
+          "Si el incremento es distinto de 1, debe indicarse."
+          PARA contador := inicialización hasta fin; incremento HACER
+      O sea: el incremento es OPCIONAL, va despues de un ';' y por defecto
+      vale 1. ACA EL PARA DE AED SE SEPARA DEL for DE PASCAL, que no tiene
+      clausula de incremento. Ejemplos que hoy parsean:
+          PARA i := 1 HASTA 10 HACER          -> paso 1
+          PARA j := 1 HASTA 10; 2 HACER       -> paso 2
+          PARA k := 10 HASTA 1; -1 HACER      -> en reversa
+
+      No hay una palabra tipo "downto": para ir en reversa se usa un
+      incremento negativo. TEORIA_COMPLETA.txt:584 dice que el PARA "puede
+      no ejecutarse nunca SI (si Vi>Vf)", asi que por defecto es ascendente.
 
       REPETIR/HASTA: NO IMPLEMENTADO, A PROPOSITO.
 
