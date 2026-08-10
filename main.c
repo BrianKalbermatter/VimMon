@@ -3,6 +3,7 @@
 #include <string.h>
 #include "bus/plugin.h"
 #include "plugins/ai/ai.h"
+#include "plugins/ai/provider.h"
 #include "plugins/ide/ide.h"
 #include "plugins/ide/parser.h"
 #include "plugins/ide/interpreter.h"
@@ -24,9 +25,12 @@ void manejar_señal(int señal) {
 
 static void cmd_help(void) {
     printf("\nComandos disponibles:\n");
-    printf("  engine   abre el motor gráfico con tu juego (game/game.c)\n");
+    printf("  engine   abre la ventana y dibuja plugins/ide/scene.paed\n");
+    printf("           (se recarga sola al guardar el archivo)\n");
     printf("  scene    carga y ejecuta plugins/ide/scene.paed (intérprete PAED)\n");
-    printf("  ai       manda un prompt de prueba a Ollama (necesita Ollama activo)\n");
+    printf("  ai       menú de proveedores de IA (llama/qwen/claude/kimi...)\n");
+    printf("  ai use <id|nº>   cambia de proveedor\n");
+    printf("  ai <prompt>      manda ese prompt al proveedor activo\n");
     printf("  help     muestra esta ayuda\n");
     printf("  quit     apaga vimmon\n\n");
 }
@@ -38,24 +42,64 @@ static void cmd_engine(void) {
 
 // scene: parsea scene.paed y lo ejecuta en el intérprete PAED.
 static void cmd_scene(void) {
-    PAEDScene paed;
-    SceneState scene;
+    PAEDProgram prog;
+    SceneState  scene;
     interp_init(&scene);
-    if (paed_parse_file(SCENE_PATH, &paed) == 0) {
-        interp_exec(&scene, &paed);
-        interp_print(&scene);
-        printf("[scene] OK\n");
-    } else {
-        printf("[scene] ERROR — no se pudo leer %s\n", SCENE_PATH);
+
+    // Analisis primero: si hay un solo error, no se ejecuta nada.
+    if (paed_parse_file(PAED_SCENE_PATH, &prog) != 0) {
+        paed_print_errors(&prog);
+        printf("[scene] ERROR — %d error(es), no se ejecuto\n", prog.error_count);
+        return;
     }
+
+    int ok = interp_exec(&scene, &prog) == 0;
+    interp_print(&scene);
+    printf("[scene] %s — %s (%d instrucciones)\n",
+           ok ? "OK" : "con errores de ejecucion", prog.name, prog.instr_count);
 }
 
-// ai: manda un request al plugin de IA por el bus (procesa en on_event).
-static void cmd_ai(void) {
+// Intenta activar un proveedor por id ("qwen") o número de menú ("3").
+// Devuelve 1 si lo logró, 0 si no existe. Avisa si quedó activo uno que
+// todavía no está listo: mejor enterarte ahora que cuando mandes el prompt.
+static int ai_seleccionar(const char *destino) {
+    if (ai_provider_use(destino) != 0) return 0;
+
+    const AIProvider *p      = ai_provider_active();
+    const char       *motivo = NULL;
+
+    printf("[ai] proveedor activo: %s (%s)\n", p->label,
+           ai_transport_name(p->transport));
+    if (!ai_provider_ready(p, &motivo))
+        printf("[ai] ojo: no está listo (%s)\n", motivo ? motivo : "?");
+    return 1;
+}
+
+// ¿La línea es solo dígitos? Si el menú muestra números, apretar el número
+// tiene que funcionar; obligarte a escribir 'ai use 3' es un menú a medias.
+static int es_numero(const char *s) {
+    if (*s == '\0') return 0;
+    for (const char *c = s; *c; c++)
+        if (*c < '0' || *c > '9') return 0;
+    return 1;
+}
+
+// ai: sin argumentos muestra el menú; 'use X' cambia de proveedor; cualquier
+// otra cosa se manda como prompt al proveedor activo por el bus.
+static void cmd_ai(const char *args) {
+    if (args[0] == '\0') {              // 'ai' pelado -> menú
+        ai_provider_list();
+        return;
+    }
+
+    if (strncmp(args, "use ", 4) == 0) {
+        if (!ai_seleccionar(args + 4))
+            printf("[ai] no conozco el proveedor '%s' (probá 'ai')\n", args + 4);
+        return;
+    }
+
     AIRequest req;
-    strncpy(req.prompt, "creá un cubo rojo en el centro de la escena",
-            AI_PROMPT_MAX - 1);
-    req.prompt[AI_PROMPT_MAX - 1] = '\0';
+    snprintf(req.prompt, AI_PROMPT_MAX, "%s", args);
     bus_send(EVENT_AI_REQUEST, &req, sizeof(req));
 }
 
@@ -64,10 +108,19 @@ static int despachar(const char *cmd) {
     if (cmd[0] == '\0')                 return 1;   // línea vacía
     if (strcmp(cmd, "engine") == 0)     { cmd_engine(); return 1; }
     if (strcmp(cmd, "scene")  == 0)     { cmd_scene();  return 1; }
-    if (strcmp(cmd, "ai")     == 0)     { cmd_ai();     return 1; }
+    if (strcmp(cmd, "ai")     == 0)     { cmd_ai("");   return 1; }
+    if (strncmp(cmd, "ai ", 3) == 0)    { cmd_ai(cmd + 3); return 1; }
     if (strcmp(cmd, "help")   == 0)     { cmd_help();   return 1; }
     if (strcmp(cmd, "quit")   == 0 ||
         strcmp(cmd, "exit")   == 0)     return 0;     // salir
+
+    // Número pelado = elegir del menú de IA. Va último, después de los
+    // comandos con nombre, para no robarle una palabra a nadie.
+    if (es_numero(cmd)) {
+        if (ai_seleccionar(cmd)) return 1;
+        printf("no hay proveedor %s (probá 'ai' para ver el menú)\n", cmd);
+        return 1;
+    }
 
     printf("comando desconocido: '%s' (probá 'help')\n", cmd);
     return 1;

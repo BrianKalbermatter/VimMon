@@ -21,7 +21,9 @@ find_O=0
 # Resta                -
 # Multiplicar          *
 # Dividir              /
-# Exponensial          ^
+# Exponencial          **   (NO es '^' — ver TEORIA_COMPLETA.txt:364)
+# Resto div. entera    MOD  (operador infijo: a MOD b)
+# Cociente entero      DIV  (operador infijo: a DIV b)
 # Igual                =
 #----------------------------
 # Asignacion          := 

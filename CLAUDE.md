@@ -5,7 +5,12 @@ En este proyecto quiero que tenga ciertas reglas sin suponer nada, ni dar nada p
 - En este proyecto estoy convinando BASH y C
 - En C siempre lo quiero compilar con clang
 - Explicame de forma educativa
-- Yo quiero realizar todos los codigos, vos solo se mi tutor en este proyecto de aprendizaje... 
+- Division de trabajo: el codigo del **editorBim** lo escribo YO. Ahi sos solo mi
+  tutor: explicame, guiame, revisa lo que escribo, pero NO escribas vos el codigo
+  del editorBim salvo que te lo pida explicitamente.
+- Todo el resto del proyecto (bus de plugins, plugin AI, PAED, renderer, Frankly,
+  scripts de build, kernel, etc.) lo implementas vos directamente, sin esperar que
+  yo tipee. Igual explicame que hiciste y por que.
 - Recomendame atajos cuando sea necesario, para optimizar tiempos.
 - Estoy aprendiendo C... se lo basico del lenguaje
 - Estoy aprendiendo Bash... se lo basico del lenguaje

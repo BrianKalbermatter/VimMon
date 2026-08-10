@@ -3,6 +3,7 @@
 #include "interpreter.h"
 #include "../ai/ai.h"
 #include <stdio.h>
+#include <string.h>
 
 static SceneState scene;
 
@@ -13,32 +14,63 @@ static int ide_init(void) {
 }
 
 static void ide_shutdown(void) {
+    paed_syntax_free();
     printf("[ide] apagado\n");
 }
 
 static void ide_tick(float delta) { (void)delta; }
+
+// PAED es un lenguaje con bloques: el delta de la IA son instrucciones sueltas,
+// asi que NO se puede appendear al final del archivo (quedaria despues de
+// FIN_ACCION). Se reescribe el archivo insertando el delta antes del cierre.
+static int insertar_delta(const char *path, const char *delta) {
+    char lineas[PAED_MAX_INSTRS][512];
+    int  total = 0, corte = -1;
+
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+
+    while (total < PAED_MAX_INSTRS && fgets(lineas[total], sizeof(lineas[0]), f)) {
+        if (strstr(lineas[total], "FIN_ACCION")) corte = total;
+        total++;
+    }
+    fclose(f);
+
+    if (corte < 0) {
+        fprintf(stderr, "[ide] %s no tiene FIN_ACCION, no se donde insertar\n", path);
+        return -1;
+    }
+
+    f = fopen(path, "w");
+    if (!f) return -1;
+
+    for (int i = 0; i < corte; i++) fputs(lineas[i], f);
+    fprintf(f, "\n        %s\n", delta);
+    for (int i = corte; i < total; i++) fputs(lineas[i], f);
+
+    fclose(f);
+    return 0;
+}
 
 static void ide_on_event(Event *e) {
     if (e->type != EVENT_AI_RESPONSE) return;
 
     AIResponse *resp = (AIResponse *)e->data;
 
-    FILE *f = fopen(SCENE_PATH, "a");
-    if (!f) {
-        fprintf(stderr, "[ide] no se pudo abrir scene.paed\n");
+    if (insertar_delta(PAED_SCENE_PATH, resp->paed_delta) != 0) {
+        fprintf(stderr, "[ide] no se pudo escribir el delta en %s\n", PAED_SCENE_PATH);
         return;
     }
-    fprintf(f, "\n%s\n", resp->paed_delta);
-    fclose(f);
 
-    PAEDScene paed;
-    if (paed_parse_file(SCENE_PATH, &paed) != 0) {
-        fprintf(stderr, "[ide] error al parsear scene.paed\n");
+    PAEDProgram prog;
+    if (paed_parse_file(PAED_SCENE_PATH, &prog) != 0) {
+        fprintf(stderr, "[ide] %s tiene errores, la escena NO se actualizo:\n", PAED_SCENE_PATH);
+        paed_print_errors(&prog);
         return;
     }
 
     interp_init(&scene);
-    interp_exec(&scene, &paed);
+    interp_exec(&scene, &prog);
 
     printf("[ide] escena actualizada:\n");
     interp_print(&scene);
@@ -48,7 +80,7 @@ static void ide_on_event(Event *e) {
 
 Plugin ide_plugin = {
     .name     = "ide",
-    .version  = "0.1",
+    .version  = "0.2",
     .init     = ide_init,
     .shutdown = ide_shutdown,
     .tick     = ide_tick,

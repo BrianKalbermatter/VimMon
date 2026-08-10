@@ -1,0 +1,3 @@
+A[5] = 50
+A[9] = 90
+ahora se va de rango: paed/Frankly/tests/arreglo_limites.paed:25: error: indice 4 fuera de rango: 'A' va de 5 a 9

@@ -1,7 +1,8 @@
 #include "../../bus/plugin.h"
 #include "renderer.h"
 #include "../../engine/engine.h"
-#include "../../game/game.h"
+#include "../ide/parser.h"       // PAED_SCENE_PATH
+#include "../ide/scene_view.h"
 #include <stdio.h>
 
 /*
@@ -28,7 +29,15 @@ static void launch_engine(void)
         return;
     }
 
-    game_setup(w);        // tu juego (game/game.c)
+    // La escena PAED se monta como UNA entidad que se vigila y se dibuja sola.
+    // El juego de game/game.c sigue existiendo intacto: para volver a montarlo,
+    // se cambia esta linea por game_setup(w).
+    if (scene_view_mount(w, PAED_SCENE_PATH) != 0) {
+        printf("[renderer] no se pudo montar la escena PAED\n");
+        engine_shutdown(w);
+        return;
+    }
+
     engine_run(w);        // loop hasta X o ESC
     engine_shutdown(w);   // cierra la ventana, vuelve a la consola
     printf("[renderer] ventana cerrada, de vuelta en vimmon\n");

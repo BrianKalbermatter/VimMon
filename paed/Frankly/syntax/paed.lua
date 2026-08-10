@@ -76,6 +76,7 @@ for _, cat in ipairs(data.categorias) do
         local p = cat.patron
         if     p == "//"     then vim.cmd('syntax match '  .. grp .. ' "//.*$"')
         elseif p == '".*"'   then vim.cmd('syntax region ' .. grp .. ' start=/"/ end=/"/')
+        elseif p == "'.*'"   then vim.cmd("syntax region " .. grp .. " start=/'/ end=/'/")
         elseif p:find("%[0%-9%]") then
             vim.cmd('syntax match ' .. grp .. ' "\\<[0-9]\\+\\(\\.[0-9]\\+\\)\\?\\>"')
         end

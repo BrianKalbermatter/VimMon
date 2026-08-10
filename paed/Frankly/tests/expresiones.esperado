@@ -1,0 +1,23 @@
+-- prioridades --
+2 + 3 * 4 = 14
+2 ** 3 ** 2 = 512
+-2 ** 2 = 4
+7 / 2 = 3.5
+7 DIV 2 = 3
+7 MOD 2 = 1
+'A' < 'K' es V
+'MARIA' < 'JUAN' es F
+pegado: vimmon5
+-- maximo comun divisor (Euclides) --
+mcd(1071, 462) = 21
+-- primos hasta 30 --
+hay 10 primos hasta 30
+-- fibonacci --
+fibonacci(10) = 55
+-- factorial y cuenta regresiva --
+10! = 3628800
+cuenta 5
+cuenta 4
+cuenta 3
+cuenta 2
+cuenta 1
