@@ -12,7 +12,7 @@
     "palabras_clave": "MAYUSCULAS",
     "identificadores": "minusculas",
     "llamadas": "posicionales: PROCEDIMIENTO(arg1, arg2)",
-    "estructura": "ACCION <nombre> ES / AMBIENTE / PROCESO / FIN_ACCION",
+    "estructura": "ACCION <nombre> ES / AMBIENTE / PROCESO / FIN_ACCION (o FINACCION)",
     "bloques_sin_terminador": ["SI", "SINO", "FIN_SI", "MIENTRAS", "FIN_MIENTRAS", "PARA", "FIN_PARA", "REPETIR", "HASTA", "SEGUN", "FIN_SEGUN"]
   },
 
@@ -33,7 +33,7 @@
       "nombre": "estructura",
       "color": "dorado",
       "scope": "keyword.other.estructura.paed",
-      "palabras": ["ACCION", "ES", "FIN_ACCION", "PROCESO", "AMBIENTE", "FUNCION", "FIN_FUNCION", "PROCEDIMIENTO", "FIN_PROCEDIMIENTO", "RETORNAR", "SEGUN", "FIN_SEGUN", "ABRIR", "CERRAR", "ARCHIVO", "REGISTRO", "FIN_REGISTRO"]
+      "palabras": ["ACCION", "ES", "FIN_ACCION", "FINACCION", "PROCESO", "AMBIENTE", "FUNCION", "FIN_FUNCION", "PROCEDIMIENTO", "FIN_PROCEDIMIENTO", "RETORNAR", "SEGUN", "FIN_SEGUN", "ABRIR", "CERRAR", "ARCHIVO", "REGISTRO", "FIN_REGISTRO"]
     },
     {
       "nombre": "salida",

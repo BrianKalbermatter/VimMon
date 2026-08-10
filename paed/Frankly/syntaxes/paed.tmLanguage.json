@@ -23,7 +23,7 @@
     "repository": {
         "condicionales": { "match": "\\b(SI|FIN_SI|SINO|CONTRARIO|ENTONCES)\\b", "name": "keyword.control.condicional.paed" },
         "bucles": { "match": "\\b(MIENTRAS|FIN_MIENTRAS|PARA|FIN_PARA|REPETIR|HASTA|HACER)\\b", "name": "keyword.control.bucle.paed" },
-        "estructura": { "match": "\\b(ACCION|ES|FIN_ACCION|PROCESO|AMBIENTE|FUNCION|FIN_FUNCION|PROCEDIMIENTO|FIN_PROCEDIMIENTO|RETORNAR|SEGUN|FIN_SEGUN|ABRIR|CERRAR|ARCHIVO|REGISTRO|FIN_REGISTRO)\\b", "name": "keyword.other.estructura.paed" },
+        "estructura": { "match": "\\b(ACCION|ES|FIN_ACCION|FINACCION|PROCESO|AMBIENTE|FUNCION|FIN_FUNCION|PROCEDIMIENTO|FIN_PROCEDIMIENTO|RETORNAR|SEGUN|FIN_SEGUN|ABRIR|CERRAR|ARCHIVO|REGISTRO|FIN_REGISTRO)\\b", "name": "keyword.other.estructura.paed" },
         "salida": { "match": "\\b(ESCRIBIR)\\b", "name": "support.function.salida.paed" },
         "entrada": { "match": "\\b(LEER)\\b", "name": "support.function.entrada.paed" },
         "tipos": { "match": "\\b(ENTEROS|ENTERO|REAL|CARACTER|CARACTERES|BOOLEANO|SECUENCIA|VENTANA|SALIDA|ARREGLO|CONSTANTE|VAR|DE|AN|N)\\b", "name": "storage.type.paed" },

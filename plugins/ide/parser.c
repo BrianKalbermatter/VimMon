@@ -765,6 +765,20 @@ static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
 
 // ── Analisis del archivo completo ─────────────────────────────────────────────
 
+// Cierre de la ACCION. Se aceptan DOS formas, decididas el 2026-08-10:
+//
+//   FIN_ACCION   la de la wiki, y la que usan todos los .paed del repo
+//   FINACCION    la misma sin el guion bajo
+//
+// Las dos son una sola palabra, asi que cuestan un solo strcmp y ningun
+// lookahead. La forma de la catedra (`FIN ACCION`, con ESPACIO, en
+// AED_2021_UnI.pdf pagina 10) queda AFUERA por decision del autor: partida en
+// dos palabras obligaria a mirar la siguiente antes de decidir.
+static int es_fin_accion(const char *linea) {
+    return strcmp(linea, "FIN_ACCION") == 0 ||
+           strcmp(linea, "FINACCION")  == 0;
+}
+
 typedef enum { FUERA, CABECERA, AMBIENTE, PROCESO, CERRADO } Bloque;
 
 int paed_parse_file(const char *path, PAEDProgram *out) {
@@ -822,9 +836,37 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
             continue;
         }
 
-        if (strcmp(linea, "FIN_ACCION") == 0) {
+        // 'FACCION' se entiende, pero abreviar 'FIN' a 'F' deja el cierre
+        // incompleto y se rechaza. Lleva mensaje propio porque sin este caso
+        // caeria como instruccion suelta y el error seria "falta ';'", que no
+        // ayuda a nadie. Igual se CIERRA el bloque: se sabe que quiso cerrar,
+        // y seguir con el PROCESO abierto haria cascar errores en todas las
+        // lineas que vengan despues.
+        if (strcmp(linea, "FACCION") == 0) {
+            add_error(out, lineno,
+                      "'FACCION' esta incompleto: el cierre se escribe "
+                      "FIN_ACCION o FINACCION");
+        }
+
+        // 'FIN ACCION' partido en dos es la forma de la catedra
+        // (AED_2021_UnI.pdf:10). No se acepta, pero se reconoce para poder
+        // decirlo: es la forma que uno copia del apunte, y sin este caso el
+        // error seria "falta ';'", que manda a buscar el problema al lugar
+        // equivocado.
+        if (strcmp(linea, "FIN ACCION") == 0) {
+            add_error(out, lineno,
+                      "el apunte escribe 'FIN ACCION' con espacio, pero en PAED "
+                      "el cierre es una sola palabra: FIN_ACCION o FINACCION");
+        }
+
+        // Las formas rechazadas igual CIERRAN el bloque: ya se reporto el
+        // motivo, y seguir con el PROCESO abierto haria cascar un error mas en
+        // cada linea que venga despues.
+        if (es_fin_accion(linea) ||
+            strcmp(linea, "FACCION")    == 0 ||
+            strcmp(linea, "FIN ACCION") == 0) {
             if (bloque != PROCESO)
-                add_error(out, lineno, "FIN_ACCION sin un bloque PROCESO abierto");
+                add_error(out, lineno, "el cierre de ACCION no tiene un bloque PROCESO abierto");
             // FIN_ACCION no puede cerrar bloques que quedaron abiertos: se avisa
             // aca, con la linea de apertura, y no cuando ya no se sabe nada.
             for (int i = pila.tope - 1; i >= 0; i--)
@@ -860,7 +902,7 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
 
     if (bloque == FUERA)  add_error(out, lineno, "falta ACCION <nombre> ES");
     if (bloque == CABECERA || bloque == AMBIENTE) add_error(out, lineno, "falta PROCESO");
-    if (bloque == PROCESO) add_error(out, lineno, "falta FIN_ACCION");
+    if (bloque == PROCESO) add_error(out, lineno, "falta el cierre: FIN_ACCION o FINACCION");
 
     return out->error_count == 0 ? 0 : -1;
 }

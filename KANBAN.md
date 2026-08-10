@@ -76,6 +76,8 @@ kanban-plugin: board
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
 - [x] `paed/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED, fuente unica de verdad #fase0
 - [x] PAED.md v4.0 absorbe entero `docs/paed_spec.md` (v2.0), que se borra: una sola spec, no dos. Se separan **catedra** / **decidido** / **implementado**, porque habia decisiones documentadas que el parser no cumplia (keywords case-insensitive, `;` como separador) #fase0
+- [x] Cierre de la `ACCION` RESUELTO — era el ultimo punto BLOQUEANTE de la spec. Se aceptan `FIN_ACCION` y `FINACCION`: las dos son una sola palabra, cuestan un `strcmp` y ningun lookahead. `FACCION` se rechaza (abreviar FIN a F deja el cierre incompleto) y `FIN ACCION` con espacio tambien, aunque sea la forma de la catedra: partida en dos obliga a mirar la palabra siguiente. Las tres formas rechazadas igual CIERRAN el bloque, para no cascar un error por cada linea que venga despues #fase2
+- [x] Verificado de primera mano `AED_2021_UnI.pdf` pagina 10: la catedra efectivamente escribe `FIN ACCION` con espacio. La cita que venia arrastrada de `paed_spec.md` era correcta — es una captura de Sublime Text 2 dentro del apunte, no un BNF formal #fase2
 - [x] `docs/plugin_spec.md` — cómo crear plugins #fase0
 - [x] `KANBAN.md` — este archivo #fase0
 - [x] `Makefile` raíz — compila bus + plugins juntos #fase0

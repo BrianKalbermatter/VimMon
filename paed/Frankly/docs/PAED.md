@@ -35,7 +35,7 @@ errores, y de hecho los contiene:
 | Fuente | Estado | Error conocido |
 |---|---|---|
 | `Frankly/paed` (715 líneas bash) | Implementación | Acepta `PARA ... a ...` y comillas dobles — ninguna es de cátedra |
-| `Frankly/DOC.txt` | Notas de aprendizaje | Fija `FIN_ACCION`, forma no confirmada por la cátedra |
+| `Frankly/DOC.txt` | Notas de aprendizaje | Desactualizado seguido; redirige a este documento |
 | `paed/AlgebraRectas/recta.paed` | Ejercicio propio | Sintaxis incorrecta (ver §12.1) |
 | `Frankly/data/sintaxis.json` | Lista de keywords | Incompleta |
 | `Frankly/syntaxes/paed.tmLanguage.json` | Resaltador | Incompleta, comillas dobles |
@@ -80,6 +80,7 @@ FIN_ACCION
 - Declaraciones e instrucciones terminan en `;`.
 - Las palabras de bloque (`SI`, `MIENTRAS`, `FIN_SI`, …) **no** llevan `;`.
 - El `AMBIENTE` es opcional: un programa que solo usa escalares puede no tenerlo.
+- El cierre se escribe `FIN_ACCION` **o** `FINACCION`, las dos válidas (§10.7).
 
 ## 2. Tipos de datos
 
@@ -544,6 +545,40 @@ En cualquier otro caso `.` es un token propio.
 Caso a testear cuando lleguen los registros: `arreglo[1..30]` — tras el `1`
 viene `.` y después otro `.`, que no es dígito, así que el número corta.
 
+### 10.7 El cierre de la `ACCION` — RESUELTO 2026-08-10
+
+Era el único punto **bloqueante** que le quedaba a la spec. Las fuentes se
+contradecían:
+
+| Fuente | Escribe |
+|---|---|
+| `AED_2021_UnI.pdf:10` (cátedra) | `FIN ACCION` — **con espacio** |
+| `OnlySintaxis.md:14` (wiki) | `FIN_ACCION` — con guión bajo |
+
+**Decisión: se aceptan `FIN_ACCION` y `FINACCION`.** Las dos son una sola
+palabra, así que cuestan un `strcmp` y ningún lookahead.
+
+`FACCION` **se rechaza**: se entiende la intención, pero abreviar `FIN` a `F`
+deja el cierre incompleto.
+
+La forma de la cátedra (`FIN ACCION`, partida en dos) **queda afuera**. Es la
+única que cuesta código: partida en dos palabras obliga a mirar la siguiente
+antes de decidir si es un cierre o el principio de otra cosa.
+
+Las tres formas rechazadas igual **cierran el bloque** después de reportar el
+motivo. Si no lo hicieran, el `PROCESO` quedaría abierto y cada línea siguiente
+sumaría un error más, enterrando el verdadero.
+
+`FIN ACCION` con espacio tiene mensaje propio, aunque no se acepte:
+
+```
+el apunte escribe 'FIN ACCION' con espacio, pero en PAED el cierre es una
+sola palabra: FIN_ACCION o FINACCION
+```
+
+Es la forma que uno copia del apunte sin pensar. Sin ese caso el error sería
+"falta `;`", que manda a buscar el problema al lugar equivocado.
+
 ## 11. Pendiente de revisión con la cátedra
 
 ### 11.1 El `;`: ¿separador o terminador?
@@ -556,23 +591,12 @@ viene `.` y después otro `.`, que no es dígito, así que el número corta.
 La cátedra gana en el papel, pero cambiarlo ahora rompe todos los `.paed` del
 repo. Sin decidir.
 
-### 11.2 `FIN ACCION` con espacio — BLOQUEANTE
+### 11.2 Puntos abiertos del ejemplo de cátedra
 
-| Fuente | Dice |
-|---|---|
-| `AED_2021_UnI.pdf:10` | `FIN ACCION` **con espacio** |
-| `OnlySintaxis.md:14` | `FIN_ACCION` **con guión bajo** |
+El cierre de bloque **ya no está acá**: se decidió el 2026-08-10, ver §10.7.
 
-Costo en el lexer:
-
-- **Guión bajo:** una keyword, un token. Cero trabajo extra.
-- **Espacio:** **dos tokens**. Obliga a lookahead en el parser o caso especial
-  en el lexer. Es la única forma que cuesta código.
-
-Falta contrastar con los PDF no leídos (§11.4). Si `AED_2018_UnI_B.pdf` o el
-resto usan guión bajo, el conflicto se cierra a favor de la wiki.
-
-Del mismo ejemplo salen otros dos puntos abiertos, ninguno implementado:
+Del ejemplo de `AED_2021_UnI.pdf:10` quedan dos puntos abiertos, ninguno
+implementado:
 
 - **`VARIABLES` como sub-sección de `AMBIENTE`**. Keyword ausente de
   `OnlySintaxis.md` y del resaltador. ¿Es obligatoria?
@@ -635,7 +659,9 @@ de línea — nunca se ignora.
 
 | Construcción | Estado |
 |---|---|
-| `ACCION` / `AMBIENTE` / `PROCESO` / `FIN_ACCION` | ✅ |
+| `ACCION` / `AMBIENTE` / `PROCESO` | ✅ |
+| Cierre `FIN_ACCION` y `FINACCION` | ✅ §10.7 |
+| `FACCION` y `FIN ACCION` rechazados, con mensaje propio | ✅ §10.7 |
 | Declaraciones `nombre: TIPO;` | ✅ (el tipo se guarda como texto, no se valida) |
 | Comentarios `//`, incluso dentro de strings | ✅ |
 | Llamadas posicionales `PROC(a, b);` | ✅ |
@@ -650,7 +676,7 @@ de línea — nunca se ignora.
 | Keywords en minúscula (`accion`, `mientras`) | ❌ §10.1 |
 | Declaración múltiple `A,B: ENTERO` | ❌ §11.2 |
 | `VARIABLES` dentro de `AMBIENTE` | ❌ §11.2 |
-| `FIN ACCION` con espacio | ❌ §11.2 |
+| `FIN ACCION` con espacio | ❌ a propósito, §10.7 |
 | `;` omitido en la última sentencia | ❌ §11.1 |
 | Nombre de `ACCION` con espacios | ❌ |
 | `REPETIR` / `SEGUN` | ❌ |
