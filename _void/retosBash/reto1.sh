@@ -1,2 +1,2 @@
-#!learnC/bash
+#!/usr/bin/env bash
 

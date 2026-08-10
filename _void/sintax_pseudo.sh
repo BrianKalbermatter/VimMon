@@ -9,7 +9,7 @@
 # $? -> El resultado del ultimo comando (0=ok, 1=fallo)
 # $((errores + 1)) -> Sumar numeros
 
-#!/learnC/bash
+#!/usr/bin/env bash
 archivo="$1" # Esto recibe el archivo como argumento
 #$1 es porque puede ser cualquier archivo? o sea de cualquier nivel...
 

@@ -1,4 +1,4 @@
-#!/learnC/bash
+#!/usr/bin/env bash
 # Nivel 2 - Ejercicio 1.1.5.2: Discriminante
 
 ENUNCIADO="

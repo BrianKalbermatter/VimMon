@@ -1,4 +1,4 @@
-#!/learnC/bash
+#!/usr/bin/env bash
 # Nivel 3 - Ejercicio 1.1.5.3: Precio PC + Impresora
 
 ENUNCIADO="

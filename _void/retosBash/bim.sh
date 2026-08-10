@@ -1,4 +1,4 @@
-#!/learnC/bash
+#!/usr/bin/env bash
 
 # raw -> no espera Enter para enviar input, cada tecla llega inmediato.
 # -echo -> no muestra lo que escibis en pantalla (controlo lo que se va a mostrar)

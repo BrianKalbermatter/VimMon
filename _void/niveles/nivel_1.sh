@@ -1,4 +1,4 @@
-#!/learnC/bash
+#!/usr/bin/env bash
 # Nivel 1 - Ejercicio 1.1.5.1: Precio con inflación
 
 ENUNCIADO="

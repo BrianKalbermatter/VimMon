@@ -1,4 +1,4 @@
-#!/usr/learnC/env bash
+#!/usr/bin/env bash
 
 # $1 = primer numero
 # $2 = operador

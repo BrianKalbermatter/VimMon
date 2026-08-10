@@ -1,4 +1,4 @@
-#!/learnC/bash
+#!/usr/bin/env bash
 # Con esto le dice al sistema que use bash para ejecutar este script
 # ============================================
 #  AED Game - Sistema de niveles por ejercicio
