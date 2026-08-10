@@ -98,11 +98,32 @@ typedef struct {
     char msg[PAED_MSG_MAX];
 } PAEDError;
 
+// Tipo REGISTRO declarado en el AMBIENTE:
+//
+//     vector2 = REGISTRO
+//         vx: REAL;
+//         vy: REAL;
+//     FIN_REGISTRO
+//
+// Es el `struct` de C con otro nombre. Guarda QUE campos tiene el tipo; las
+// variables de ese tipo se declaran aparte (`pori: vector2;`).
+#define PAED_MAX_REGISTROS 16
+#define PAED_MAX_CAMPOS    16
+
+typedef struct {
+    char     name[PAED_NAME_MAX];      // vector2
+    PAEDDecl campos[PAED_MAX_CAMPOS];  // vx: REAL, vy: REAL
+    int      campo_count;
+    int      line;
+} PAEDRegistro;
+
 typedef struct {
     char      path[PAED_PATH_MAX];
     char      name[PAED_NAME_MAX];          // el <nombre> de ACCION <nombre> ES
     PAEDDecl  decls  [PAED_MAX_DECLS];
     int       decl_count;
+    PAEDRegistro registros[PAED_MAX_REGISTROS];
+    int          registro_count;
     PAEDInstr instrs [PAED_MAX_INSTRS];
     int       instr_count;
     PAEDError errors [PAED_MAX_ERRORS];

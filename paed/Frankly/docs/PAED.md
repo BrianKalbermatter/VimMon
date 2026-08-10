@@ -96,7 +96,8 @@ FIN_ACCION
 | `SECUENCIA DE <tipo>` | `sec1: SECUENCIA DE CARACTER;` | ❌ |
 | `VENTANA DE <tipo>` | `recorrido: VENTANA DE CARACTER;` | ❌ |
 | `SECUENCIA DE SALIDA` | `secSalida: SECUENCIA DE SALIDA;` | ❌ |
-| `REGISTRO`, `CONSTANTE`, `ARCHIVO`, `PUNTERO` | | ❌ |
+| `REGISTRO` / `FIN_REGISTRO` | `vector2 = REGISTRO ... FIN_REGISTRO` | implementado |
+| `CONSTANTE`, `ARCHIVO`, `PUNTERO` | | ❌ |
 
 El tipo se guarda como texto y **no se valida**: hoy nada impide asignarle un
 texto a algo declarado `ENTERO`. Los tipos escalares se aceptan todos por igual.
@@ -128,6 +129,52 @@ otro lado sin relación aparente.
 
 Los elementos arrancan en 0, no en basura: leer `A[3]` antes de cargarlo da algo
 previsible.
+
+### 2.2 Registros
+
+Es el `struct` de C con otro nombre.
+
+```paed
+AMBIENTE
+    vector2 = REGISTRO
+        vx: REAL;
+        vy: REAL;
+    FIN_REGISTRO
+
+    pori: vector2;      // una VARIABLE de ese tipo
+```
+
+`vector2` es un **tipo**; `pori` es una **variable**; `pori.vx` es un **campo**
+de esa variable. El `.` se lee "de adentro de": `pori.vx` es "el vx de pori".
+
+Sin registros, un punto necesita dos variables sueltas (`pori_x`, `pori_y`) y
+nada las une. Con registro, `pori` es **una** cosa que tiene dos partes. En un
+programa de geometría con cuatro puntos, la diferencia es entre 8 variables
+sueltas y 4 objetos con sentido.
+
+Un campo vale en cualquier lado donde valga una variable: como destino
+(`pori.vx := 0`) y dentro de expresiones (`pori.vx ** 2 + pori.vy ** 2`).
+
+**Por dentro se aplana.** `pori` de tipo `vector2` se guarda como dos variables
+llamadas `"pori.vx"` y `"pori.vy"`. El entorno no sabe nada de registros: para
+él son dos variables comunes que tienen un punto en el nombre. El precio de esa
+simplicidad es que no se puede asignar un registro entero (`p1 := p2`), que no
+aparece en el corpus.
+
+**Un campo no nace al asignarlo**, al revés que un escalar: se crean todos al
+declarar la variable. Un campo que el registro no declara se rechaza:
+
+```
+'p' no tiene un campo 'vz'
+```
+
+Sin ese chequeo el registro no serviría de nada — admitiría cualquier campo
+inventado, y declarar el tipo no impediría absolutamente nada.
+
+**El punto decimal no se confunde con el de campo.** `1.5` es un número y
+`pori.vx` es un campo. Se resuelve mirando qué viene después del punto: un
+dígito lo hace parte del número, una letra lo hace acceso a campo. Un número
+nunca llega al lector de identificadores, porque empieza con dígito.
 
 ## 3. Asignación y operadores
 
@@ -414,7 +461,8 @@ Solo las construcciones en alcance. Las diferidas no figuran.
 programa    = accion ;
 accion      = "ACCION" IDENT "ES" [ ambiente ] proceso "FIN_ACCION" ;
 
-ambiente    = "AMBIENTE" { declaracion } ;
+ambiente    = "AMBIENTE" { declaracion | registro } ;
+registro    = IDENT "=" "REGISTRO" { declaracion } "FIN_REGISTRO" ;
 declaracion = IDENT ":" tipo ";" ;
 
 tipo        = "ENTERO" | "REAL" | "CARACTER" | "BOOLEANO"
@@ -427,7 +475,7 @@ proceso     = "PROCESO" { sentencia } ;
 sentencia   = asignacion | si | mientras | para | llamada ;
 
 asignacion  = lvalue ":=" expr ";" ;
-lvalue      = IDENT [ "[" expr "]" ] ;
+lvalue      = IDENT ( [ "[" expr "]" ] | { "." IDENT } ) ;
 
 si          = "SI" expr "ENTONCES" { sentencia }
               [ "SINO" { sentencia } ] "FIN_SI" ;
@@ -442,7 +490,6 @@ arg         = expr | IDENT "=" expr ;
 Diferencias con la gramática de la v2.0, que documentaba intención y no
 implementación:
 
-- `lvalue` **no** incluye `"." IDENT`: los campos de registro no existen todavía.
 - `declaracion` acepta **un solo** identificador. `A,B,SUMA: entero` del
   `AED_2021_UnI.pdf:10` **no parsea** (ver §11.2).
 - El `;` es **terminador obligatorio**, no separador opcional (ver §11.1).
@@ -695,7 +742,10 @@ de línea — nunca se ignora.
 | Nombre de `ACCION` con espacios | ❌ |
 | `REPETIR` / `SEGUN` | ❌ |
 | `FUNCION` / `PROCEDIMIENTO` anidados en `AMBIENTE` | ❌ |
-| `REGISTRO` (`pori.vx`) / `ARCHIVO` / `CONSTANTE` | ❌ |
+| `REGISTRO` / `FIN_REGISTRO` y acceso `pori.vx` | ✅ §2.2 |
+| Un campo que el registro no declara | ❌ rechazado, §2.2 |
+| Instrucción partida en dos líneas | ❌ el parser lee línea por línea |
+| `ARCHIVO` / `CONSTANTE` | ❌ |
 | `SECUENCIA`, y por lo tanto `NFDS` / `FDS` | ❌ |
 | `ARR` / `AVZ` / `CREAR` / `CERRAR` / `LEER` | parsean, no ejecutan |
 

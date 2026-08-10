@@ -54,6 +54,10 @@ int env_set(Entorno *e, const char *nombre, Valor v) {
     return 0;
 }
 
+int env_existe(Entorno *e, const char *nombre) {
+    return env_entrada(e, nombre) != NULL;
+}
+
 int env_declarar_arreglo(Entorno *e, const char *nombre, int desde, int hasta) {
     if (hasta < desde) {
         snprintf(e->error, PAED_MSG_MAX,
@@ -239,6 +243,18 @@ static Valor primario(Ctx *c) {
         while (isalnum((unsigned char)*c->p) || *c->p == '_') {
             if (n < PAED_NAME_MAX - 1) nombre[n++] = *c->p;
             c->p++;
+
+            // Acceso a campo de registro: 'pori.vx' es UN nombre, no dos.
+            // El campo aparece en el entorno como "pori.vx", asi que alcanza
+            // con dejar que el punto forme parte del nombre.
+            //
+            // Un numero como 1.5 nunca llega aca: se lee mas arriba, porque
+            // empieza con digito. Y se exige letra despues del punto, asi que
+            // 'pori.' o 'pori.1' cortan el nombre en vez de tragarse el punto.
+            if (*c->p == '.' && (isalpha((unsigned char)c->p[1]) || c->p[1] == '_')) {
+                if (n < PAED_NAME_MAX - 1) nombre[n++] = '.';
+                c->p++;
+            }
         }
         nombre[n] = '\0';
 

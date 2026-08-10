@@ -77,6 +77,11 @@ int    env_set   (Entorno *e, const char *nombre, Valor v);  // 0 OK, -1 lleno
 // Devuelve 0 si salio bien, -1 si no: el motivo queda en e->error.
 int env_declarar_arreglo(Entorno *e, const char *nombre, int desde, int hasta);
 
+// ¿Existe ya una variable con ese nombre? No toca e->error ni la crea.
+// Sirve para distinguir "campo valido de un registro" de "campo inventado":
+// los campos se crean todos al arrancar, asi que uno que no esta, no existe.
+int env_existe(Entorno *e, const char *nombre);
+
 // Devuelve el elemento `indice` de un arreglo, listo para leer o escribir.
 // Devuelve NULL si la variable no existe, no es un arreglo, o el indice se fue
 // de los limites declarados: el motivo queda en e->error.

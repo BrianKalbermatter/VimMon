@@ -115,6 +115,26 @@ static int es_identificador(const char *s) {
     return 1;
 }
 
+// Igual que es_identificador, pero acepta el punto de acceso a campo:
+// 'pori.vx' es un nombre valido y 'pori' tambien.
+//
+// El punto tiene que estar ENTRE dos partes validas. Asi '.x', 'pori.' y
+// 'pori..vx' se siguen rechazando, y un numero como 1.5 nunca entra aca porque
+// no empieza con letra.
+static int es_campo(const char *s) {
+    if (!*s || (!isalpha((unsigned char)*s) && *s != '_')) return 0;
+
+    for (const char *c = s; *c; c++) {
+        if (*c == '.') {
+            // ni al principio, ni al final, ni dos seguidos
+            if (c == s || !(isalpha((unsigned char)c[1]) || c[1] == '_')) return 0;
+            continue;
+        }
+        if (!isalnum((unsigned char)*c) && *c != '_') return 0;
+    }
+    return 1;
+}
+
 // ── Errores ───────────────────────────────────────────────────────────────────
 
 static void add_error(PAEDProgram *p, int line, const char *fmt, ...) {
@@ -242,7 +262,8 @@ static void parse_asignacion(PAEDProgram *p, char *linea, int lineno, char *op) 
         }
     }
 
-    if (!es_identificador(destino)) {
+    // es_campo y no es_identificador: el destino puede ser 'pori.vx'.
+    if (!es_campo(destino)) {
         add_error(p, lineno, "destino de asignacion invalido: '%s'", destino);
         return;
     }
@@ -798,6 +819,82 @@ static int es_fin_accion(const char *linea) {
            kw_es(linea, "FINACCION");
 }
 
+// ── El bloque AMBIENTE, que puede tener REGISTROS adentro ─────────────────────
+//
+//     AMBIENTE
+//         vector2 = REGISTRO      <- abre un tipo
+//             vx: REAL;           <- campo
+//             vy: REAL;
+//         FIN_REGISTRO            <- lo cierra
+//         pori: vector2;          <- variable de ese tipo
+//
+// `reg` apunta al registro que se esta llenando, o es NULL si no hay ninguno
+// abierto. El que llama lo mantiene entre lineas: es el sub-estado del bloque.
+static void parse_ambiente(PAEDProgram *p, char *linea, int lineno, PAEDRegistro **reg) {
+    // ── Dentro de un REGISTRO ──
+    if (*reg) {
+        if (kw_es(linea, "FIN_REGISTRO") || kw_es(linea, "FINREGISTRO")) {
+            if ((*reg)->campo_count == 0)
+                add_error(p, lineno, "el registro '%s' no tiene ningun campo", (*reg)->name);
+            *reg = NULL;
+            return;
+        }
+
+        if ((*reg)->campo_count >= PAED_MAX_CAMPOS) {
+            add_error(p, lineno, "el registro '%s' tiene demasiados campos (maximo %d)",
+                      (*reg)->name, PAED_MAX_CAMPOS);
+            return;
+        }
+
+        // Un campo se declara igual que una variable, asi que se reusa el mismo
+        // parseo en vez de tener dos copias que se desincronicen.
+        PAEDDecl *destino = &(*reg)->campos[(*reg)->campo_count];
+        int antes = p->decl_count;
+        parse_decl(p, linea, lineno);
+
+        if (p->decl_count > antes) {
+            // parse_decl lo dejo en la tabla general: se mueve al registro,
+            // porque un campo no es una variable del programa.
+            *destino = p->decls[--p->decl_count];
+            (*reg)->campo_count++;
+        }
+        return;
+    }
+
+    // ── ¿Abre un REGISTRO? `<nombre> = REGISTRO` ──
+    // Se mira el '=' antes que nada: una declaracion normal lleva ':' y esta no.
+    char *igual = strchr(linea, '=');
+    if (igual && kw_es(trim(igual + 1), "REGISTRO")) {
+        *igual = '\0';
+        char *nombre = trim(linea);
+
+        if (!es_identificador(nombre)) {
+            add_error(p, lineno, "nombre de registro invalido: '%s'", nombre);
+            return;
+        }
+        if (p->registro_count >= PAED_MAX_REGISTROS) {
+            add_error(p, lineno, "demasiados registros (maximo %d)", PAED_MAX_REGISTROS);
+            return;
+        }
+        for (int i = 0; i < p->registro_count; i++)
+            if (kw_es(p->registros[i].name, nombre)) {
+                add_error(p, lineno, "el registro '%s' ya se declaro en la linea %d",
+                          nombre, p->registros[i].line);
+                return;
+            }
+
+        PAEDRegistro *nuevo = &p->registros[p->registro_count++];
+        memset(nuevo, 0, sizeof(*nuevo));
+        strncpy(nuevo->name, nombre, PAED_NAME_MAX - 1);
+        nuevo->line = lineno;
+        *reg = nuevo;
+        return;
+    }
+
+    // ── Declaracion normal de variable ──
+    parse_decl(p, linea, lineno);
+}
+
 typedef enum { FUERA, CABECERA, AMBIENTE, PROCESO, CERRADO } Bloque;
 
 int paed_parse_file(const char *path, PAEDProgram *out) {
@@ -819,6 +916,10 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
     int    lineno = 0;
     Bloque bloque = FUERA;
     Pila   pila   = { .tope = 0 };   // bloques abiertos dentro del PROCESO
+
+    // Sub-estado del AMBIENTE: mientras hay un REGISTRO abierto, cada linea es
+    // un CAMPO del tipo y no una declaracion de variable. NULL = no hay ninguno.
+    PAEDRegistro *reg = NULL;
 
     while (fgets(buf, sizeof(buf), f)) {
         lineno++;
@@ -901,7 +1002,7 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
         }
 
         switch (bloque) {
-            case AMBIENTE: parse_decl(out, linea, lineno); break;
+            case AMBIENTE: parse_ambiente(out, linea, lineno, &reg); break;
             case PROCESO:
                 // Primero los bloques: sus cabeceras NO llevan ';', asi que
                 // tienen que reconocerse antes de que parse_instruction lo exija.
@@ -924,6 +1025,8 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
 
     if (bloque == FUERA)  add_error(out, lineno, "falta ACCION <nombre> ES");
     if (bloque == CABECERA || bloque == AMBIENTE) add_error(out, lineno, "falta PROCESO");
+    if (reg) add_error(out, lineno, "falta FIN_REGISTRO: el registro '%s' de la linea %d quedo abierto",
+                       reg->name, reg->line);
     if (bloque == PROCESO) add_error(out, lineno, "falta el cierre: FIN_ACCION o FINACCION");
 
     return out->error_count == 0 ? 0 : -1;

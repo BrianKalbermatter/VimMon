@@ -6,12 +6,11 @@ kanban-plugin: board
 
 ## Backlog
 
-- [ ] Parser PAED: `pori.vx := ...` — acceso a campos de registro. 13 asignaciones del corpus fallan solo por esto (`es_identificador` no acepta el punto) #fase2
+- [ ] Parser PAED: una instrucción no puede partirse en dos líneas — el parser lee línea por línea. Un `ESCRIBIR` largo hay que dejarlo en una sola #fase2
 - [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir antes de implementar #fase2
 - [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
 - [ ] Evaluador: guardar un árbol de la expresión en vez de re-parsear el texto en CADA vuelta del bucle. Hoy es simple y correcto, pero un `MIENTRAS` largo paga el costo en cada iteración #fase2
 - [ ] Evaluador: usar el `AMBIENTE` para chequear tipos. Hoy se parsea pero no se usa: asignarle un texto a algo declarado `ENTERO` no da error #fase2
-- [ ] Evaluador: campos de registro (`pori.vx`) en expresiones y como destino de asignación. Los arreglos ya están; falta el punto #fase2
 - [ ] Evaluador: los arreglos no chequean el TIPO declarado. `A: ARREGLO[1..5] DE ENTERO` acepta que le metan un texto en `A[2]`, igual que pasa con los escalares #fase2
 - [ ] Evaluador: `NFDS`/`FDS` necesitan SECUENCIAS, que el intérprete no tiene. Hoy avisan en vez de inventar un valor #fase2
 - [ ] Avisar cuando se usa `==`: ya está resuelto que NO existe en AED (`TEORIA_COMPLETA.txt:324` define `=`, y la wiki lo marca como error de escritura arrastrado, 91 usos). Hoy se acepta callado para no romper los archivos; debería avisar sin frenar la ejecución #fase2
@@ -75,6 +74,10 @@ kanban-plugin: board
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
 - [x] `paed/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED, fuente unica de verdad #fase0
 - [x] PAED.md v4.0 absorbe entero `docs/paed_spec.md` (v2.0), que se borra: una sola spec, no dos. Se separan **catedra** / **decidido** / **implementado**, porque habia decisiones documentadas que el parser no cumplia (keywords case-insensitive, `;` como separador) #fase0
+- [x] REGISTRO implementado — `vector2 = REGISTRO ... FIN_REGISTRO` en el AMBIENTE, y `pori.vx` como destino y dentro de expresiones. Es el `struct` de C con otro nombre #fase2
+- [x] `AlgebraRectas/recta.paed` corre ENTERO: de 10 errores a 0. Verificado a mano que el calculo da bien — P0=(0,0), D=(1,-4), dominio [-4,4] produce el segmento (-4,16) a (4,-16), que es la recta y=-4x #fase2
+- [x] Los registros se APLANAN: `pori` de tipo vector2 se guarda como las variables "pori.vx" y "pori.vy". El Entorno no sabe nada de registros. El precio es que no se puede asignar un registro entero (`p1 := p2`), que no aparece en el corpus #fase2
+- [x] Un campo que el registro NO declara se rechaza (`'p' no tiene un campo 'vz'`). Sin ese chequeo el registro no serviria de nada: como los campos se aplanan, `p.vz` naceria solo en su primera asignacion igual que un escalar #fase2
 - [x] Keywords case-insensitive RESUELTO — `accion`, `MiEnTrAs` y `FiN_sI` parsean igual que en mayusculas. Alcanza a palabras clave, tipos, nombres de procedimiento y claves de parametro. Los IDENTIFICADORES siguen distinguiendo: `total` y `Total` son dos variables. Regla: lo que define el lenguaje no distingue, lo que nombras vos si #fase2
 - [x] Verificado que ninguna variable del corpus real choca solo por mayusculas, asi que mantener los identificadores case-sensitive no rompe ningun `.paed` existente #fase2
 - [x] Bug encontrado al hacerlo: `FIN_MIENTRAS` y `FIN_PARA` se distinguian por `linea[4] == 'P'`. Con `fin_para` en minuscula eso es `'p'` y el bucle se cerraba como si fuera un `FIN_MIENTRAS` #fase2

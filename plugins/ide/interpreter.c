@@ -354,15 +354,48 @@ static int condicion(Entorno *env, const PAEDProgram *prog, const PAEDInstr *in,
 // Reserva los arreglos declarados en el AMBIENTE. Un escalar no hace falta
 // declararlo (nace en su primera asignacion), pero un arreglo si: sin los
 // limites no hay donde guardar ni contra que chequear el indice.
+// ¿El tipo de esta declaracion es un REGISTRO declarado en el AMBIENTE?
+static const PAEDRegistro *registro_de(const PAEDProgram *prog, const char *tipo) {
+    for (int i = 0; i < prog->registro_count; i++)
+        if (strcasecmp(prog->registros[i].name, tipo) == 0)
+            return &prog->registros[i];
+    return NULL;
+}
+
 static int declarar_ambiente(const PAEDProgram *prog) {
     int fallos = 0;
     for (int i = 0; i < prog->decl_count; i++) {
         const PAEDDecl *d = &prog->decls[i];
-        if (!d->es_arreglo) continue;
 
-        if (env_declarar_arreglo(&env, d->name, d->desde, d->hasta) != 0) {
-            fprintf(stderr, "%s:%d: error: %s\n", prog->path, d->line, env.error);
-            fallos++;
+        if (d->es_arreglo) {
+            if (env_declarar_arreglo(&env, d->name, d->desde, d->hasta) != 0) {
+                fprintf(stderr, "%s:%d: error: %s\n", prog->path, d->line, env.error);
+                fallos++;
+            }
+            continue;
+        }
+
+        // Variable de tipo REGISTRO: se APLANA en una variable por campo.
+        // `pori: vector2` con campos vx,vy pasa a ser "pori.vx" y "pori.vy".
+        //
+        // Asi el entorno no necesita saber nada de registros: para el son dos
+        // variables comunes que da la casualidad que tienen un punto en el
+        // nombre. El precio es que no se puede asignar un registro entero
+        // (`p1 := p2`), que no aparece en el corpus.
+        const PAEDRegistro *reg = registro_de(prog, d->type);
+        if (!reg) continue;   // tipo escalar: nace solo en su primera asignacion
+
+        for (int c = 0; c < reg->campo_count; c++) {
+            char completo[PAED_NAME_MAX];
+            snprintf(completo, sizeof(completo), "%s.%s", d->name, reg->campos[c].name);
+
+            Valor cero = {0};
+            cero.tipo = VAL_NUM;
+            if (env_set(&env, completo, cero) != 0) {
+                fprintf(stderr, "%s:%d: error: no entran mas variables (campo '%s')\n",
+                        prog->path, d->line, completo);
+                fallos++;
+            }
         }
     }
     return fallos;
@@ -378,6 +411,21 @@ static int asignar(const PAEDProgram *prog, const PAEDInstr *in) {
 
     const char *idx_txt = paed_get_arg(in, "indice");
     if (!idx_txt) {
+        // Un campo de registro NO nace en su primera asignacion, al reves que
+        // un escalar: los campos se crearon todos al declarar la variable. Si
+        // el nombre tiene punto y no existe, es un campo que el registro no
+        // tiene — y aceptarlo callado dejaria el registro sin sentido, porque
+        // admitiria cualquier campo inventado.
+        const char *punto = strchr(in->proc, '.');
+        if (punto && !env_existe(&env, in->proc)) {
+            char msg[PAED_MSG_MAX];
+            snprintf(msg, sizeof(msg),
+                     "'%.*s' no tiene un campo '%s'",
+                     (int)(punto - in->proc), in->proc, punto + 1);
+            runtime_error(prog, in, msg);
+            return -1;
+        }
+
         if (env_set(&env, in->proc, v) != 0) {
             // env_set deja el motivo cuando el nombre ya existe como arreglo.
             runtime_error(prog, in, env.error[0] ? env.error : "no entran mas variables");
