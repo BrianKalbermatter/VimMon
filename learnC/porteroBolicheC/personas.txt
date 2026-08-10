@@ -1,0 +1,6 @@
+dni;nombre;edad;hora_ingreso
+40123456;Pereyra;22;23:15
+38999111;Gomez;31;00:42
+40123456;Pereyra;22;01:30
+41555222;Lopez;17;23:50
+38999111;Gomez;31;23:05
