@@ -30,10 +30,15 @@
 paed/build_o/
 paed/aed
 paed/PseudoGames.exe
-paed/Frankly/paed
 paed/screenPJ/screenPJ
 paed/learBash/*.out
 paed/lib/
+
+# OJO: 'paed/Frankly/paed' estuvo aca hasta el 2026-08-10, listado como si fuera
+# un binario. No lo es: son 715 lineas de bash, el interprete de Frankly. Por
+# estar ignorado no lo movio el renombre PseudoGames -> paed, y quedo solo en
+# disco, sin ninguna copia en git, a un rm de perderse.
+# Un archivo sin extension no es un binario. Mirar antes de ignorar.
 
 # Aprendizaje y contenido personal
 !/documentacion/
