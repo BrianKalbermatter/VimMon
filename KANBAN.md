@@ -11,7 +11,8 @@ kanban-plugin: board
 - [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
 - [ ] Evaluador: guardar un árbol de la expresión en vez de re-parsear el texto en CADA vuelta del bucle. Hoy es simple y correcto, pero un `MIENTRAS` largo paga el costo en cada iteración #fase2
 - [ ] Evaluador: usar el `AMBIENTE` para chequear tipos. Hoy se parsea pero no se usa: asignarle un texto a algo declarado `ENTERO` no da error #fase2
-- [ ] Evaluador: arreglos (`A[i]`) y campos de registro (`pori.vx`) en expresiones y como destino de asignación #fase2
+- [ ] Evaluador: campos de registro (`pori.vx`) en expresiones y como destino de asignación. Los arreglos ya están; falta el punto #fase2
+- [ ] Evaluador: los arreglos no chequean el TIPO declarado. `A: ARREGLO[1..5] DE ENTERO` acepta que le metan un texto en `A[2]`, igual que pasa con los escalares #fase2
 - [ ] Evaluador: `NFDS`/`FDS` necesitan SECUENCIAS, que el intérprete no tiene. Hoy avisan en vez de inventar un valor #fase2
 - [ ] Avisar cuando se usa `==`: ya está resuelto que NO existe en AED (`TEORIA_COMPLETA.txt:324` define `=`, y la wiki lo marca como error de escritura arrastrado, 91 usos). Hoy se acepta callado para no romper los archivos; debería avisar sin frenar la ejecución #fase2
 - [ ] Confirmar contra la cátedra: `-2 ** 2` da 4 porque la tabla de prioridad pone los unarios ARRIBA de la potencia. En casi todos los lenguajes da -4. ¿Es lo que quiere AED? #fase2
@@ -101,6 +102,12 @@ kanban-plugin: board
 - [x] Guarda de bucle infinito (2M pasos): el intérprete corre DENTRO del game loop, así que un programa colgado colgaba la ventana entera #fase2
 - [x] Bug: `parse_instruction` buscaba el `=` de `clave = valor` con `strchr`, sin respetar comillas, y `ESCRIBIR("a = b")` quedaba destrozado #fase2
 - [x] Test: programa con `PARA`, `PARA` en reversa, `MIENTRAS` acumulador, `SI/SINO` y `PARA` anidado corre entero y da los valores correctos #fase2
+- [x] `build/paedrun` — arnés que corre un `.paed` en la terminal, sin SDL ni bus. El intérprete vive dentro del game loop, así que probar el lenguaje era abrir la ventana y mirar; un test que hay que mirar no es un test #fase2
+- [x] `make test` — corre todos los `.paed` de `paed/Frankly/tests/` y compara contra el `.esperado` de al lado. Agregar un test es dejar los dos archivos: no hay lista que mantener a mano #fase2
+- [x] Evaluador: `ARREGLO[desde..hasta] DE <tipo>` en el `AMBIENTE`, `A[i]` en expresiones y como destino. El índice es una expresión completa, así que `A[(izq+der) DIV 2]` sale gratis. Los límites se chequean en runtime: `indice 4 fuera de rango: 'A' va de 5 a 9` #fase2
+- [x] Algoritmos reales corriendo: búsqueda lineal, búsqueda binaria, burbuja con `PARA` anidado, Euclides, primos, Fibonacci, factorial #fase2
+- [x] Bug: `falla(c, "%s", c->env->error)` pasaba el buffer de error como argumento de un `vsnprintf` que escribe en ESE MISMO buffer. Aliasing: el mensaje llegaba vacío (`error: ` pelado). Se copia antes de pasarlo #fase2
+- [x] Bug: `stdout` con buffer y `stderr` sin él descolocaban el orden de la salida al mandarla a una tubería, y los errores aparecían antes de líneas impresas primero. `setvbuf` en `paedrun` #fase2
 - [x] `PARA <var> := <desde> HASTA <hasta>[; <paso>] HACER` / `FIN_PARA`. El paso es OPCIONAL y por defecto 1, corroborado en `TEORIA_COMPLETA.txt:565-571` ("Si el incremento es distinto de 1, debe indicarse"). En reversa se usa paso negativo, no una palabra tipo `downto`. `recta.paed:47` decía `a` en vez de `HASTA` y se corrigió #fase2
 - [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3

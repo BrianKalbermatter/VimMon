@@ -148,6 +148,73 @@ ventana entera y hay que matar el proceso sin saber por qué.
   costo. La solución es guardar un árbol una sola vez.
 - **`NFDS` y `FDS` no funcionan**: preguntan por secuencias, que el intérprete
   no tiene. Se avisa en vez de inventar un valor.
-- **No hay arreglos ni campos de registro**: `A[i]` y `pori.vx` no se evalúan.
+- **No hay campos de registro**: `pori.vx` todavía no se evalúa.
 - **`==` se acepta como sinónimo de `=`** porque aparece en los ejercicios,
   aunque la teoría solo define `=`. Falta confirmar si es válido.
+
+## Arreglos
+
+Se declaran en el `AMBIENTE` con los dos límites, y los elige el programador:
+no arrancan en 0 ni siempre en 1.
+
+```paed
+AMBIENTE
+    A: ARREGLO[1..10] DE ENTERO;
+```
+
+El índice es una **expresión completa**, no solo un número, así que `A[i]`,
+`A[i + 1]` y `A[(izq + der) DIV 2]` salen gratis, sin ningún caso especial. Se
+evalúa recién en tiempo de ejecución: en `A[i] := 0` dentro de un bucle, `i`
+vale distinto en cada vuelta.
+
+Como destino de asignación, el parser corta el nombre del índice y guarda el
+índice crudo en `args[0]`, con la clave `indice`. El intérprete distingue
+"escalar" de "elemento" por si ese argumento existe — no hizo falta un campo
+nuevo en la instrucción.
+
+### Los límites se chequean
+
+```
+indice 4 fuera de rango: 'A' va de 5 a 9
+```
+
+Esto es lo que hace útil declarar el rango. En C, `A[99]` sobre un arreglo de
+10 escribe en memoria ajena y el programa sigue como si nada, hasta reventar
+en otro lado sin relación aparente. Acá se corta en el momento, con el índice
+y los límites a la vista.
+
+Los elementos arrancan en 0 y no en basura: leer `A[3]` antes de cargarlo tiene
+que dar algo previsible.
+
+El almacenamiento es un **pool compartido** en el `Entorno`
+(`PAED_MAX_ELEMS`), no un array dentro de cada `Variable`: reservar el máximo
+en cada una de las 64 variables gastaría toda esa memoria en los escalares,
+que son la mayoría.
+
+### Por qué la búsqueda lineal necesita el cortocircuito
+
+```paed
+MIENTRAS (i <= n) Y (A[i] <> buscado) HACER
+```
+
+Cuando el elemento no está, `i` llega a `n + 1`. Sin cortocircuito se evaluaría
+`A[n+1]`, fuera de rango: el programa cortaría con un error en vez de contestar
+"no está". Es el ejemplo de que el cortocircuito **cambia el comportamiento**,
+no la velocidad.
+
+## Cómo se prueba
+
+`build/paedrun` corre un `.paed` en la terminal, sin SDL ni bus. El intérprete
+vive dentro del game loop, así que antes la única forma de probar el lenguaje
+era abrir la ventana y mirar — y un test que hay que mirar no es un test.
+
+```bash
+make paedrun
+build/paedrun paed/Frankly/tests/busqueda_binaria.paed
+make test     # corre todos y compara contra los .esperado
+```
+
+Los programas de `paed/Frankly/tests/` cubren búsqueda lineal (con el caso que
+justifica el cortocircuito), búsqueda binaria, burbuja con `PARA` anidado,
+Euclides, primos, Fibonacci, las tres trampas de prioridad y el índice fuera
+de rango.

@@ -44,7 +44,11 @@ FIN_ACCION
 | `SECUENCIA DE <tipo>` | `sec1: SECUENCIA DE CARACTER;` |
 | `VENTANA DE <tipo>` | `recorrido: VENTANA DE CARACTER;` |
 | `SECUENCIA DE SALIDA` | `secSalida: SECUENCIA DE SALIDA;` |
-| `ARREGLO`, `REGISTRO`, `CONSTANTE` | |
+| `ARREGLO[d..h] DE <tipo>` | `A: ARREGLO[1..10] DE ENTERO;` |
+| `REGISTRO`, `CONSTANTE` | |
+
+Los límites del arreglo los elige el programador y **no arrancan en 0**:
+`ARREGLO[1..10]` va del 1 al 10, y `ARREGLO[5..9]` del 5 al 9.
 
 ## 3. Asignación y operadores
 
@@ -146,16 +150,38 @@ se reporta como no implementado, con número de línea — nunca se ignora.
 | Comentarios `//`, incluso dentro de strings | ✅ |
 | Llamadas posicionales `PROC(a, b);` | ✅ |
 | `;` obligatorio, error con línea | ✅ |
+| Asignación `:=` | ✅ |
+| `SI` / `SINO` / `FIN_SI`, anidados | ✅ |
+| `MIENTRAS` / `FIN_MIENTRAS`, anidados | ✅ |
+| `PARA ... HASTA ... [; paso] HACER`, incluso en reversa | ✅ |
+| Expresiones y operadores de comparación | ✅ |
+| `ARREGLO[desde..hasta] DE <tipo>`, en expresión y como destino | ✅ |
 | Nombre de `ACCION` **con espacios** (`ACCION Ejercicio de Parcial ES`) | ❌ |
-| Asignación `:=` | ❌ |
-| `SI` / `MIENTRAS` / `PARA` / `REPETIR` / `SEGUN` | ❌ |
+| `REPETIR` / `SEGUN` | ❌ |
 | `FUNCION` / `PROCEDIMIENTO` anidados en `AMBIENTE` | ❌ |
-| `REGISTRO` / `ARCHIVO` / `ARREGLO` | ❌ |
-| Expresiones y operadores de comparación | ❌ |
+| `REGISTRO` (`pori.vx`) / `ARCHIVO` | ❌ |
+| `SECUENCIA`, y por lo tanto `NFDS` / `FDS` | ❌ |
 
-Para tragar tus ejercicios de la cátedra tal como están escritos faltan las
-filas con ❌. Las estructuras de control necesitan una **pila** de bloques, no
-la máquina de estados plana que tiene hoy.
+Las estructuras de control usan una **pila** de bloques, no una máquina de
+estados plana: una variable sola no puede representar un CAMINO de anidamiento,
+y es pila porque los bloques cierran en el orden inverso al que se abren.
+
+Los arreglos chequean el índice contra los límites declarados. Es la diferencia
+con C: ahí `A[99]` sobre un arreglo de 10 pisa memoria ajena en silencio, y acá
+corta diciendo cuál fue el índice y cuáles eran los límites.
+
+### Cómo se prueba
+
+`build/paedrun` corre un `.paed` en la terminal, sin abrir la ventana:
+
+```bash
+make paedrun
+build/paedrun paed/Frankly/tests/busqueda_binaria.paed
+```
+
+`make test` corre todos los `.paed` de `paed/Frankly/tests/` y compara la
+salida contra el `.esperado` de al lado. Agregar un test es dejar los dos
+archivos ahí: no hay ninguna lista que mantener a mano.
 
 ## 8. Sin corroborar
 
