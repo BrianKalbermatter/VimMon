@@ -1,0 +1,323 @@
+================================================================================
+  VIMMON KERNEL — PLAN DE DESARROLLO
+  OS Embebido x86-64 | Desde cero | Siguiendo osdev.org
+================================================================================
+
+CONTEXTO
+--------
+VimMon no es solo una app — es un Sistema Operativo de proposito unico.
+El kernel arranca y corre SOLAMENTE VimMon. No hay shell generico, no hay
+multi-usuario, no hay filesystem complejo. El kernel existe para darle a
+VimMon lo que necesita: pantalla, teclado, memoria, timer.
+
+Arquitectura : x86-64
+Objetivo     : Aprendizaje profundo de cada capa del OS, testeando en QEMU
+Tipo         : Embedded / Single-purpose OS
+
+Diferencia clave vs OS generico:
+  - No se necesita ELF loader ni userspace separation
+  - Display: framebuffer VESA (grafico, no solo texto VGA)
+  - No scheduler complejo: una sola tarea principal = VimMon
+  - VimMon debe ser portado de SDL2 a framebuffer propio
+
+
+================================================================================
+  ESTRUCTURA DE DIRECTORIOS
+================================================================================
+
+VimMon/kernel/
+├── Makefile
+├── linker.ld
+├── iso/boot/grub/grub.cfg
+├── boot/
+│   └── entry.asm          <- Multiboot2 + VESA framebuffer request
+├── arch/x86_64/
+│   ├── gdt.c / gdt.h
+│   ├── idt.c / idt.h
+│   ├── isr.asm
+│   └── pic.c / pic.h
+├── mm/
+│   ├── pmm.c / pmm.h      <- bitmap allocator
+│   └── heap.c / heap.h    <- kmalloc/kfree
+├── drivers/
+│   ├── fb.c / fb.h        <- Framebuffer (VESA via Multiboot2 tag)
+│   ├── font.c / font.h    <- PSF font embebida
+│   ├── keyboard.c         <- PS/2 IRQ1 -> keymap ASCII
+│   └── timer.c            <- PIT 100Hz
+├── kernel/
+│   ├── main.c             <- kmain() -> init todo -> vimmon_main()
+│   └── panic.c
+└── include/
+    ├── types.h
+    └── io.h
+
+VimMon/app/                <- VimMon portado a bare-metal
+├── vimmon.c / vimmon.h    <- entry point: vimmon_main()
+├── render.c               <- usa fb.h en vez de SDL_RenderCopy
+├── input.c                <- usa keyboard.h en vez de SDL_PollEvent
+└── ...                    <- resto de logica sin cambios
+
+
+================================================================================
+  EL CAMBIO CLAVE: SDL2 -> FRAMEBUFFER
+================================================================================
+
+SDL2 existe en Linux. En bare metal NO HAY SDL2.
+Lo que hace SDL2 en VimMon y su reemplazo:
+
+  SDL_RenderCopy (texturas)         ->  fb_blit(pixels, x, y, w, h)
+  SDL_RenderFillRect (rectangulos)  ->  fb_fill_rect(x, y, w, h, color)
+  TTF_RenderUTF8_Blended (texto)    ->  font_draw_string(x, y, str, color) [PSF]
+  SDL_PollEvent (teclado)           ->  keyboard_poll() desde buffer IRQ1
+  SDL_Delay (timing)                ->  timer_sleep(ms)
+
+La logica de VimMon (pantallas, panels, tabs) NO CAMBIA.
+Solo cambia el backend de render e input.
+
+
+================================================================================
+  HERRAMIENTAS NECESARIAS
+================================================================================
+
+  sudo apt install nasm gcc grub-pc-bin grub-common xorriso qemu-system-x86
+
+Compilar con:
+  gcc -m64 -ffreestanding -nostdlib -mno-red-zone -mcmodel=kernel -O2
+
+Flags importantes:
+  -ffreestanding  -> no asumir que existe stdlib
+  -nostdlib       -> no linkear libs del sistema
+  -mno-red-zone   -> necesario para kernel (interrupts pueden usar red zone)
+  -mcmodel=kernel -> para higher-half kernel (0xFFFFFFFF80000000)
+
+
+================================================================================
+  FASES DE IMPLEMENTACION
+================================================================================
+
+------------------------------------------------------------------------
+FASE 1 — BOOT + FRAMEBUFFER: VimMon en modo grafico
+Referencia: osdev.org/wiki/Bare_Bones
+            osdev.org/wiki/Multiboot#Framebuffer
+------------------------------------------------------------------------
+
+Archivos a crear:
+  boot/entry.asm
+    - Header Multiboot2 con tag framebuffer (pedir 1024x768x32)
+    - GRUB configura el framebuffer y pasa el puntero en multiboot_info
+    - Llamar a kmain(magic, mbi)
+
+  drivers/fb.c
+    - Extraer de mbi: fb_addr, fb_width, fb_height, fb_pitch, fb_bpp
+    - fb_put_pixel(x, y, color)     color = 0xRRGGBB
+    - fb_fill_rect(x, y, w, h, color)
+    - fb_blit(src, x, y, w, h, pitch)
+
+  drivers/font.c
+    - Embeber font PSF2 (ej: ter-u16n.psf) como array de bytes
+    - font_draw_char(x, y, ch, fg, bg)
+    - font_draw_string(x, y, str, fg, bg)
+
+  kernel/main.c
+    - Dibujar "VimMon OS" en el framebuffer con color y fuente
+
+MILESTONE: pantalla grafica con texto renderizado en QEMU.
+TEST    : qemu-system-x86_64 -cdrom vimmon.iso
+
+
+------------------------------------------------------------------------
+FASE 2 — CPU: GDT + IDT + EXCEPCIONES
+Referencia: osdev.org/wiki/Global_Descriptor_Table
+            osdev.org/wiki/Interrupt_Descriptor_Table
+------------------------------------------------------------------------
+
+Archivos a crear:
+  arch/x86_64/gdt.c
+    - 3 entradas: null descriptor, kernel code (0x9A), kernel data (0x92)
+    - lgdt con struct __attribute__((packed))
+
+  arch/x86_64/idt.c
+    - 256 entradas, gate type 0xE (interrupt gate 64-bit)
+    - lidt + set_idt_gate(n, handler, flags)
+
+  arch/x86_64/isr.asm
+    - Macros para 32 ISRs (excepciones 0-31 de la CPU)
+    - Push error code + numero -> isr_common_stub -> isr_handler(regs*)
+
+  arch/x86_64/pic.c
+    - Remapear PIC master a 0x20, slave a 0x28
+    - pic_send_eoi()
+
+MILESTONE: excepcion capturada -> pantalla de panic con mensaje.
+TEST    : forzar division por cero -> ver "Exception 0: Division by Zero"
+
+
+------------------------------------------------------------------------
+FASE 3 — MEMORIA: PMM + HEAP
+Referencia: osdev.org/wiki/Memory_Map_(x86)
+            osdev.org/wiki/Memory_management
+------------------------------------------------------------------------
+
+Archivos a crear:
+  mm/pmm.c
+    - Parsear multiboot memory map (tipo 1 = usable)
+    - Bitmap: 1 bit por frame de 4KB
+    - pmm_alloc_frame() -> direccion fisica
+    - pmm_free_frame(addr)
+
+  mm/heap.c
+    - Free-list allocator sobre region fija del kernel
+    - kmalloc(size), kfree(ptr)
+
+NOTA: No se necesita VMM/paging complejo en esta etapa.
+      GRUB ya deja paging activo con identity mapping.
+
+MILESTONE: kmalloc(1024) devuelve ptr valido. kfree() sin corrupcion.
+TEST    : loop de 1000 alloc/free sin crash.
+
+
+------------------------------------------------------------------------
+FASE 4 — DRIVERS: TECLADO + TIMER
+Referencia: osdev.org/wiki/PIT
+            osdev.org/wiki/PS/2_Keyboard
+------------------------------------------------------------------------
+
+Archivos a crear:
+  drivers/timer.c
+    - PIT Canal 0, frecuencia 100Hz (divisor = 11932)
+    - IRQ0 -> incrementar tick_count
+    - timer_sleep(ms) usando ticks
+    - get_ticks() -> uint64_t
+
+  drivers/keyboard.c
+    - IRQ1 -> leer scancode de port 0x60
+    - Scancode Set 1 -> ASCII
+    - Buffer circular de 64 chars
+    - keyboard_getchar(), keyboard_poll()
+
+  drivers/serial.c (debug)
+    - COM1 (0x3F8), 38400 baud
+    - serial_write(str) -> visible en QEMU con -serial stdio
+
+MILESTONE: tipear en QEMU -> caracteres en pantalla.
+TEST    : timer_sleep(1000) medible con reloj real.
+
+
+------------------------------------------------------------------------
+FASE 5 — PORT DE VIMMON A BARE METAL
+Referencia: VimMon/PseudoGames/src/
+------------------------------------------------------------------------
+
+Crear VimMon/app/ con el port del backend:
+
+  app/render.c
+    - Reemplazar SDL calls con fb_* calls
+    - SDL_Color {r,g,b,a} -> uint32_t (r<<16)|(g<<8)|b
+    - TTF calls -> font_draw_string()
+
+  app/input.c
+    - Reemplazar SDL_PollEvent con keyboard_poll()
+    - Mapear scancodes a las mismas constantes que usaba SDL
+
+  app/vimmon.c
+    - vimmon_main() que llama el loop principal de VimMon
+
+  kernel/main.c (modificar)
+    - Al final del init: llamar vimmon_main() -- nunca retorna
+
+MILESTONE: VimMon completo corriendo en bare metal en QEMU.
+TEST    : navegar menus, abrir tabs, escribir pseudocodigo.
+
+
+================================================================================
+  FLUJO DE BOOT COMPLETO
+================================================================================
+
+  QEMU -> GRUB -> entry.asm
+    -> kmain(magic, mbi)
+       |
+       +-> fb_init(mbi)          [framebuffer grafico listo]
+       +-> gdt_init()            [segmentacion]
+       +-> idt_init()            [interrupciones]
+       +-> pic_remap()           [IRQs en 0x20-0x2F]
+       +-> pmm_init(mbi)         [memoria fisica]
+       +-> heap_init()           [kmalloc listo]
+       +-> timer_init(100)       [100 Hz]
+       +-> keyboard_init()       [PS/2 listo]
+       +-> sti()                 [habilitar IRQs]
+       +-> vimmon_main()         <- VimMon, nunca retorna
+
+
+================================================================================
+  NOTAS DE IMPLEMENTACION
+================================================================================
+
+  - Compilador : usar -mcmodel=kernel -mno-red-zone siempre
+  - No stdlib  : no printf, no malloc del sistema -- todo propio
+  - Debug      : serial_write() es el printf del kernel hasta tener FB estable
+  - Assets     : embeber como arrays C con: xxd -i imagen.png > imagen.c
+  - PSF font   : usar Terminus u otra libre con licencia OFL/GPL
+  - Multiboot2 : GRUB maneja el modo grafico, no necesitamos driver VESA propio
+  - xv6 ref    : /home/devkbtj/MiniOS/xv6-riscv/kernel/ para conceptos
+                 (codigo diferente: RISC-V vs x86-64, pero logica igual)
+
+
+================================================================================
+  TABLA DE VERIFICACION
+================================================================================
+
+  Fase | Test
+  -----|--------------------------------------------------------------
+  1    | qemu -cdrom vimmon.iso -> pantalla grafica con "VimMon OS"
+  2    | Division por cero -> pantalla de panic, no freeze silencioso
+  3    | kmalloc/kfree loop 1000x sin crash ni corrupcion
+  4    | Tipear -> eco en pantalla; timer_sleep(1000) = 1 segundo real
+  5    | VimMon completo navegable en bare metal
+
+
+================================================================================
+  ORDEN DE CREACION DE ARCHIVOS
+================================================================================
+
+  1.  kernel/include/types.h
+  2.  kernel/include/io.h
+  3.  boot/entry.asm
+  4.  linker.ld
+  5.  Makefile
+  6.  iso/boot/grub/grub.cfg
+  7.  drivers/fb.c / fb.h
+  8.  drivers/font.c / font.h  (+ font PSF embebida)
+  9.  kernel/main.c
+  10. kernel/panic.c
+  11. arch/x86_64/gdt.c / gdt.h
+  12. arch/x86_64/idt.c / idt.h
+  13. arch/x86_64/isr.asm
+  14. arch/x86_64/pic.c / pic.h
+  15. mm/pmm.c / pmm.h
+  16. mm/heap.c / heap.h
+  17. drivers/keyboard.c
+  18. drivers/timer.c
+  19. drivers/serial.c
+  20. app/render.c
+  21. app/input.c
+  22. app/vimmon.c
+
+
+================================================================================
+  RECURSOS OSDEV.ORG
+================================================================================
+
+  https://osdev.org/wiki/Bare_Bones
+  https://osdev.org/wiki/Multiboot
+  https://osdev.org/wiki/Global_Descriptor_Table
+  https://osdev.org/wiki/Interrupt_Descriptor_Table
+  https://osdev.org/wiki/Exceptions
+  https://osdev.org/wiki/PIC
+  https://osdev.org/wiki/PIT
+  https://osdev.org/wiki/PS/2_Keyboard
+  https://osdev.org/wiki/Memory_Map_(x86)
+  https://osdev.org/wiki/Memory_management
+  https://osdev.org/wiki/PSF
+  https://osdev.org/wiki/GRUB_2
+
+================================================================================
