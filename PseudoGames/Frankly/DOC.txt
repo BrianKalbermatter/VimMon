@@ -3,6 +3,62 @@ PAED - Documentacion del Compilador/Interprete
 Lenguaje: .paed (pseudo + aed)
 Herramienta: paed (script bash sin extension, ejecutable)
 
+
+>>> SPEC AUTORITATIVA: docs/paed_spec.md  (desde 2026-08-07)
+-----------------------------------------------------------
+La definicion COMPLETA y unica del lenguaje vive ahora en:
+
+    /home/devkbtj/proyectos/VimMon/docs/paed_spec.md
+
+Este DOC.txt sigue siendo valido como guia de Frankly (el
+interprete en bash), pero NO es la fuente de verdad de la
+sintaxis. Si algo de aca contradice a paed_spec.md, gana
+paed_spec.md.
+
+Por que una sola fuente:
+  Antes habia DOS lenguajes llamados PAED sin relacion, y
+  TRES listas de keywords desincronizadas (sintaxis.json,
+  paed.tmLanguage.json, editorText.c). A ninguna le entraban
+  FIN_REGISTRO, SUBACCION, FDA, NFDA, Verdadero, Falso ni nil.
+  Ese es exactamente el bug que mato a la version anterior.
+
+Que dice paed_spec.md sobre Frankly:
+  - Frankly/paed es la IMPLEMENTACION DE REFERENCIA.
+  - PAED v2 (en C) lo reemplaza, pero debe seguir aceptando
+    todo lo que Frankly acepta hoy. Su comportamiento es el
+    contrato de compatibilidad.
+  - Convenciones de Frankly que v2 hereda:
+      * analizar() antes de ejecutar()        DOC.txt:8-15
+      * error "archivo:linea: error: msg"     paed:96,147,155
+      * pila para validar anidamiento         paed:110-195
+      * multiples formas de cierre aceptadas  paed:192
+      * ';' al final de sentencia             core/validacion.sh:23
+
+Cambio 2026-08-07: Lua removido de Frankly
+-------------------------------------------
+Se saco syntax/paed.lua (94 lineas) -> _void/frankly-lua/paed.lua
+Frankly queda 100% bash + JSON, sin Lua.
+
+Consecuencias a tener en cuenta:
+  - Ya NO hay resaltado de .paed en Neovim. El tmLanguage.json
+    es formato TextMate (VSCode/Zed), no sirve para Neovim.
+  - ftdetect/paed.vim quedo huerfano: sigue haciendo
+    "set filetype=paed" pero ya no hay nada que coloree ese
+    filetype. Es inofensivo, pero es codigo muerto.
+  - data/sintaxis.json quedo sin consumidor: paed.lua era el
+    unico que lo leia. Sigue siendo util como lista de
+    keywords de referencia.
+
+Para recuperarlo:
+    mv _void/frankly-lua/paed.lua PseudoGames/Frankly/syntax/
+
+
+Pendiente (ver paed_spec.md seccion 7):
+  18 conflictos documentados entre este DOC.txt, la wiki, los
+  apuntes y los PDF de catedra. Dos son BLOQUEANTES:
+    - Cierre de bloque: FIN_ACCION vs FIN ACCION vs FinAccion
+    - Separador del PARA: "a" (repo) vs "hasta" (catedra)
+
 Que es paed?
 ------------
 Es un interprete con fase de analisis previa.
