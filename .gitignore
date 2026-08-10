@@ -61,3 +61,9 @@ bus/.atl/
 
 # Binario temporal del generador de sintaxis PAED
 paed/Frankly/tools/gen_sintaxis
+
+# Resaltado de PAED para Helix: es configuracion del editor de cada uno, no
+# parte del proyecto. Adentro estan grammar.js, el parser generado y las
+# queries. Si lo necesitas en otra maquina, copiá la carpeta a mano y corré
+# ./instalar.sh — no viaja por git a proposito.
+paed/helix/
