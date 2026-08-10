@@ -229,6 +229,29 @@ static PAEDInstr *nueva_instr(PAEDProgram *p, PAEDKind kind, int lineno) {
 // La expresion se guarda CRUDA: todavia no hay evaluador. Igual se valida que
 // el destino sea un identificador y que haya algo del lado derecho, porque
 // aceptar basura ahora es esconder el error para mas adelante.
+// Copia un valor de argumento avisando si no entra.
+//
+// strncpy trunca en silencio, y el pedazo que queda casi siempre es texto sin
+// la comilla de cierre: el error que sale despues es "falta la comilla de
+// cierre", que manda a buscar un problema que no existe. Un texto de mas de
+// PAED_VAL_MAX bytes tiene que decir eso mismo.
+//
+// El limite es en BYTES, no en caracteres: una linea de guiones Unicode gasta
+// 3 bytes por guion y llega al tope con un tercio de los simbolos.
+static int copiar_valor(PAEDProgram *p, int lineno, char *destino,
+                        const char *valor, const char *donde) {
+    size_t n = strlen(valor);
+    if (n >= PAED_VAL_MAX) {
+        add_error(p, lineno,
+                  "el valor de %s ocupa %zu bytes y el maximo es %d "
+                  "(ojo: cada simbolo Unicode gasta hasta 4 bytes)",
+                  donde, n, PAED_VAL_MAX - 1);
+        return -1;
+    }
+    memcpy(destino, valor, n + 1);
+    return 0;
+}
+
 static void parse_asignacion(PAEDProgram *p, char *linea, int lineno, char *op) {
     *op = '\0';
     char *destino = trim(linea);
@@ -376,7 +399,11 @@ static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
         if (!igual) {
             // Nada se ignora en silencio: o es variadico, o es un error.
             if (variadico) {
-                strncpy(instr->args[instr->arg_count].val, partes[i], PAED_VAL_MAX - 1);
+                if (copiar_valor(p, lineno, instr->args[instr->arg_count].val,
+                                 partes[i], nombre) != 0) {
+                    hubo_error = 1;
+                    continue;
+                }
                 instr->arg_count++;
                 continue;
             }
@@ -418,7 +445,10 @@ static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
         }
 
         strncpy(instr->args[instr->arg_count].key, clave, PAED_KEY_MAX - 1);
-        strncpy(instr->args[instr->arg_count].val, valor, PAED_VAL_MAX - 1);
+        if (copiar_valor(p, lineno, instr->args[instr->arg_count].val, valor, nombre) != 0) {
+            hubo_error = 1;
+            continue;
+        }
         instr->arg_count++;
     }
 

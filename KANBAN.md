@@ -6,6 +6,7 @@ kanban-plugin: board
 
 ## Backlog
 
+- [ ] Subir `PAED_VAL_MAX` (128 bytes) o hacer que el texto de `ESCRIBIR` no tenga ese tope: hoy un marco decorativo Unicode de 40 simbolos ya no entra #fase2
 - [ ] Parser PAED: una instrucción no puede partirse en dos líneas — el parser lee línea por línea. Un `ESCRIBIR` largo hay que dejarlo en una sola #fase2
 - [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir antes de implementar #fase2
 - [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
@@ -78,6 +79,8 @@ kanban-plugin: board
 - [x] `plugins/editor/editor.c` escucha `EVENT_EDITOR_OPEN` y lanza `paed/aed`. main.c no sabe QUE programa es ni donde vive: el dia que haya otro, cambia el plugin y nada mas #fase5
 - [x] Si `paed/aed` no esta compilado, el plugin corre `make -C paed` solo. La primera vez que alguien escribe `edit` no tiene por que saber que habia que compilar a mano #fase5
 - [x] PseudoGames corre parado en `paed/`, porque carga `assets/`, `data/` y `saves/` con rutas relativas. `VIMMON_IDE` permite cambiar el programa sin recompilar VimMon #fase5
+- [x] `ParcialSimulado_01.paed` — parcial de 5 ejercicios REALES de la catedra (guia 1.1.5.1/2/3 + condicion de alumno + BOSS de notas), corriendo entero con `paedrun`. Usa arreglos, registros, `PARA`, `SI/SINO` anidados y potencia con exponente 0.5 para la raiz #fase2
+- [x] Bug de diagnostico: un texto de mas de `PAED_VAL_MAX` (128) bytes se truncaba en silencio y el error que salia era "falta la comilla de cierre", que manda a buscar un problema inexistente. Ahora dice cuantos bytes ocupa y cual es el maximo. El limite es en BYTES: una linea de guiones Unicode gasta 3 bytes por guion #fase2
 - [x] REGISTRO implementado — `vector2 = REGISTRO ... FIN_REGISTRO` en el AMBIENTE, y `pori.vx` como destino y dentro de expresiones. Es el `struct` de C con otro nombre #fase2
 - [x] `AlgebraRectas/recta.paed` corre ENTERO: de 10 errores a 0. Verificado a mano que el calculo da bien — P0=(0,0), D=(1,-4), dominio [-4,4] produce el segmento (-4,16) a (4,-16), que es la recta y=-4x #fase2
 - [x] Los registros se APLANAN: `pori` de tipo vector2 se guarda como las variables "pori.vx" y "pori.vy". El Entorno no sabe nada de registros. El precio es que no se puede asignar un registro entero (`p1 := p2`), que no aparece en el corpus #fase2
