@@ -18,7 +18,6 @@ kanban-plugin: board
 - [ ] Confirmar contra la cátedra: `-2 ** 2` da 4 porque la tabla de prioridad pone los unarios ARRIBA de la potencia. En casi todos los lenguajes da -4. ¿Es lo que quiere AED? #fase2
 - [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
 - [ ] Parser PAED: nombre de `ACCION` con espacios (`ACCION Ejercicio de Parcial ES`) #fase2
-- [ ] Parser PAED: keywords case-insensitive. `PAED.md:10.1` lo decidió pero el parser es case-sensitive (`accion t es` no parsea). Los operadores con nombre SÍ lo son, porque `expr.c` usa `strncasecmp`: la inconsistencia es entre parser y evaluador #fase2
 - [ ] Parser PAED: declaración múltiple `A,B,SUMA: entero`. Es la forma del único ejemplo con autoridad de cátedra (`AED_2021_UnI.pdf:10`) y hoy da "nombre de variable invalido" #fase2
 - [ ] Parser PAED: `VARIABLES` como sub-sección de `AMBIENTE`. Aparece en `AED_2021_UnI.pdf:10` y en ninguna otra fuente. Antes de implementar, confirmar si es obligatoria #fase2
 - [ ] Decidir el `;`: la cátedra lo usa como SEPARADOR (la última sentencia no lo lleva) y el parser lo exige como terminador. Cambiarlo rompe todos los `.paed` del repo — decidir antes de tocar #fase2
@@ -76,6 +75,9 @@ kanban-plugin: board
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
 - [x] `paed/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED, fuente unica de verdad #fase0
 - [x] PAED.md v4.0 absorbe entero `docs/paed_spec.md` (v2.0), que se borra: una sola spec, no dos. Se separan **catedra** / **decidido** / **implementado**, porque habia decisiones documentadas que el parser no cumplia (keywords case-insensitive, `;` como separador) #fase0
+- [x] Keywords case-insensitive RESUELTO — `accion`, `MiEnTrAs` y `FiN_sI` parsean igual que en mayusculas. Alcanza a palabras clave, tipos, nombres de procedimiento y claves de parametro. Los IDENTIFICADORES siguen distinguiendo: `total` y `Total` son dos variables. Regla: lo que define el lenguaje no distingue, lo que nombras vos si #fase2
+- [x] Verificado que ninguna variable del corpus real choca solo por mayusculas, asi que mantener los identificadores case-sensitive no rompe ningun `.paed` existente #fase2
+- [x] Bug encontrado al hacerlo: `FIN_MIENTRAS` y `FIN_PARA` se distinguian por `linea[4] == 'P'`. Con `fin_para` en minuscula eso es `'p'` y el bucle se cerraba como si fuera un `FIN_MIENTRAS` #fase2
 - [x] Cierre de la `ACCION` RESUELTO — era el ultimo punto BLOQUEANTE de la spec. Se aceptan `FIN_ACCION` y `FINACCION`: las dos son una sola palabra, cuestan un `strcmp` y ningun lookahead. `FACCION` se rechaza (abreviar FIN a F deja el cierre incompleto) y `FIN ACCION` con espacio tambien, aunque sea la forma de la catedra: partida en dos obliga a mirar la palabra siguiente. Las tres formas rechazadas igual CIERRAN el bloque, para no cascar un error por cada linea que venga despues #fase2
 - [x] Verificado de primera mano `AED_2021_UnI.pdf` pagina 10: la catedra efectivamente escribe `FIN ACCION` con espacio. La cita que venia arrastrada de `paed_spec.md` era correcta — es una captura de Sublime Text 2 dentro del apunte, no un BNF formal #fase2
 - [x] `docs/plugin_spec.md` — cómo crear plugins #fase0

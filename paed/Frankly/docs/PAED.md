@@ -58,9 +58,9 @@ lo que hace que una spec mienta:
 | **decidido** | Se eligió una forma entre varias posibles, con fecha y motivo. Todavía puede no estar implementado. |
 | **implementado** | El parser en C lo hace hoy, verificado con `make test`. |
 
-Una regla puede estar **decidida pero no implementada** (§10.1 es el caso vivo:
-las keywords se decidieron case-insensitive y el parser es case-sensitive).
-Cuando eso pasa, se dice.
+Una regla puede estar **decidida pero no implementada**. Cuando eso pasa, se
+dice: hoy el caso vivo es el `;` (§11.1), que la cátedra usa como separador y el
+parser exige como terminador.
 
 ---
 
@@ -404,7 +404,7 @@ Rango          ..                        OnlySintaxis.md:121  (arreglo[1..30])
 - **UTF-8:** todas las keywords son ASCII puro. Los caracteres no-ASCII (`ñ`,
   tildes) solo pueden aparecer dentro de cadenas y comentarios.
 - **Espacios y saltos de línea:** no significativos. La indentación es estética.
-- **Keywords:** hoy **case-sensitive**, en contra de la decisión §10.1.
+- **Keywords:** case-insensitive (§10.1). Los identificadores no.
 
 ## 8. Gramática
 
@@ -467,19 +467,33 @@ ventana entera y hay que matar el proceso sin saber por qué.
 
 Ambigüedades del lenguaje, resueltas. **Sujetas a revisión contra la cátedra.**
 
-### 10.1 Sensibilidad a mayúsculas — decidido, NO implementado
+### 10.1 Sensibilidad a mayúsculas — RESUELTO 2026-08-10
 
 La wiki usa `ARREGLO` (`wiki.txt:1791`) y `arreglo[` (`wiki.txt:1798`) para lo
 mismo. También `puntero a ENTERO` (`OnlySintaxis.md:502`) y `archivo de TIPO`
-(`:143`) en minúscula.
+(`:143`) en minúscula. Y el único ejemplo con autoridad de cátedra
+(`AED_2021_UnI.pdf:10`) declara los tipos en minúscula: `A,B,SUMA: entero`.
 
-**Decisión:** el lexer normaliza a mayúsculas **solo para buscar en la tabla de
-keywords**. Los identificadores conservan su capitalización.
+Obligar a una sola forma sería inventar una regla que las fuentes no tienen.
 
-**Estado real:** el parser es **case-sensitive**. `accion t es` no parsea.
-Los operadores con nombre (`Y`, `O`, `NO`, `DIV`, `MOD`) sí son
-case-insensitive, porque `expr.c` los compara con `strncasecmp`. La
-inconsistencia está sin resolver.
+**Decisión, ya implementada:** las **palabras clave** no distinguen mayúsculas.
+Los **identificadores** sí.
+
+| Qué | Distingue mayúsculas | Ejemplo |
+|---|---|---|
+| Palabras clave y tipos | **no** | `MIENTRAS` = `mientras` = `MiEnTrAs` |
+| Nombres de procedimiento | **no** | `ESCRIBIR` = `escribir` |
+| Claves de parámetro | **no** | `nombre =` = `NOMBRE =` |
+| Operadores con nombre | **no** | `Y` `O` `NO` `DIV` `MOD` |
+| **Nombres de variable** | **sí** | `total` y `Total` son **dos** variables |
+| **Nombres de entidad de escena** | **sí** | `nave` y `Nave` son **dos** cuerpos |
+
+La regla en una línea: **lo que define el lenguaje no distingue; lo que nombrás
+vos, sí.**
+
+Antes de esto el parser era case-sensitive pero `expr.c` no, así que
+`MIENTRAS (a Y b)` andaba y `mientras (a Y b)` no. La inconsistencia estaba en
+que cada archivo había elegido por su cuenta.
 
 ### 10.2 El separador del `PARA` es `HASTA` — RESUELTO 2026-08-07
 
@@ -673,7 +687,7 @@ de línea — nunca se ignora.
 | Expresiones y operadores de comparación | ✅ |
 | `ARREGLO[desde..hasta] DE <tipo>`, en expresión y como destino | ✅ |
 | `ESCRIBIR` que evalúa sus argumentos | ✅ |
-| Keywords en minúscula (`accion`, `mientras`) | ❌ §10.1 |
+| Keywords en minúscula o mezcladas (`accion`, `MiEnTrAs`) | ✅ §10.1 |
 | Declaración múltiple `A,B: ENTERO` | ❌ §11.2 |
 | `VARIABLES` dentro de `AMBIENTE` | ❌ §11.2 |
 | `FIN ACCION` con espacio | ❌ a propósito, §10.7 |

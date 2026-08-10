@@ -59,7 +59,9 @@ static cJSON *buscar_proc(cJSON *raiz, const char *nombre) {
     cJSON *p = NULL;
     cJSON_ArrayForEach(p, cJSON_GetObjectItem(raiz, "procedimientos")) {
         cJSON *n = cJSON_GetObjectItem(p, "nombre");
-        if (cJSON_IsString(n) && strcmp(n->valuestring, nombre) == 0) return p;
+        // El nombre del procedimiento tampoco distingue mayusculas:
+        // ESCRIBIR y escribir son el mismo.
+        if (cJSON_IsString(n) && strcasecmp(n->valuestring, nombre) == 0) return p;
     }
     return NULL;
 }
@@ -77,8 +79,8 @@ static cJSON *param_def(cJSON *proc, const char *clave) {
     cJSON_ArrayForEach(p, params) {
         cJSON *n = cJSON_GetObjectItem(p, "nombre");
         cJSON *a = cJSON_GetObjectItem(p, "alias");
-        if (cJSON_IsString(n) && strcmp(n->valuestring, clave) == 0) return p;
-        if (cJSON_IsString(a) && strcmp(a->valuestring, clave) == 0) return p;
+        if (cJSON_IsString(n) && strcasecmp(n->valuestring, clave) == 0) return p;
+        if (cJSON_IsString(a) && strcasecmp(a->valuestring, clave) == 0) return p;
     }
     return NULL;
 }
@@ -460,12 +462,27 @@ static const char *nombre_kind(PAEDKind k) {
 // se confunda con la palabra HASTA.
 static char *palabra_en(char *s, const char *kw) {
     size_t n = strlen(kw);
-    for (char *c = s; (c = strstr(c, kw)) != NULL; c += n) {
+    // strcasestr y no strstr: las palabras clave no distinguen mayusculas
+    // (ver kw_es, mas abajo), asi que 'PARA i := 1 hasta 5 HACER' tambien vale.
+    for (char *c = s; (c = strcasestr(c, kw)) != NULL; c += n) {
         int izq = (c == s) || (!isalnum((unsigned char)c[-1]) && c[-1] != '_');
         int der = !isalnum((unsigned char)c[n]) && c[n] != '_';
         if (izq && der) return c;
     }
     return NULL;
+}
+
+// ¿Esta linea ES exactamente esta palabra clave, sin mirar mayusculas?
+//
+// La wiki escribe `ARREGLO` (wiki.txt:1791) y `arreglo[` (:1798) para lo mismo,
+// y el ejemplo de catedra (AED_2021_UnI.pdf:10) declara los tipos en minuscula.
+// Obligar a una sola forma seria inventar una regla que las fuentes no tienen.
+//
+// Solo aplica a las PALABRAS CLAVE. Los identificadores conservan su
+// capitalizacion y se siguen comparando con strcmp: 'total' y 'Total' son dos
+// variables distintas.
+static int kw_es(const char *linea, const char *kw) {
+    return strcasecmp(linea, kw) == 0;
 }
 
 // Saca la palabra clave del principio y el terminador del final.
@@ -474,7 +491,7 @@ static char *cuerpo_cabecera(char *linea, const char *kw, const char *fin) {
     char  *c  = trim(linea + strlen(kw));
     size_t lc = strlen(c), nf = strlen(fin);
 
-    if (lc < nf || strcmp(c + lc - nf, fin) != 0) return NULL;
+    if (lc < nf || strcasecmp(c + lc - nf, fin) != 0) return NULL;
     // El terminador tiene que ser una palabra suelta, no el final de otra:
     // sin esto, un identificador que termine en HACER pasaria por terminador.
     if (lc > nf && !isspace((unsigned char)c[lc - nf - 1]) && c[lc - nf - 1] != ')')
@@ -487,7 +504,7 @@ static char *cuerpo_cabecera(char *linea, const char *kw, const char *fin) {
 // ¿La linea empieza con esta palabra clave como palabra entera?
 static int empieza_con(const char *linea, const char *kw) {
     size_t n = strlen(kw);
-    if (strncmp(linea, kw, n) != 0) return 0;
+    if (strncasecmp(linea, kw, n) != 0) return 0;
     return linea[n] == '\0' || isspace((unsigned char)linea[n]) || linea[n] == '(';
 }
 
@@ -604,7 +621,7 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
     }
 
     // ── SINO ──
-    if (strcmp(linea, "SINO") == 0) {
+    if (kw_es(linea, "SINO")) {
         if (pila->tope == 0 || pila->items[pila->tope - 1].kind != PAED_SI) {
             add_error(p, lineno, "SINO sin un SI abierto");
             return 1;
@@ -625,7 +642,7 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
     }
 
     // ── FIN_SI ──
-    if (strcmp(linea, "FIN_SI") == 0) {
+    if (kw_es(linea, "FIN_SI")) {
         if (pila->tope == 0) { add_error(p, lineno, "FIN_SI sin un SI abierto"); return 1; }
         Abierto *a = &pila->items[pila->tope - 1];
         if (a->kind != PAED_SI) {
@@ -651,8 +668,10 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
     // ── FIN_MIENTRAS y FIN_PARA ──
     // Los dos cierran un bucle y hacen exactamente lo mismo con los saltos, asi
     // que comparten el cierre en vez de tener dos copias que se desincronicen.
-    if (strcmp(linea, "FIN_MIENTRAS") == 0 || strcmp(linea, "FIN_PARA") == 0) {
-        int      es_para = linea[4] == 'P';
+    if (kw_es(linea, "FIN_MIENTRAS") || kw_es(linea, "FIN_PARA")) {
+        // toupper: con 'fin_para' en minuscula, linea[4] es 'p' y sin esto
+        // el bucle se cerraria como si fuera un FIN_MIENTRAS.
+        int      es_para = toupper((unsigned char)linea[4]) == 'P';
         PAEDKind abre    = es_para ? PAED_PARA     : PAED_MIENTRAS;
         PAEDKind cierra  = es_para ? PAED_FIN_PARA : PAED_FIN_MIENTRAS;
 
@@ -775,8 +794,8 @@ static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
 // AED_2021_UnI.pdf pagina 10) queda AFUERA por decision del autor: partida en
 // dos palabras obligaria a mirar la siguiente antes de decidir.
 static int es_fin_accion(const char *linea) {
-    return strcmp(linea, "FIN_ACCION") == 0 ||
-           strcmp(linea, "FINACCION")  == 0;
+    return kw_es(linea, "FIN_ACCION") ||
+           kw_es(linea, "FINACCION");
 }
 
 typedef enum { FUERA, CABECERA, AMBIENTE, PROCESO, CERRADO } Bloque;
@@ -807,13 +826,16 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
         char *linea = trim(buf);
         if (!*linea) continue;
 
-        if (strncmp(linea, "ACCION", 6) == 0 && (linea[6] == ' ' || linea[6] == '\t')) {
+        if (strncasecmp(linea, "ACCION", 6) == 0 && (linea[6] == ' ' || linea[6] == '\t')) {
             if (bloque != FUERA) {
                 add_error(out, lineno, "ACCION anidada: un archivo .paed tiene una sola ACCION");
                 continue;
             }
             char nombre[PAED_NAME_MAX] = {0}, es[8] = {0};
-            if (sscanf(linea, "ACCION %63s %7s", nombre, es) != 2 || strcmp(es, "ES") != 0) {
+            // El literal "ACCION" dentro de sscanf tambien distingue
+            // mayusculas. Ya se comprobo arriba con strncasecmp, asi que se
+            // saltean esas 6 letras y se lee desde el nombre.
+            if (sscanf(linea + 6, "%63s %7s", nombre, es) != 2 || !kw_es(es, "ES")) {
                 add_error(out, lineno, "se esperaba: ACCION <nombre> ES");
                 continue;
             }
@@ -822,14 +844,14 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
             continue;
         }
 
-        if (strcmp(linea, "AMBIENTE") == 0) {
+        if (kw_es(linea, "AMBIENTE")) {
             if (bloque != CABECERA)
                 add_error(out, lineno, "AMBIENTE va justo despues de ACCION ... ES y antes de PROCESO");
             bloque = AMBIENTE;
             continue;
         }
 
-        if (strcmp(linea, "PROCESO") == 0) {
+        if (kw_es(linea, "PROCESO")) {
             if (bloque != CABECERA && bloque != AMBIENTE)
                 add_error(out, lineno, "PROCESO fuera de lugar");
             bloque = PROCESO;
@@ -842,7 +864,7 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
         // ayuda a nadie. Igual se CIERRA el bloque: se sabe que quiso cerrar,
         // y seguir con el PROCESO abierto haria cascar errores en todas las
         // lineas que vengan despues.
-        if (strcmp(linea, "FACCION") == 0) {
+        if (kw_es(linea, "FACCION")) {
             add_error(out, lineno,
                       "'FACCION' esta incompleto: el cierre se escribe "
                       "FIN_ACCION o FINACCION");
@@ -853,7 +875,7 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
         // decirlo: es la forma que uno copia del apunte, y sin este caso el
         // error seria "falta ';'", que manda a buscar el problema al lugar
         // equivocado.
-        if (strcmp(linea, "FIN ACCION") == 0) {
+        if (kw_es(linea, "FIN ACCION")) {
             add_error(out, lineno,
                       "el apunte escribe 'FIN ACCION' con espacio, pero en PAED "
                       "el cierre es una sola palabra: FIN_ACCION o FINACCION");
@@ -863,8 +885,8 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
         // motivo, y seguir con el PROCESO abierto haria cascar un error mas en
         // cada linea que venga despues.
         if (es_fin_accion(linea) ||
-            strcmp(linea, "FACCION")    == 0 ||
-            strcmp(linea, "FIN ACCION") == 0) {
+            kw_es(linea, "FACCION") ||
+            kw_es(linea, "FIN ACCION")) {
             if (bloque != PROCESO)
                 add_error(out, lineno, "el cierre de ACCION no tiene un bloque PROCESO abierto");
             // FIN_ACCION no puede cerrar bloques que quedaron abiertos: se avisa
@@ -909,7 +931,10 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
 
 const char *paed_get_arg(const PAEDInstr *instr, const char *key) {
     for (int i = 0; i < instr->arg_count; i++)
-        if (strcmp(instr->args[i].key, key) == 0)
+        // El parser guarda la clave TAL CUAL la escribio el usuario, y el
+        // interprete la pide en minuscula. Sin esto, NOMBRE = x no se
+        // encontraria y el procedimiento diria que le falta el parametro.
+        if (strcasecmp(instr->args[i].key, key) == 0)
             return instr->args[i].val;
     return NULL;
 }

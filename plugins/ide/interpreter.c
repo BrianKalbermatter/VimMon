@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>  // strcasecmp: los nombres de procedimiento no distinguen mayusculas
 #include <math.h>   // sinf/cosf: rotar un grupo alrededor de su centro
 
 // El parser ya valido nombres, tipos y obligatorios contra sintaxis.json.
@@ -143,11 +144,11 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
     const char *p = in->proc;
 
     // ── Globales ─────────────────────────────────────────────────────────────
-    if (strcmp(p, "FONDO") == 0) {
+    if (strcasecmp(p, "FONDO") == 0) {
         strncpy(scene->bg_color, arg_o(in, "color", "#000000"), sizeof(scene->bg_color) - 1);
         return 0;
     }
-    if (strcmp(p, "CAMARA") == 0) {
+    if (strcasecmp(p, "CAMARA") == 0) {
         const char *pos   = paed_get_arg(in, "posicion");
         const char *mirar = paed_get_arg(in, "mirar");
         if (pos)   scene->cam_pos    = parse_vec3(pos);
@@ -156,10 +157,10 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
     }
 
     // ── Creacion de entidades ────────────────────────────────────────────────
-    int es_cubo   = strcmp(p, "CUBO")   == 0;
-    int es_esfera = strcmp(p, "ESFERA") == 0;
-    int es_plano  = strcmp(p, "PLANO")  == 0;
-    int es_luz    = strcmp(p, "LUZ")    == 0;
+    int es_cubo   = strcasecmp(p, "CUBO")   == 0;
+    int es_esfera = strcasecmp(p, "ESFERA") == 0;
+    int es_plano  = strcasecmp(p, "PLANO")  == 0;
+    int es_luz    = strcasecmp(p, "LUZ")    == 0;
 
     if (es_cubo || es_esfera || es_plano || es_luz) {
         const char *kind = es_cubo ? "cubo" : es_esfera ? "esfera" : es_plano ? "plano" : "luz";
@@ -196,7 +197,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
     // Todas resuelven primero el objetivo: puede ser una pieza o un grupo.
     Objetivo obj;
 
-    if (strcmp(p, "MOVER") == 0) {
+    if (strcasecmp(p, "MOVER") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         Vec3 destino = parse_vec3(arg_o(in, "posicion", "(0,0,0)"));
 
@@ -216,7 +217,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return 0;
     }
 
-    if (strcmp(p, "ROTAR") == 0) {
+    if (strcasecmp(p, "ROTAR") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         float grados = parse_num(paed_get_arg(in, "angulo"));
         char  eje    = arg_o(in, "eje", "")[0];
@@ -239,7 +240,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return 0;
     }
 
-    if (strcmp(p, "ESCALAR") == 0) {
+    if (strcasecmp(p, "ESCALAR") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         float f = parse_num(paed_get_arg(in, "factor"));
 
@@ -260,7 +261,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return 0;
     }
 
-    if (strcmp(p, "COLOR") == 0) {
+    if (strcasecmp(p, "COLOR") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         const char *col = arg_o(in, "color", "#ffffff");
         for (int i = 0; i < obj.count; i++)
@@ -269,7 +270,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
     }
 
     // ── Comportamientos ──────────────────────────────────────────────────────
-    if (strcmp(p, "GIRAR") == 0) {
+    if (strcasecmp(p, "GIRAR") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         char eje = arg_o(in, "eje", "")[0];
         if (eje != 'x' && eje != 'y' && eje != 'z') {
@@ -284,7 +285,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return 0;
     }
 
-    if (strcmp(p, "OSCILAR") == 0) {
+    if (strcasecmp(p, "OSCILAR") == 0) {
         if (resolver(scene, prog, in, &obj) != 0) return -1;
         float amp  = parse_num(paed_get_arg(in, "amplitud"));
         float frec = parse_num(paed_get_arg(in, "frecuencia"));
@@ -296,7 +297,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
     }
 
     // ── Salida ───────────────────────────────────────────────────────────────
-    if (strcmp(p, "ESCRIBIR") == 0) {
+    if (strcasecmp(p, "ESCRIBIR") == 0) {
         for (int i = 0; i < in->arg_count; i++) {
             const char *v = in->args[i].val;
             size_t n = strlen(v);
