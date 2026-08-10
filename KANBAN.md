@@ -21,7 +21,8 @@ kanban-plugin: board
 - [ ] Parser PAED: declaración múltiple `A,B,SUMA: entero`. Es la forma del único ejemplo con autoridad de cátedra (`AED_2021_UnI.pdf:10`) y hoy da "nombre de variable invalido" #fase2
 - [ ] Parser PAED: `VARIABLES` como sub-sección de `AMBIENTE`. Aparece en `AED_2021_UnI.pdf:10` y en ninguna otra fuente. Antes de implementar, confirmar si es obligatoria #fase2
 - [ ] Decidir el `;`: la cátedra lo usa como SEPARADOR (la última sentencia no lo lleva) y el parser lo exige como terminador. Cambiarlo rompe todos los `.paed` del repo — decidir antes de tocar #fase2
-- [ ] Interprete PAED: implementar `ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` (hoy parsean pero no ejecutan) #fase2
+- [ ] **Interprete PAED: `LEER` — es lo que mas falta.** Hoy parsea pero no ejecuta, asi que ningun programa puede pedir datos: en `ParcialSimulado_01.paed` los valores van fijos en el codigo y hay que editarlos y volver a correr para probar otro caso. Con `LEER` andando, los parciales se resuelven como en la catedra. Ojo con dos cosas: el interprete corre DENTRO del game loop (leer de stdin lo congela), y `LEER(A,B)` toma varios destinos, cada uno pudiendo ser `x`, `A[i]` o `p.campo` #fase2
+- [ ] Interprete PAED: `ARR`/`AVZ`/`CREAR`/`CERRAR` (hoy parsean pero no ejecutan). Van despues de `LEER` y despues del tipo `SECUENCIA`, porque sin secuencias no tienen sobre que operar #fase2
 - [ ] Corroborar contra la wiki: `RETORNAR`, `TRUNC`, `ABSO`, `REDOND` — 0 apariciones en los apuntes #fase2
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
 - [ ] Recortar contra el plano cercano: hoy `scene_view.c` acota las coordenadas de las esquinas en vez de generar vértices en el borde, y un objeto que abraza la cámara (el suelo) queda mal #fase3
