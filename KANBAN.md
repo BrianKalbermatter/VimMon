@@ -39,7 +39,7 @@ kanban-plugin: board
 - [ ] Registrar en el bus (EVT_MONITOR_TICK) #fase4
 - [ ] Mover/adaptar `paed/` como plugin en `plugins/ide/` #fase5
 - [ ] Conectar al bus: teclado, render, AI #fase5
-- [ ] Editor PAED integrado al split screen #fase5
+- [ ] Editor PAED integrado al split screen (hoy `edit` lo abre a pantalla completa; falta el split) #fase5
 - [ ] `kernel/boot/entry.asm` — Multiboot2 + request framebuffer #fase6
 - [ ] `kernel/drivers/fb.c` — framebuffer VESA #fase6
 - [ ] `kernel/drivers/font.c` — PSF font embebida #fase6
@@ -74,6 +74,10 @@ kanban-plugin: board
 - [x] `plugins/input/input.c` — plugin de teclado + mouse: modo raw de terminal (termios), lectura no bloqueante, reporte SGR de mouse (click + posición), restaura la terminal al apagar #fase0
 - [x] `paed/Frankly/docs/PAED.md` + `data/sintaxis.json` — spec y definicion formal de PAED, fuente unica de verdad #fase0
 - [x] PAED.md v4.0 absorbe entero `docs/paed_spec.md` (v2.0), que se borra: una sola spec, no dos. Se separan **catedra** / **decidido** / **implementado**, porque habia decisiones documentadas que el parser no cumplia (keywords case-insensitive, `;` como separador) #fase0
+- [x] `edit <archivo>` — el editor es un comando del OS, como `engine` o `ai`. `plugins/editor/editor.c` escucha `EVENT_EDITOR_OPEN` y lanza el editorBim; main.c no sabe QUE editor es ni donde vive #fase5
+- [x] Al salir del editor, si el archivo es `.paed` se PARSEA solo y se reportan los errores. Eso es lo que lo hace parte del OS y no un lanzador: salis del editor y el sistema ya te dice si compila #fase5
+- [x] `VIMMON_EDITOR=/usr/bin/vim` cambia el editor sin recompilar. Sirve para probar la cadena sin abrir uno interactivo, y para el dia que haya un segundo editor #fase5
+- [x] El plugin crea el archivo si no existe: el editorBim lo lee con `mapfile`, que falla si falta. Asi `edit` sirve para EMPEZAR un archivo, no solo para modificarlo #fase5
 - [x] REGISTRO implementado — `vector2 = REGISTRO ... FIN_REGISTRO` en el AMBIENTE, y `pori.vx` como destino y dentro de expresiones. Es el `struct` de C con otro nombre #fase2
 - [x] `AlgebraRectas/recta.paed` corre ENTERO: de 10 errores a 0. Verificado a mano que el calculo da bien — P0=(0,0), D=(1,-4), dominio [-4,4] produce el segmento (-4,16) a (4,-16), que es la recta y=-4x #fase2
 - [x] Los registros se APLANAN: `pori` de tipo vector2 se guarda como las variables "pori.vx" y "pori.vy". El Entorno no sabe nada de registros. El precio es que no se puede asignar un registro entero (`p1 := p2`), que no aparece en el corpus #fase2

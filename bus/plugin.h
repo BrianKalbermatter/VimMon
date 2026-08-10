@@ -19,6 +19,7 @@ typedef enum {
     EVENT_AI_RESPONSE,     // respuesta de la IA (PAED delta)
     EVENT_SCENE_UPDATE,    // escena cambió (nuevo delta en scene.paed)
     EVENT_RENDER_FRAME,    // es momento de renderizar
+    EVENT_EDITOR_OPEN,     // abrir un archivo en el editor (data = ruta)
     EVENT_MONITOR_TICK,    // actualización de stats del sistema
     EVENT_SHUTDOWN,        // el OS se está apagando
     EVENT_COUNT,           // centinela: cantidad total de tipos de evento

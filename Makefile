@@ -27,8 +27,9 @@ SRCS_RENDERER = plugins/renderer/renderer.c plugins/renderer/sdl_fb.c # plugin r
 SRCS_ENGINE = engine/engine.c # motor 2D de entidades
 SRCS_GAME = game/game.c # el juego del usuario
 SRCS_INPUT = plugins/input/input.c # plugin de teclado + mouse
+SRCS_EDITOR = plugins/editor/editor.c # puente al editorBim
 
-SRCS = main.c $(SRCS_BUS) cjson/cJSON.c $(SRCS_AI) $(SRCS_IDE) $(SRCS_MONITOR) $(SRCS_RENDERER) $(SRCS_ENGINE) $(SRCS_GAME) $(SRCS_INPUT)
+SRCS = main.c $(SRCS_BUS) cjson/cJSON.c $(SRCS_AI) $(SRCS_IDE) $(SRCS_MONITOR) $(SRCS_RENDERER) $(SRCS_ENGINE) $(SRCS_GAME) $(SRCS_INPUT) $(SRCS_EDITOR)
 
 # plugins/ai/ai.c -> build/obj/plugins/ai/ai.o (y .d al lado)
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)

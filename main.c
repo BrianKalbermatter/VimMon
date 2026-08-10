@@ -4,6 +4,7 @@
 #include "bus/plugin.h"
 #include "plugins/ai/ai.h"
 #include "plugins/ai/provider.h"
+#include "plugins/editor/editor.h"
 #include "plugins/ide/ide.h"
 #include "plugins/ide/parser.h"
 #include "plugins/ide/interpreter.h"
@@ -11,6 +12,7 @@
 extern Plugin ai_plugin;
 extern Plugin renderer_plugin;
 extern Plugin monitor_plugin;
+extern Plugin editor_plugin;
 
 // corriendo controla la consola. sig_atomic_t porque lo toca un
 // signal handler (puede interrumpir el programa en cualquier punto).
@@ -28,11 +30,19 @@ static void cmd_help(void) {
     printf("  engine   abre la ventana y dibuja plugins/ide/scene.paed\n");
     printf("           (se recarga sola al guardar el archivo)\n");
     printf("  scene    carga y ejecuta plugins/ide/scene.paed (intérprete PAED)\n");
+    printf("  edit <archivo>   abre el archivo en el editorBim\n");
+    printf("           (al salir, si es .paed se valida solo)\n");
     printf("  ai       menú de proveedores de IA (llama/qwen/claude/kimi...)\n");
     printf("  ai use <id|nº>   cambia de proveedor\n");
     printf("  ai <prompt>      manda ese prompt al proveedor activo\n");
     printf("  help     muestra esta ayuda\n");
     printf("  quit     apaga vimmon\n\n");
+}
+
+// edit: publica el evento; el editor_plugin lo agarra y abre el editorBim.
+// Mismo patron que engine: main no sabe QUE editor es ni donde vive.
+static void cmd_edit(const char *archivo) {
+    bus_send(EVENT_EDITOR_OPEN, (void *)archivo, (uint32_t)strlen(archivo) + 1);
 }
 
 // engine: publica el evento; el renderer_plugin lo agarra y abre el motor.
@@ -110,6 +120,8 @@ static int despachar(const char *cmd) {
     if (strcmp(cmd, "scene")  == 0)     { cmd_scene();  return 1; }
     if (strcmp(cmd, "ai")     == 0)     { cmd_ai("");   return 1; }
     if (strncmp(cmd, "ai ", 3) == 0)    { cmd_ai(cmd + 3); return 1; }
+    if (strncmp(cmd, "edit ", 5) == 0)  { cmd_edit(cmd + 5); return 1; }
+    if (strcmp(cmd, "edit")   == 0)     { cmd_edit("");  return 1; }
     if (strcmp(cmd, "help")   == 0)     { cmd_help();   return 1; }
     if (strcmp(cmd, "quit")   == 0 ||
         strcmp(cmd, "exit")   == 0)     return 0;     // salir
@@ -137,11 +149,13 @@ int main(void) {
     EventType ide_inputs[]      = { EVENT_AI_RESPONSE };
     EventType renderer_inputs[] = { EVENT_SCENE_UPDATE, EVENT_RENDER_FRAME };
     EventType monitor_inputs[]  = { EVENT_MONITOR_TICK };
+    EventType editor_inputs[]   = { EVENT_EDITOR_OPEN };
 
     bus_register(&ai_plugin,       ai_inputs,       1);  ai_plugin.init();
     bus_register(&ide_plugin,      ide_inputs,      1);  ide_plugin.init();
     bus_register(&renderer_plugin, renderer_inputs, 2);  renderer_plugin.init();
     bus_register(&monitor_plugin,  monitor_inputs,  1);  monitor_plugin.init();
+    bus_register(&editor_plugin,   editor_inputs,   1);  editor_plugin.init();
 
     // El plugin 'input' queda DORMIDO a propósito: su init() pone la
     // terminal en modo raw + no-bloqueante, y eso se pelea con la consola
