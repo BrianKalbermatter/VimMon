@@ -31,6 +31,11 @@
 
 #define PAED_MAX_VARS 64
 
+// Cuantos elementos de arreglo entran EN TOTAL, sumando todos los arreglos del
+// programa. Es un pool compartido y no un array por variable: reservar el
+// maximo en cada una de las 64 variables gastaria memoria en los 63 escalares.
+#define PAED_MAX_ELEMS 512
+
 typedef enum {
     VAL_NUM,      // entero o real: en PAED no se distinguen al evaluar
     VAL_TEXTO,
@@ -46,19 +51,36 @@ typedef struct {
 
 typedef struct {
     char  nombre[PAED_NAME_MAX];
-    Valor valor;
+    Valor valor;        // el valor, cuando es un escalar
+
+    // Arreglo declarado con ARREGLO[desde..hasta]. En AED los limites los pone
+    // el programador y NO arrancan en 0: A[1..10] va del 1 al 10, no del 0 al 9.
+    int   es_arreglo;
+    int   desde, hasta; // ambos inclusive
+    int   off;          // donde empiezan sus elementos dentro de Entorno.pool
 } Variable;
 
 // Tabla de variables. Sin malloc, como todo el resto del proyecto.
 typedef struct {
     Variable items[PAED_MAX_VARS];
     int      count;
+    Valor    pool[PAED_MAX_ELEMS]; // elementos de todos los arreglos, seguidos
+    int      pool_usado;
     char     error[PAED_MSG_MAX];  // vacio si la ultima operacion salio bien
 } Entorno;
 
 void   env_init  (Entorno *e);
 Valor *env_buscar(Entorno *e, const char *nombre);   // NULL si no existe
 int    env_set   (Entorno *e, const char *nombre, Valor v);  // 0 OK, -1 lleno
+
+// Reserva los elementos de un arreglo y los deja en 0.
+// Devuelve 0 si salio bien, -1 si no: el motivo queda en e->error.
+int env_declarar_arreglo(Entorno *e, const char *nombre, int desde, int hasta);
+
+// Devuelve el elemento `indice` de un arreglo, listo para leer o escribir.
+// Devuelve NULL si la variable no existe, no es un arreglo, o el indice se fue
+// de los limites declarados: el motivo queda en e->error.
+Valor *env_elem(Entorno *e, const char *nombre, int indice);
 
 // Evalua `texto` y deja el resultado en `out`.
 // Devuelve 0 si salio bien, -1 si no: el motivo queda en env->error.

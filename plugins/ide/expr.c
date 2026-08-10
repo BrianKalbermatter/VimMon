@@ -13,22 +13,104 @@ void env_init(Entorno *e) {
     memset(e, 0, sizeof(*e));
 }
 
-Valor *env_buscar(Entorno *e, const char *nombre) {
+// Busca la ENTRADA de la tabla, no su valor: env_buscar devuelve el escalar, y
+// para un arreglo eso no sirve (hay que llegar a los limites y al offset).
+static Variable *env_entrada(Entorno *e, const char *nombre) {
     for (int i = 0; i < e->count; i++)
         if (strcmp(e->items[i].nombre, nombre) == 0)
-            return &e->items[i].valor;
+            return &e->items[i];
     return NULL;
 }
 
+Valor *env_buscar(Entorno *e, const char *nombre) {
+    Variable *var = env_entrada(e, nombre);
+    // Un arreglo usado sin corchetes no tiene un valor escalar que devolver.
+    // Se avisa acá y no más adelante con un valor inventado en 0.
+    if (var && var->es_arreglo) {
+        snprintf(e->error, PAED_MSG_MAX,
+                 "'%s' es un arreglo: falta el indice, se esperaba %s[i]", nombre, nombre);
+        return NULL;
+    }
+    return var ? &var->valor : NULL;
+}
+
 int env_set(Entorno *e, const char *nombre, Valor v) {
-    Valor *ya = env_buscar(e, nombre);
-    if (ya) { *ya = v; return 0; }
+    Variable *ya = env_entrada(e, nombre);
+    if (ya) {
+        if (ya->es_arreglo) {
+            snprintf(e->error, PAED_MSG_MAX,
+                     "'%s' es un arreglo: no se le puede asignar de una sola vez", nombre);
+            return -1;
+        }
+        ya->valor = v;
+        return 0;
+    }
     if (e->count >= PAED_MAX_VARS) return -1;
 
-    snprintf(e->items[e->count].nombre, PAED_NAME_MAX, "%s", nombre);
-    e->items[e->count].valor = v;
-    e->count++;
+    Variable *nueva = &e->items[e->count++];
+    memset(nueva, 0, sizeof(*nueva));
+    snprintf(nueva->nombre, PAED_NAME_MAX, "%s", nombre);
+    nueva->valor = v;
     return 0;
+}
+
+int env_declarar_arreglo(Entorno *e, const char *nombre, int desde, int hasta) {
+    if (hasta < desde) {
+        snprintf(e->error, PAED_MSG_MAX,
+                 "el arreglo '%s' tiene los limites al reves: [%d..%d]", nombre, desde, hasta);
+        return -1;
+    }
+    int largo = hasta - desde + 1;
+
+    if (e->count >= PAED_MAX_VARS) {
+        snprintf(e->error, PAED_MSG_MAX, "no entran mas variables");
+        return -1;
+    }
+    if (e->pool_usado + largo > PAED_MAX_ELEMS) {
+        snprintf(e->error, PAED_MSG_MAX,
+                 "no entran los %d elementos de '%s' (quedan %d de %d)",
+                 largo, nombre, PAED_MAX_ELEMS - e->pool_usado, PAED_MAX_ELEMS);
+        return -1;
+    }
+
+    Variable *var = &e->items[e->count++];
+    memset(var, 0, sizeof(*var));
+    snprintf(var->nombre, PAED_NAME_MAX, "%s", nombre);
+    var->es_arreglo = 1;
+    var->desde      = desde;
+    var->hasta      = hasta;
+    var->off        = e->pool_usado;
+    e->pool_usado  += largo;
+
+    // Arrancan en 0 y no en basura: leer A[3] antes de cargarlo tiene que dar
+    // algo previsible, no lo que hubiera quedado en esa memoria.
+    for (int i = 0; i < largo; i++) {
+        memset(&e->pool[var->off + i], 0, sizeof(Valor));
+        e->pool[var->off + i].tipo = VAL_NUM;
+    }
+    return 0;
+}
+
+Valor *env_elem(Entorno *e, const char *nombre, int indice) {
+    Variable *var = env_entrada(e, nombre);
+    if (!var) {
+        snprintf(e->error, PAED_MSG_MAX, "el arreglo '%s' no esta declarado", nombre);
+        return NULL;
+    }
+    if (!var->es_arreglo) {
+        snprintf(e->error, PAED_MSG_MAX, "'%s' no es un arreglo, no se puede indexar", nombre);
+        return NULL;
+    }
+    // El chequeo de limites es LO que hace util a un arreglo con rango
+    // declarado. En C, A[99] sobre un arreglo de 10 pisa memoria ajena en
+    // silencio; acá se corta con el indice y los limites a la vista.
+    if (indice < var->desde || indice > var->hasta) {
+        snprintf(e->error, PAED_MSG_MAX,
+                 "indice %d fuera de rango: '%s' va de %d a %d",
+                 indice, nombre, var->desde, var->hasta);
+        return NULL;
+    }
+    return &e->pool[var->off + (indice - var->desde)];
 }
 
 int valor_verdadero(const Valor *v) {
@@ -165,6 +247,42 @@ static Valor primario(Ctx *c) {
         if (strcmp(nombre, "F") == 0 || strcasecmp(nombre, "FALSO")     == 0) return LOG(0);
 
         espacios(c);
+
+        // A[i] — el indice es una EXPRESION completa, no solo un numero: asi
+        // valen A[i], A[i+1] y A[med] sin ningun caso especial.
+        if (*c->p == '[') {
+            c->p++;
+            Valor idx = eval_o(c);
+            espacios(c);
+            if (*c->p != ']') { falla(c, "falta ']' al indexar %s", nombre); return NUM(0); }
+            c->p++;
+            if (c->fallo) return NUM(0);
+
+            if (idx.tipo != VAL_NUM) {
+                falla(c, "el indice de %s tiene que ser un numero", nombre);
+                return NUM(0);
+            }
+            // Un indice con coma es un error del programa, no algo para
+            // redondear por atras: A[2.5] no existe.
+            if (idx.num != floor(idx.num)) {
+                falla(c, "el indice de %s no puede tener decimales (%g)", nombre, idx.num);
+                return NUM(0);
+            }
+
+            Valor *elem = env_elem(c->env, nombre, (int)idx.num);
+            if (!elem) {
+                // El motivo ya esta en env->error, pero NO se puede pasar
+                // directo a falla(): adentro hace vsnprintf SOBRE ese mismo
+                // buffer, y escribir y leer el mismo string a la vez es
+                // comportamiento indefinido (deja el mensaje vacio). Se copia.
+                char motivo[PAED_MSG_MAX];
+                snprintf(motivo, sizeof(motivo), "%s", c->env->error);
+                falla(c, "%s", motivo);
+                return NUM(0);
+            }
+            return *elem;
+        }
+
         if (*c->p == '(') {   // llamada a funcion
             c->p++;
             Valor arg = {0};
@@ -191,7 +309,17 @@ static Valor primario(Ctx *c) {
 
         Valor *v = env_buscar(c->env, nombre);
         if (!v) {
-            falla(c, "la variable '%s' no tiene valor todavia", nombre);
+            // env_buscar deja un motivo mejor cuando el nombre SI existe pero
+            // es un arreglo usado sin indice. Solo si no dijo nada se cae al
+            // mensaje generico. Se copia antes de pasarlo: falla() escribe en
+            // ese mismo buffer (ver el comentario del indexado, mas arriba).
+            if (c->env->error[0]) {
+                char motivo[PAED_MSG_MAX];
+                snprintf(motivo, sizeof(motivo), "%s", c->env->error);
+                falla(c, "%s", motivo);
+            } else {
+                falla(c, "la variable '%s' no tiene valor todavia", nombre);
+            }
             return NUM(0);
         }
         return *v;

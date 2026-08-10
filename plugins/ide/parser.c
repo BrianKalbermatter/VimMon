@@ -212,12 +212,36 @@ static void parse_asignacion(PAEDProgram *p, char *linea, int lineno, char *op) 
     char *destino = trim(linea);
     char *expr    = trim(op + 2);
 
-    if (!es_identificador(destino)) {
-        add_error(p, lineno, "destino de asignacion invalido: '%s'", destino);
-        return;
-    }
     if (!*expr) {
         add_error(p, lineno, "falta la expresion a la derecha de ':=' en '%s'", destino);
+        return;
+    }
+
+    // El destino puede ser A[i]: se parte en nombre e indice, y el indice queda
+    // CRUDO igual que el resto de las expresiones, para que lo evalue expr.c en
+    // tiempo de ejecucion (i cambia en cada vuelta del bucle).
+    char *corchete = strchr(destino, '[');
+    char  indice[PAED_VAL_MAX] = {0};
+
+    if (corchete) {
+        size_t n = strlen(destino);
+        if (destino[n - 1] != ']') {
+            add_error(p, lineno, "falta ']' en el destino '%s'", destino);
+            return;
+        }
+        destino[n - 1] = '\0';     // saca el ']'
+        *corchete      = '\0';     // corta el nombre antes del '['
+        snprintf(indice, sizeof(indice), "%s", trim(corchete + 1));
+        destino = trim(destino);
+
+        if (!*indice) {
+            add_error(p, lineno, "falta el indice en el destino '%s[]'", destino);
+            return;
+        }
+    }
+
+    if (!es_identificador(destino)) {
+        add_error(p, lineno, "destino de asignacion invalido: '%s'", destino);
         return;
     }
 
@@ -225,6 +249,14 @@ static void parse_asignacion(PAEDProgram *p, char *linea, int lineno, char *op) 
     if (!in) return;
     strncpy(in->proc, destino, PAED_NAME_MAX - 1);
     strncpy(in->cond, expr,    PAED_COND_MAX - 1);
+
+    // Se guarda como argumento con nombre en vez de un campo nuevo: el
+    // interprete distingue "escalar" de "elemento" por si existe 'indice'.
+    if (corchete) {
+        in->arg_count = 1;
+        snprintf(in->args[0].key, PAED_KEY_MAX, "indice");
+        snprintf(in->args[0].val, PAED_VAL_MAX, "%s", indice);
+    }
 }
 
 // Busca el '=' que separa clave de valor, SALTEANDO lo que este entre
@@ -683,8 +715,52 @@ static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
     PAEDDecl *d = &p->decls[p->decl_count++];
     memset(d, 0, sizeof(*d));
     strncpy(d->name, nombre, PAED_NAME_MAX - 1);
-    strncpy(d->type, tipo,   PAED_NAME_MAX - 1);
     d->line = lineno;
+
+    // ARREGLO[desde..hasta] DE TIPO
+    // Los limites se exigen constantes: en AED el tamaño de un arreglo se
+    // conoce al declararlo, no depende de una variable que todavia no existe.
+    if (strncasecmp(tipo, "ARREGLO", 7) == 0) {
+        int   desde = 0, hasta = 0, leidos = 0;
+        char  base[PAED_NAME_MAX] = {0};
+
+        // Ya se sabe que empieza con ARREGLO: se saltan esas 7 letras y se lee
+        // el rango. Los espacios del formato admiten "[1..10]" y "[ 1 .. 10 ]".
+        if (sscanf(tipo + 7, " [ %d .. %d ]%n", &desde, &hasta, &leidos) != 2 || leidos == 0) {
+            add_error(p, lineno,
+                      "arreglo mal declarado en '%s': se esperaba "
+                      "ARREGLO[desde..hasta] DE TIPO", nombre);
+            p->decl_count--;
+            return;
+        }
+        if (hasta < desde) {
+            add_error(p, lineno, "el arreglo '%s' tiene los limites al reves: [%d..%d]",
+                      nombre, desde, hasta);
+            p->decl_count--;
+            return;
+        }
+
+        char *resto = trim(tipo + 7 + leidos);
+        if (strncasecmp(resto, "DE", 2) != 0 || !isspace((unsigned char)resto[2])) {
+            add_error(p, lineno, "al arreglo '%s' le falta 'DE <tipo>'", nombre);
+            p->decl_count--;
+            return;
+        }
+        snprintf(base, sizeof(base), "%s", trim(resto + 2));
+        if (!*base) {
+            add_error(p, lineno, "al arreglo '%s' le falta el tipo despues de 'DE'", nombre);
+            p->decl_count--;
+            return;
+        }
+
+        d->es_arreglo = 1;
+        d->desde      = desde;
+        d->hasta      = hasta;
+        strncpy(d->type, base, PAED_NAME_MAX - 1);
+        return;
+    }
+
+    strncpy(d->type, tipo, PAED_NAME_MAX - 1);
 }
 
 // ── Analisis del archivo completo ─────────────────────────────────────────────

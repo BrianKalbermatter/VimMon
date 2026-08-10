@@ -43,9 +43,14 @@ typedef struct {
 } PAEDArg;
 
 // Declaracion del bloque AMBIENTE: nombre: TIPO;
+// Tambien   nombre: ARREGLO[desde..hasta] DE TIPO;
 typedef struct {
     char name[PAED_NAME_MAX];
-    char type[PAED_NAME_MAX];
+    char type[PAED_NAME_MAX];   // el tipo BASE: ENTERO, REAL, CARACTER, LOGICO
+    int  es_arreglo;
+    // Limites del arreglo, los dos inclusive. En AED los elige el programador
+    // y no arrancan en 0: ARREGLO[1..10] va del 1 al 10.
+    int  desde, hasta;
     int  line;
 } PAEDDecl;
 

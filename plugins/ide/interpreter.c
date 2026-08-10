@@ -350,8 +350,68 @@ static int condicion(Entorno *env, const PAEDProgram *prog, const PAEDInstr *in,
     return valor_verdadero(&v);
 }
 
+// Reserva los arreglos declarados en el AMBIENTE. Un escalar no hace falta
+// declararlo (nace en su primera asignacion), pero un arreglo si: sin los
+// limites no hay donde guardar ni contra que chequear el indice.
+static int declarar_ambiente(const PAEDProgram *prog) {
+    int fallos = 0;
+    for (int i = 0; i < prog->decl_count; i++) {
+        const PAEDDecl *d = &prog->decls[i];
+        if (!d->es_arreglo) continue;
+
+        if (env_declarar_arreglo(&env, d->name, d->desde, d->hasta) != 0) {
+            fprintf(stderr, "%s:%d: error: %s\n", prog->path, d->line, env.error);
+            fallos++;
+        }
+    }
+    return fallos;
+}
+
+// destino := expr, donde destino puede ser un escalar o un elemento A[i].
+static int asignar(const PAEDProgram *prog, const PAEDInstr *in) {
+    Valor v;
+    if (expr_eval(in->cond, &env, &v) != 0) {
+        runtime_error(prog, in, env.error);
+        return -1;
+    }
+
+    const char *idx_txt = paed_get_arg(in, "indice");
+    if (!idx_txt) {
+        if (env_set(&env, in->proc, v) != 0) {
+            // env_set deja el motivo cuando el nombre ya existe como arreglo.
+            runtime_error(prog, in, env.error[0] ? env.error : "no entran mas variables");
+            return -1;
+        }
+        return 0;
+    }
+
+    // El indice se evalua RECIEN AHORA, no al parsear: en A[i] := 0 dentro de
+    // un bucle, i vale distinto en cada vuelta.
+    Valor idx;
+    if (expr_eval(idx_txt, &env, &idx) != 0) {
+        runtime_error(prog, in, env.error);
+        return -1;
+    }
+    if (idx.tipo != VAL_NUM || idx.num != floor(idx.num)) {
+        char msg[PAED_MSG_MAX];
+        snprintf(msg, sizeof(msg), "el indice de %s tiene que ser un numero entero", in->proc);
+        runtime_error(prog, in, msg);
+        return -1;
+    }
+
+    Valor *elem = env_elem(&env, in->proc, (int)idx.num);
+    if (!elem) {
+        runtime_error(prog, in, env.error);
+        return -1;
+    }
+    *elem = v;
+    return 0;
+}
+
 int interp_exec(SceneState *scene, const PAEDProgram *prog) {
     env_init(&env);
+    int fallos_ambiente = declarar_ambiente(prog);
+    if (fallos_ambiente > 0) return -1;   // sin sus arreglos, el programa no corre
 
     // Un PARA tiene que inicializar su variable la PRIMERA vez que se entra,
     // pero no cada vuelta. Como el FIN_PARA salta de vuelta al PARA, hace
@@ -384,18 +444,10 @@ int interp_exec(SceneState *scene, const PAEDProgram *prog) {
                 i++;
                 break;
 
-            case PAED_ASIGNA: {
-                Valor v;
-                if (expr_eval(in->cond, &env, &v) != 0) {
-                    runtime_error(prog, in, env.error);
-                    fallos++;
-                } else if (env_set(&env, in->proc, v) != 0) {
-                    runtime_error(prog, in, "no entran mas variables");
-                    fallos++;
-                }
+            case PAED_ASIGNA:
+                if (asignar(prog, in) != 0) fallos++;
                 i++;
                 break;
-            }
 
             case PAED_SI:
                 // Verdadera: se sigue derecho al cuerpo. Falsa: al SINO, o a
