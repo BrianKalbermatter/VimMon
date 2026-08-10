@@ -211,7 +211,7 @@ era abrir la ventana y mirar — y un test que hay que mirar no es un test.
 ```bash
 make paedrun
 build/paedrun paed/Frankly/tests/busqueda_binaria.paed
-make test     # corre todos y compara contra los .esperado
+make test     # corre todos; cada .paed declara su salida al final
 ```
 
 Los programas de `paed/Frankly/tests/` cubren búsqueda lineal (con el caso que

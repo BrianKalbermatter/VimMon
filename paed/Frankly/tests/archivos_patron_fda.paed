@@ -40,3 +40,10 @@ ACCION archivos_patron_fda ES
         CERRAR(arch);
         ESCRIBIR("registros leidos: ", cant);
 FIN_ACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// paed/Frankly/tests/archivos_patron_fda.paed:32: error: ABRIR todavia no esta implementado: por ahora solo se valida la declaracion
+// paed/Frankly/tests/archivos_patron_fda.paed:33: error: LEER(archivo, registro) todavia no avanza el archivo: falta el manejo de archivos en disco
+// paed/Frankly/tests/archivos_patron_fda.paed:35: error: FDA() necesita archivos, que todavia no existen en el interprete
+// paed/Frankly/tests/archivos_patron_fda.paed:40: error: CERRAR todavia no esta implementado: por ahora solo se valida la declaracion
+// registros leidos: 0

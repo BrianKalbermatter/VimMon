@@ -87,6 +87,7 @@ kanban-plugin: board
 - [x] PseudoGames corre parado en `paed/`, porque carga `assets/`, `data/` y `saves/` con rutas relativas. `VIMMON_IDE` permite cambiar el programa sin recompilar VimMon #fase5
 - [x] `ParcialSimulado_01.paed` — parcial de 5 ejercicios REALES de la catedra (guia 1.1.5.1/2/3 + condicion de alumno + BOSS de notas), corriendo entero con `paedrun`. Usa arreglos, registros, `PARA`, `SI/SINO` anidados y potencia con exponente 0.5 para la raiz #fase2
 - [x] Bug de diagnostico: un texto de mas de `PAED_VAL_MAX` (128) bytes se truncaba en silencio y el error que salia era "falta la comilla de cierre", que manda a buscar un problema inexistente. Ahora dice cuantos bytes ocupa y cual es el maximo. El limite es en BYTES: una linea de guiones Unicode gasta 3 bytes por guion #fase2
+- [x] Los `.esperado` se eliminaron: cada `.paed` declara su salida al final, en un bloque `// ── SALIDA ESPERADA`. Un test es UN archivo, y la referencia queda al lado del codigo que la produce. Se saco tambien `ACTUALIZAR=1`: si un test falla, el bloque se corrige a mano leyendo el diff, que es lo que evita "arreglar" el test en vez del bug #fase2
 - [x] `LEER`/`ESCRIBIR` de consola y de archivo DISTINGUIDOS — se siguen escribiendo igual, y el parser decide cual es mirando si el primer argumento se declaro `ARCHIVO DE X`. No alcanza con contar argumentos: `LEER(clave, cod_mov)` es consola y tiene dos, igual que la de archivo (`wiki.txt:2761` vs `:2765`, en el MISMO algoritmo) #fase2
 - [x] `arch: ARCHIVO DE <tipo>;` se declara y se valida. Un REGISTRO no puede tener un ARCHIVO adentro: vive en memoria #fase2
 - [x] La decision se toma POR INSTRUCCION: un programa con tres archivos arriba y varios `LEER` de consola abajo no se pisa. Verificado en `archivos_formas.paed` #fase2
@@ -134,7 +135,7 @@ kanban-plugin: board
 - [x] Bug: `parse_instruction` buscaba el `=` de `clave = valor` con `strchr`, sin respetar comillas, y `ESCRIBIR("a = b")` quedaba destrozado #fase2
 - [x] Test: programa con `PARA`, `PARA` en reversa, `MIENTRAS` acumulador, `SI/SINO` y `PARA` anidado corre entero y da los valores correctos #fase2
 - [x] `build/paedrun` — arnés que corre un `.paed` en la terminal, sin SDL ni bus. El intérprete vive dentro del game loop, así que probar el lenguaje era abrir la ventana y mirar; un test que hay que mirar no es un test #fase2
-- [x] `make test` — corre todos los `.paed` de `paed/Frankly/tests/` y compara contra el `.esperado` de al lado. Agregar un test es dejar los dos archivos: no hay lista que mantener a mano #fase2
+- [x] `make test` — corre todos los `.paed` de `paed/Frankly/tests/`. Agregar un test es dejar el archivo: no hay lista que mantener a mano #fase2
 - [x] Evaluador: `ARREGLO[desde..hasta] DE <tipo>` en el `AMBIENTE`, `A[i]` en expresiones y como destino. El índice es una expresión completa, así que `A[(izq+der) DIV 2]` sale gratis. Los límites se chequean en runtime: `indice 4 fuera de rango: 'A' va de 5 a 9` #fase2
 - [x] Algoritmos reales corriendo: búsqueda lineal, búsqueda binaria, burbuja con `PARA` anidado, Euclides, primos, Fibonacci, factorial #fase2
 - [x] Bug: `falla(c, "%s", c->env->error)` pasaba el buffer de error como argumento de un `vsnprintf` que escribe en ESE MISMO buffer. Aliasing: el mensaje llegaba vacío (`error: ` pelado). Se copia antes de pasarlo #fase2

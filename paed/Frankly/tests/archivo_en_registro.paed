@@ -15,3 +15,6 @@ ACCION archivo_en_registro ES
         f.legajo := 1;
         ESCRIBIR(f.legajo);
 FIN_ACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// paed/Frankly/tests/archivo_en_registro.paed:10: error: un campo de registro no puede ser un archivo: 'adjunto' (un registro vive en memoria)

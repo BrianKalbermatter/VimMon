@@ -76,3 +76,14 @@ ACCION registros ES
         tini := 1.5 + 2.5;
         ESCRIBIR("1.5 + 2.5 = ", tini);
 FIN_ACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// -- campos como cualquier variable --
+// pori = (3, 4)
+// modulo al cuadrado = 25
+// dir = (6, 5)
+// -- recta parametrica P(t) = P0 + t * D --
+// segmento: (-4,16) a (4,-16)
+// la recta da los valores esperados
+// -- el punto decimal NO se confunde con el de campo --
+// 1.5 + 2.5 = 4

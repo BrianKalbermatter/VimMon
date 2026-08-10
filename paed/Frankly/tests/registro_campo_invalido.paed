@@ -24,3 +24,7 @@ ACCION registro_campo_invalido ES
         // vz no existe en vector2
         p.vz := 3;
 FIN_ACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// los campos validos andan: 1 2
+// paed/Frankly/tests/registro_campo_invalido.paed:25: error: 'p' no tiene un campo 'vz'

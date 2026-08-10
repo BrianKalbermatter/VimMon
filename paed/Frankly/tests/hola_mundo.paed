@@ -7,3 +7,6 @@ ACCION test ES
           b := "Mundo";
           ESCRIBIR("ei,",a,b);
 FIN_ACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// ei,HolaMundo

@@ -55,3 +55,12 @@ accion mayusculas ES
             escribir("cuenta ", i);
         fin_para
 finaccion
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// suma de cuadrados 1..5 = 55
+// 55 es correcto y divisible por 5
+// total=1  Total=2
+// los identificadores si distinguen mayusculas
+// cuenta 3
+// cuenta 2
+// cuenta 1

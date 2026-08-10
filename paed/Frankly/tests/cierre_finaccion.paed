@@ -7,3 +7,6 @@ ACCION cierre_finaccion ES
         n := 7;
         ESCRIBIR("cierra con FINACCION, n vale ", n);
 FINACCION
+
+// ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
+// cierra con FINACCION, n vale 7

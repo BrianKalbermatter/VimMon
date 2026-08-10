@@ -811,19 +811,27 @@ el lenguaje era abrir la ventana SDL y mirar — y **un test que hay que mirar n
 es un test**.
 
 ```bash
-make test    # corre todos y compara contra los .esperado
+make test    # corre todos y compara
 ```
 
-Agregar un caso es dejar el `.paed` y su `.esperado` en
-`paed/Frankly/tests/`: el runner los descubre solos, no hay lista que mantener.
-Para regrabar los esperados después de un cambio intencional:
+**Un test es UN archivo.** Cada `.paed` declara su propia salida al final, en un
+bloque de comentarios:
 
-```bash
-ACTUALIZAR=1 bash paed/Frankly/tests/correr.sh
+```paed
+FIN_ACCION
+
+// ── SALIDA ESPERADA ──
+// 1..10 suman 55
+// Gauss tenia razon
 ```
 
-Mirar el diff de los `.esperado` en el commit **antes** de darlo por bueno: si
-se regraban sin leerlos, el test deja de proteger nada.
+El runner lo extrae y compara contra lo que el programa imprime de verdad —
+incluidos los errores, que salen por `stderr`. Agregar un caso es dejar el
+`.paed` con su bloque: no hay lista que mantener ni archivo espejo.
+
+**No hay ningún modo que regrabe la salida sola.** Si un test falla, el runner
+muestra el diff y el bloque se corrige **a mano**, leyéndolo. Regrabar sin leer
+es exactamente cómo un test deja de proteger: "arregla" el test en vez del bug.
 
 ### 13.1 El corpus
 
