@@ -1,0 +1,54 @@
+// LEER y ESCRIBIR tienen DOS formas que se escriben igual.
+//
+//     LEER(salario)       pide un dato por consola
+//     LEER(arch, reg)     lee el proximo registro del archivo y AVANZA
+//
+// La teoria pone `Leer(Arch, Reg)` en la misma fila que `Avanzar(Sec, v)`
+// (TEORIA_COMPLETA.txt:1107): son operaciones hermanas, no la misma.
+//
+// NO se distinguen contando argumentos. La prueba esta en wiki.txt:2761 y
+// :2765, en el MISMO algoritmo:
+//
+//     LEER(clave, cod_mov)      consola, 2 argumentos
+//     LEER(arch_mae, reg_mae)   archivo, 2 argumentos
+//
+// Lo unico que las separa es si el primer argumento se declaro `ARCHIVO DE X`.
+// Este test reproduce ese caso: `LEER(edad, altura)` y `LEER(maestro, reg_m)`
+// tienen los dos DOS argumentos y tienen que resolverse distinto.
+//
+// Este programa TERMINA CON ERROR a proposito: ni la entrada por consola ni los
+// archivos en disco estan implementados todavia. Lo que se prueba es que el
+// parser elija bien la forma, y eso se ve en CUAL mensaje sale en cada linea.
+
+ACCION archivos_formas ES
+    AMBIENTE
+        venta = REGISTRO
+            codigo: ENTERO;
+            monto: REAL;
+        FIN_REGISTRO
+
+        // Tres archivos, para probar que no se pisan entre si
+        maestro: ARCHIVO DE venta;
+        movim:   ARCHIVO DE venta;
+        salida:  ARCHIVO DE venta;
+
+        reg_m: venta;
+        reg_v: venta;
+
+        // Variables comunes, para la forma de consola
+        edad: ENTERO;
+        altura: REAL;
+        nombre: AN(20);
+    PROCESO
+        // ── Forma ARCHIVO: el primer argumento esta declarado ARCHIVO DE ──
+        LEER(maestro, reg_m);
+        LEER(movim, reg_v);
+        ESCRIBIR(salida, reg_m);
+
+        // ── Forma CONSOLA: ninguno es un archivo ──
+        LEER(nombre);
+        LEER(edad, altura);      // DOS argumentos, y aun asi es consola
+
+        // ESCRIBIR de consola no cambia: sigue imprimiendo como siempre
+        ESCRIBIR("el ESCRIBIR de consola sigue funcionando");
+FIN_ACCION

@@ -301,6 +301,38 @@ static Valor primario(Ctx *c) {
 
         if (*c->p == '(') {   // llamada a funcion
             c->p++;
+
+            // Las funciones que preguntan por algo que el interprete todavia
+            // no tiene se resuelven ANTES de mirar el argumento. Si no, el
+            // argumento se evalua primero y el error que sale es el suyo: en
+            // `FDA(arch)`, 'arch' es un archivo y no una variable con valor,
+            // asi que salia "la variable 'arch' no tiene valor todavia" y el
+            // nombre de la funcion no aparecia por ningun lado.
+            //
+            // El cursor igual tiene que avanzar hasta el ')', asi que se
+            // recorre el argumento con el contexto marcado como fallado —
+            // el mismo truco que usa el cortocircuito de Y y O.
+            int sin_soporte =
+                strcmp(nombre, "FDS")  == 0 || strcmp(nombre, "NFDS") == 0 ||
+                strcmp(nombre, "FDA")  == 0 || strcmp(nombre, "NFDA") == 0;
+
+            if (sin_soporte) {
+                espacios(c);
+                if (*c->p != ')') {
+                    Ctx basura = *c;
+                    basura.fallo = 1;
+                    eval_o(&basura);
+                    c->p = basura.p;
+                }
+                espacios(c);
+                if (*c->p == ')') c->p++;
+
+                int de_archivo = strcmp(nombre, "FDA") == 0 || strcmp(nombre, "NFDA") == 0;
+                falla(c, "%s() necesita %s, que todavia no existen en el interprete",
+                      nombre, de_archivo ? "archivos" : "secuencias");
+                return LOG(0);
+            }
+
             Valor arg = {0};
             espacios(c);
             int hay_arg = (*c->p != ')');
@@ -313,12 +345,6 @@ static Valor primario(Ctx *c) {
             if (strcmp(nombre, "ABSO")   == 0) return NUM(fabs(arg.num));
             if (strcmp(nombre, "REDOND") == 0) return NUM(round(arg.num));
 
-            // NFDS y FDS preguntan por una SECUENCIA, y el interprete todavia
-            // no tiene secuencias. Se dice, no se inventa un valor.
-            if (strcmp(nombre, "NFDS") == 0 || strcmp(nombre, "FDS") == 0) {
-                falla(c, "%s() necesita secuencias, que todavia no existen en el interprete", nombre);
-                return LOG(0);
-            }
             falla(c, "funcion desconocida '%s'", nombre);
             return NUM(0);
         }

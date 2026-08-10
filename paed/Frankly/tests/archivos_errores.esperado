@@ -1,0 +1,6 @@
+paed/Frankly/tests/archivos_errores.paed:24: error: ABRIR trabaja sobre un archivo y 'fantasma' no esta declarado en el AMBIENTE (falta 'fantasma: ARCHIVO DE <tipo>;')
+paed/Frankly/tests/archivos_errores.paed:25: error: ABRIR trabaja sobre un archivo, pero 'cantidad' se declaro en la linea 22 como ENTERO
+paed/Frankly/tests/archivos_errores.paed:26: error: LEER sobre el archivo 'arch' lleva exactamente 2 argumentos: LEER(arch, registro)
+paed/Frankly/tests/archivos_errores.paed:27: error: ESCRIBIR sobre el archivo 'arch' lleva exactamente 2 argumentos: ESCRIBIR(arch, registro)
+paed/Frankly/tests/archivos_errores.paed:28: error: el destino de LEER(arch, ...) no puede ser otro archivo: 'otro' (linea 20)
+paed/Frankly/tests/archivos_errores.paed:29: error: 'Arch' no esta declarado, pero si 'arch' (linea 19): los identificadores distinguen mayusculas

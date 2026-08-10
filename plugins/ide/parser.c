@@ -319,6 +319,139 @@ static char *igual_separador(char *s) {
     return NULL;
 }
 
+// ── Consola o archivo: cual de las dos formas es ──────────────────────────────
+
+// Busca una declaracion por nombre EXACTO. Los identificadores de PAED
+// distinguen mayusculas ('total' y 'Total' son dos variables), asi que va
+// strcmp y no strcasecmp.
+static const PAEDDecl *decl_por_nombre(const PAEDProgram *p, const char *nombre) {
+    for (int i = 0; i < p->decl_count; i++)
+        if (strcmp(p->decls[i].name, nombre) == 0) return &p->decls[i];
+    return NULL;
+}
+
+// Igual pero ignorando mayusculas. Solo se usa para EXPLICAR un error: si
+// alguien declaro 'arch' y escribio 'Arch', sin esto la instruccion degradaria
+// a forma consola en silencio, que es justo lo que el parser no hace.
+static const PAEDDecl *decl_parecida(const PAEDProgram *p, const char *nombre) {
+    for (int i = 0; i < p->decl_count; i++)
+        if (strcasecmp(p->decls[i].name, nombre) == 0) return &p->decls[i];
+    return NULL;
+}
+
+// Decide si esta instruccion es la forma de consola o la de archivo, y la
+// marca. Devuelve 0 si esta bien, -1 si hubo error.
+//
+// La regla es una sola: manda el PRIMER ARGUMENTO. Si es una variable
+// declarada como archivo, es operacion de archivo; si no, es consola. Se
+// resuelve por instruccion, asi que un programa puede tener tres archivos y
+// diez LEER de consola sin que se pisen: cada linea se mira sola.
+//
+// Que procedimientos tienen dos formas NO se decide aca: sale de
+// sintaxis.json, del campo "forma_archivo". Hardcodear la lista en C seria
+// tener la definicion del lenguaje en dos lados.
+static int resolver_forma(PAEDProgram *p, PAEDInstr *instr, cJSON *def,
+                          int lineno, const char *nombre) {
+    cJSON *fa    = cJSON_GetObjectItem(def, "forma_archivo");
+    cJSON *pa    = cJSON_GetObjectItem(def, "primer_arg");
+    int    exige = cJSON_IsString(pa) && strcmp(pa->valuestring, "archivo") == 0;
+
+    if (!cJSON_IsObject(fa) && !exige) {
+        instr->forma = PAED_FORMA_UNICA;
+        return 0;
+    }
+
+    instr->forma = PAED_FORMA_CONSOLA;
+    if (instr->arg_count == 0) {
+        // ABRIR() sin nada es error; ESCRIBIR() vacio no.
+        if (exige) {
+            add_error(p, lineno, "%s necesita un archivo como primer argumento", nombre);
+            return -1;
+        }
+        return 0;
+    }
+
+    const char *primero = instr->args[0].val;
+
+    // Lo que no es un nombre suelto no puede ser un archivo. Descarta gratis
+    // ESCRIBIR("hola"), LEER(A[i]) y ESCRIBIR(3*x). Se usa es_identificador y
+    // no es_campo porque 'p.campo' tampoco es nunca un archivo.
+    if (!es_identificador(primero)) {
+        if (exige) {
+            add_error(p, lineno,
+                      "%s trabaja sobre un archivo y '%s' no es el nombre de uno",
+                      nombre, primero);
+            return -1;
+        }
+        return 0;
+    }
+
+    const PAEDDecl *d = decl_por_nombre(p, primero);
+
+    if (d && d->es_archivo) {
+        instr->forma = PAED_FORMA_ARCHIVO;
+        // La clave nombra el dato; el enum de arriba decide el camino. Asi el
+        // interprete lo lee con paed_get_arg(in, "archivo") como todo lo demas.
+        snprintf(instr->args[0].key, PAED_KEY_MAX, "archivo");
+
+        if (cJSON_IsObject(fa)) {
+            cJSON *n = cJSON_GetObjectItem(fa, "args");
+            if (cJSON_IsNumber(n) && instr->arg_count != n->valueint) {
+                add_error(p, lineno,
+                          "%s sobre el archivo '%s' lleva exactamente %d argumentos: "
+                          "%s(%s, registro)",
+                          nombre, primero, n->valueint, nombre, primero);
+                return -1;
+            }
+        }
+        // El destino no puede ser otro archivo: se lee DESDE un archivo HACIA
+        // un registro en memoria.
+        if (instr->arg_count >= 2 && es_identificador(instr->args[1].val)) {
+            const PAEDDecl *dest = decl_por_nombre(p, instr->args[1].val);
+            if (dest && dest->es_archivo) {
+                add_error(p, lineno,
+                          "el destino de %s(%s, ...) no puede ser otro archivo: '%s' (linea %d)",
+                          nombre, primero, dest->name, dest->line);
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    // Declarado, pero NO es un archivo.
+    if (d && exige) {
+        add_error(p, lineno,
+                  "%s trabaja sobre un archivo, pero '%s' se declaro en la linea %d como %s",
+                  nombre, primero, d->line, d->type[0] ? d->type : "otra cosa");
+        return -1;
+    }
+
+    // No esta declarado. Si el nombre existe con otras mayusculas, es casi
+    // seguro un error de tipeo y hay que decirlo: si no, la instruccion se
+    // trataria como consola sin avisar.
+    if (!d) {
+        const PAEDDecl *parecida = decl_parecida(p, primero);
+        if (parecida && parecida->es_archivo) {
+            add_error(p, lineno,
+                      "'%s' no esta declarado, pero si '%s' (linea %d): "
+                      "los identificadores distinguen mayusculas",
+                      primero, parecida->name, parecida->line);
+            return -1;
+        }
+        if (exige) {
+            add_error(p, lineno,
+                      "%s trabaja sobre un archivo y '%s' no esta declarado en el AMBIENTE "
+                      "(falta '%s: ARCHIVO DE <tipo>;')", nombre, primero, primero);
+            return -1;
+        }
+    }
+
+    // Queda como consola. Es lo correcto: un escalar NO necesita declararse
+    // (nace en su primera asignacion), asi que LEER(salario) sin declarar es
+    // legitimo. Al archivo sin declarar lo caza ABRIR, que si lo exige.
+    return 0;
+}
+
 static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
     // 1. Toda instruccion termina en ';'
     size_t len = strlen(linea);
@@ -465,6 +598,8 @@ static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
             hubo_error = 1;
         }
     }
+
+    if (resolver_forma(p, instr, def, lineno, nombre) != 0) hubo_error = 1;
 
     if (!hubo_error) p->instr_count++;
 }
@@ -752,6 +887,26 @@ static int parse_bloque(PAEDProgram *p, char *linea, int lineno, Pila *pila) {
 
 // ── Parseo de una declaracion del AMBIENTE: nombre : TIPO; ────────────────────
 
+// Lee el `DE <tipo>` que llevan tanto ARREGLO como ARCHIVO y devuelve el tipo
+// de adentro, o NULL si no hay un 'DE' suelto.
+//
+// Lo usan las dos ramas: son la misma sintaxis, y tenerla escrita dos veces es
+// garantizar que un dia se arregle una y la otra no.
+// Devuelve NULL si no hay 'DE', y una cadena VACIA si hay 'DE' pero nada
+// despues. Son dos errores distintos y cada uno tiene su mensaje: decir "falta
+// DE" cuando el DE esta escrito manda a mirar la parte que ya esta bien.
+static char *tipo_tras_DE(char *resto) {
+    if (strncasecmp(resto, "DE", 2) != 0) return NULL;
+
+    // 'DE' con nada atras: el tipo es lo que falta, no el DE.
+    if (resto[2] == '\0') return resto + 2;
+
+    // 'DE' tiene que ser palabra suelta: sin esto, un tipo llamado 'DEUDA'
+    // pasaria por 'DE' seguido de 'UDA'.
+    if (!isspace((unsigned char)resto[2])) return NULL;
+    return trim(resto + 2);
+}
+
 static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
     size_t len = strlen(linea);
     if (len == 0 || linea[len - 1] != ';') {
@@ -810,13 +965,13 @@ static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
             return;
         }
 
-        char *resto = trim(tipo + 7 + leidos);
-        if (strncasecmp(resto, "DE", 2) != 0 || !isspace((unsigned char)resto[2])) {
+        char *base_p = tipo_tras_DE(trim(tipo + 7 + leidos));
+        if (!base_p) {
             add_error(p, lineno, "al arreglo '%s' le falta 'DE <tipo>'", nombre);
             p->decl_count--;
             return;
         }
-        snprintf(base, sizeof(base), "%s", trim(resto + 2));
+        snprintf(base, sizeof(base), "%s", base_p);
         if (!*base) {
             add_error(p, lineno, "al arreglo '%s' le falta el tipo despues de 'DE'", nombre);
             p->decl_count--;
@@ -827,6 +982,31 @@ static void parse_decl(PAEDProgram *p, char *linea, int lineno) {
         d->desde      = desde;
         d->hasta      = hasta;
         strncpy(d->type, base, PAED_NAME_MAX - 1);
+        return;
+    }
+
+    // ARCHIVO DE TIPO
+    //
+    // El isspace del final NO es decorativo: sin el, un tipo llamado
+    // 'ARCHIVOS' entraria por esta rama. La rama de ARREGLO de arriba tiene
+    // ese mismo agujero y quedo anotado en el KANBAN.
+    if (strncasecmp(tipo, "ARCHIVO", 7) == 0 &&
+        (tipo[7] == '\0' || isspace((unsigned char)tipo[7]))) {
+
+        char *base_p = tipo_tras_DE(trim(tipo + 7));
+        if (!base_p) {
+            add_error(p, lineno, "al archivo '%s' le falta 'DE <tipo>'", nombre);
+            p->decl_count--;
+            return;
+        }
+        if (!*base_p) {
+            add_error(p, lineno, "al archivo '%s' le falta el tipo despues de 'DE'", nombre);
+            p->decl_count--;
+            return;
+        }
+
+        d->es_archivo = 1;
+        strncpy(d->type, base_p, PAED_NAME_MAX - 1);
         return;
     }
 
@@ -886,6 +1066,17 @@ static void parse_ambiente(PAEDProgram *p, char *linea, int lineno, PAEDRegistro
             // parse_decl lo dejo en la tabla general: se mueve al registro,
             // porque un campo no es una variable del programa.
             *destino = p->decls[--p->decl_count];
+
+            // Un registro vive en MEMORIA: es el molde de lo que se lee o se
+            // graba. Un archivo adentro no tiene sentido, y aceptarlo callado
+            // dejaria pasar una declaracion que despues explota sin motivo
+            // visible.
+            if (destino->es_archivo) {
+                add_error(p, lineno,
+                          "un campo de registro no puede ser un archivo: '%s' "
+                          "(un registro vive en memoria)", destino->name);
+                return;
+            }
             (*reg)->campo_count++;
         }
         return;

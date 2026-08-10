@@ -44,6 +44,11 @@ typedef struct {
 
 // Declaracion del bloque AMBIENTE: nombre: TIPO;
 // Tambien   nombre: ARREGLO[desde..hasta] DE TIPO;
+//           nombre: ARCHIVO DE TIPO;
+//
+// ARREGLO y ARCHIVO son dos ENVOLTORIOS sobre un tipo base, y por eso se
+// parsean igual: `type` guarda el tipo de adentro en los dos casos. Lo que
+// cambia es donde vive el dato — el arreglo en memoria, el archivo en disco.
 typedef struct {
     char name[PAED_NAME_MAX];
     char type[PAED_NAME_MAX];   // el tipo BASE: ENTERO, REAL, CARACTER, LOGICO
@@ -51,6 +56,13 @@ typedef struct {
     // Limites del arreglo, los dos inclusive. En AED los elige el programador
     // y no arrancan en 0: ARREGLO[1..10] va del 1 al 10.
     int  desde, hasta;
+
+    // Archivo. Saber que una variable es un archivo es lo que permite
+    // distinguir `LEER(arch, reg)` (avanzar un registro) de `LEER(A, B)`
+    // (pedir datos por consola): las dos formas se escriben igual y tienen
+    // dos argumentos, asi que lo unico que las separa es esta declaracion.
+    int  es_archivo;
+
     int  line;
 } PAEDDecl;
 
@@ -69,9 +81,29 @@ typedef enum {
     PAED_FIN_PARA,        // FIN_PARA
 } PAEDKind;
 
+// Algunos procedimientos de AED se escriben IGUAL pero hacen cosas distintas
+// segun sobre que operen:
+//
+//     LEER(salario)       pide un dato por consola
+//     LEER(arch, reg)     lee el proximo registro del archivo y AVANZA
+//
+// No se distinguen contando argumentos: `LEER(clave, cod_mov)` es consola y
+// tiene dos, igual que la de archivo (wiki.txt:2761 y :2765, en el MISMO
+// algoritmo). Lo unico que las separa es si el primer argumento se declaro
+// como `archivo de X` en el AMBIENTE, y eso lo resuelve el parser.
+//
+// La teoria pone `Leer(Arch, Reg)` en la misma fila que `Avanzar(Sec, v)`
+// (TEORIA_COMPLETA.txt:1107): son operaciones hermanas, no la misma.
+typedef enum {
+    PAED_FORMA_UNICA = 0,   // el procedimiento tiene una sola forma
+    PAED_FORMA_CONSOLA,     // LEER(x)       ESCRIBIR("hola")
+    PAED_FORMA_ARCHIVO,     // LEER(arch,r)  ESCRIBIR(arch,r)
+} PAEDForma;
+
 // Instruccion del bloque PROCESO.
 typedef struct {
     PAEDKind kind;
+    PAEDForma forma;      // cual de las dos formas es, si el proc tiene dos
     // LLAMADA: nombre del proc. ASIGNA: destino. PARA: la variable del bucle,
     // con los limites en args como desde/hasta.
     char    proc[PAED_NAME_MAX];

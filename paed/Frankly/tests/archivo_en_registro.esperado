@@ -1,0 +1,1 @@
+paed/Frankly/tests/archivo_en_registro.paed:10: error: un campo de registro no puede ser un archivo: 'adjunto' (un registro vive en memoria)

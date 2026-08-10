@@ -97,7 +97,8 @@ FIN_ACCION
 | `VENTANA DE <tipo>` | `recorrido: VENTANA DE CARACTER;` | ❌ |
 | `SECUENCIA DE SALIDA` | `secSalida: SECUENCIA DE SALIDA;` | ❌ |
 | `REGISTRO` / `FIN_REGISTRO` | `vector2 = REGISTRO ... FIN_REGISTRO` | implementado |
-| `CONSTANTE`, `ARCHIVO`, `PUNTERO` | | ❌ |
+| `ARCHIVO DE <tipo>` | `arch: ARCHIVO DE venta;` | se declara y se valida; no lee disco |
+| `CONSTANTE`, `PUNTERO` | | ❌ |
 
 El tipo se guarda como texto y **no se valida**: hoy nada impide asignarle un
 texto a algo declarado `ENTERO`. Los tipos escalares se aceptan todos por igual.
@@ -175,6 +176,47 @@ inventado, y declarar el tipo no impediría absolutamente nada.
 `pori.vx` es un campo. Se resuelve mirando qué viene después del punto: un
 dígito lo hace parte del número, una letra lo hace acceso a campo. Un número
 nunca llega al lector de identificadores, porque empieza con dígito.
+
+### 2.3 Archivos y las dos formas de `LEER`
+
+```paed
+AMBIENTE
+    arch: ARCHIVO DE venta;    // el tipo de adentro es el REGISTRO que guarda
+```
+
+`LEER` significa **dos cosas distintas** que se escriben igual:
+
+| Forma | Qué hace |
+|---|---|
+| `LEER(salario)` · `LEER(A,B)` | pide datos por consola |
+| `LEER(arch, reg)` | lee el próximo registro y **avanza** |
+
+La teoría lo pone en la misma fila que `Avanzar(Sec, v)`
+(`TEORIA_COMPLETA.txt:1107`): **`Leer(Arch, Reg)` es el avanzar de los
+archivos**, no una entrada de usuario. `ESCRIBIR` tiene el mismo doble rol
+(`ESCRIBIR(texto)` vs `ESCRIBIR(arch, reg)`).
+
+**No se distinguen contando argumentos.** En `wiki.txt:2761` y `:2765`, dentro
+del mismo algoritmo:
+
+```paed
+LEER(clave, cod_mov)      // consola, 2 argumentos
+LEER(arch_mae, reg_mae)   // archivo, 2 argumentos
+```
+
+**Lo único que las separa es la declaración.** Si el primer argumento se declaró
+`ARCHIVO DE X`, es operación de archivo; si no, es consola. Lo resuelve el
+**parser**, mirando el `AMBIENTE`, antes de ejecutar — y se decide por
+instrucción, así que un programa puede tener tres archivos arriba y diez `LEER`
+de consola abajo sin que se pisen.
+
+Un `REGISTRO` **no puede** tener un `ARCHIVO` adentro: el registro es el molde
+de lo que se lee o se graba, y vive en memoria.
+
+**El archivo sin declarar lo caza `ABRIR`, no `LEER`.** `LEER` con un primer
+argumento desconocido degrada a consola a propósito, porque un escalar no
+necesita declararse. `ABRIR` sí exige que el archivo exista, y ese es el que
+avisa.
 
 ## 3. Asignación y operadores
 
@@ -747,7 +789,10 @@ de línea — nunca se ignora.
 | Instrucción partida en dos líneas | ❌ el parser lee línea por línea |
 | `ARCHIVO` / `CONSTANTE` | ❌ |
 | `SECUENCIA`, y por lo tanto `NFDS` / `FDS` | ❌ |
-| `ARR` / `AVZ` / `CREAR` / `CERRAR` / `LEER` | parsean, no ejecutan |
+| `ARCHIVO DE <tipo>` en el AMBIENTE | ✅ §2.3 |
+| `LEER`/`ESCRIBIR`: consola vs archivo, distinguidos | ✅ §2.3 |
+| `FDA` / `NFDA` reconocidas (avisan que faltan archivos) | ✅ |
+| `ARR` / `AVZ` / `CREAR` / `CERRAR` / `LEER` / `ABRIR` | parsean, no ejecutan |
 
 Lo que falta está en el KANBAN con su ticket. Esta tabla y el KANBAN se
 actualizan juntos.

@@ -23,6 +23,11 @@ kanban-plugin: board
 - [ ] Decidir el `;`: la cátedra lo usa como SEPARADOR (la última sentencia no lo lleva) y el parser lo exige como terminador. Cambiarlo rompe todos los `.paed` del repo — decidir antes de tocar #fase2
 - [ ] **Interprete PAED: `LEER` — es lo que mas falta.** Hoy parsea pero no ejecuta, asi que ningun programa puede pedir datos: en `ParcialSimulado_01.paed` los valores van fijos en el codigo y hay que editarlos y volver a correr para probar otro caso. Con `LEER` andando, los parciales se resuelven como en la catedra. Ojo con dos cosas: el interprete corre DENTRO del game loop (leer de stdin lo congela), y `LEER(A,B)` toma varios destinos, cada uno pudiendo ser `x`, `A[i]` o `p.campo` #fase2
 - [ ] Interprete PAED: `ARR`/`AVZ`/`CREAR`/`CERRAR` (hoy parsean pero no ejecutan). Van despues de `LEER` y despues del tipo `SECUENCIA`, porque sin secuencias no tienen sobre que operar #fase2
+- [ ] Archivos en disco de verdad: `ABRIR`/`LEER`/`ESCRIBIR`/`CERRAR` con handle, modo (lectura/escritura/actualizacion) y flag de fin. Hoy la forma se DISTINGUE y se valida, pero ninguna toca el disco #fase2
+- [ ] Decidir la sintaxis de `ABRIR`: la wiki escribe `ABRIR(arch, lectura)` y la catedra `Abrir E/(arch)` (`TEORIA_COMPLETA.txt:1104`). Son incompatibles entre si #fase2
+- [ ] El TERCER `LEER`: acceso indexado por clave (`reg.clave := x; LEER(arch, reg)`, `wiki.txt:2764`) NO avanza, busca. Hoy se marca igual que el secuencial; distinguirlos necesita saber si el archivo es indexado #fase2
+- [ ] `GRABAR`/`REGRABAR`/`BORRAR` de archivos indexados (`TEORIA_COMPLETA.txt:1112-1114`) #fase2
+- [ ] La rama de `ARREGLO` en `parse_decl` no exige espacio despues de la palabra, asi que un tipo llamado `ARREGLOS` entraria por ahi. La de `ARCHIVO` si lo exige #fase2
 - [ ] Corroborar contra la wiki: `RETORNAR`, `TRUNC`, `ABSO`, `REDOND` — 0 apariciones en los apuntes #fase2
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
 - [ ] Recortar contra el plano cercano: hoy `scene_view.c` acota las coordenadas de las esquinas en vez de generar vértices en el borde, y un objeto que abraza la cámara (el suelo) queda mal #fase3
@@ -82,6 +87,12 @@ kanban-plugin: board
 - [x] PseudoGames corre parado en `paed/`, porque carga `assets/`, `data/` y `saves/` con rutas relativas. `VIMMON_IDE` permite cambiar el programa sin recompilar VimMon #fase5
 - [x] `ParcialSimulado_01.paed` — parcial de 5 ejercicios REALES de la catedra (guia 1.1.5.1/2/3 + condicion de alumno + BOSS de notas), corriendo entero con `paedrun`. Usa arreglos, registros, `PARA`, `SI/SINO` anidados y potencia con exponente 0.5 para la raiz #fase2
 - [x] Bug de diagnostico: un texto de mas de `PAED_VAL_MAX` (128) bytes se truncaba en silencio y el error que salia era "falta la comilla de cierre", que manda a buscar un problema inexistente. Ahora dice cuantos bytes ocupa y cual es el maximo. El limite es en BYTES: una linea de guiones Unicode gasta 3 bytes por guion #fase2
+- [x] `LEER`/`ESCRIBIR` de consola y de archivo DISTINGUIDOS — se siguen escribiendo igual, y el parser decide cual es mirando si el primer argumento se declaro `ARCHIVO DE X`. No alcanza con contar argumentos: `LEER(clave, cod_mov)` es consola y tiene dos, igual que la de archivo (`wiki.txt:2761` vs `:2765`, en el MISMO algoritmo) #fase2
+- [x] `arch: ARCHIVO DE <tipo>;` se declara y se valida. Un REGISTRO no puede tener un ARCHIVO adentro: vive en memoria #fase2
+- [x] La decision se toma POR INSTRUCCION: un programa con tres archivos arriba y varios `LEER` de consola abajo no se pisa. Verificado en `archivos_formas.paed` #fase2
+- [x] Bug: `ESCRIBIR(arch, reg)` entraba al camino de consola y evaluaba `arch` como expresion, asi que decia "la variable 'arch' no tiene valor todavia" — mandaba a mirar al lugar equivocado #fase2
+- [x] Bug: `FDA(arch)` evaluaba el argumento ANTES de saber que funcion era, asi que el error era el del argumento y el nombre de la funcion no aparecia. Ahora las funciones sin soporte se resuelven antes de mirar sus argumentos #fase2
+- [x] `FDA`/`NFDA` reconocidas en `expr.c` con mensaje propio. Antes decian "funcion desconocida", como si no existieran en el lenguaje: existen, falta implementarlas #fase2
 - [x] REGISTRO implementado — `vector2 = REGISTRO ... FIN_REGISTRO` en el AMBIENTE, y `pori.vx` como destino y dentro de expresiones. Es el `struct` de C con otro nombre #fase2
 - [x] `AlgebraRectas/recta.paed` corre ENTERO: de 10 errores a 0. Verificado a mano que el calculo da bien — P0=(0,0), D=(1,-4), dominio [-4,4] produce el segmento (-4,16) a (4,-16), que es la recta y=-4x #fase2
 - [x] Los registros se APLANAN: `pori` de tipo vector2 se guarda como las variables "pori.vx" y "pori.vy". El Entorno no sabe nada de registros. El precio es que no se puede asignar un registro entero (`p1 := p2`), que no aparece en el corpus #fase2

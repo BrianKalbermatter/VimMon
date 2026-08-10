@@ -296,7 +296,42 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return 0;
     }
 
-    // ── Salida ───────────────────────────────────────────────────────────────
+    // ── Entrada y salida ─────────────────────────────────────────────────────
+    //
+    // LEER y ESCRIBIR tienen DOS formas y el parser ya decidio cual es esta
+    // (in->forma), mirando si el primer argumento se declaro como archivo.
+    // Aca solo se despacha. Que la bifurcacion vaya ANTES del bucle de
+    // impresion no es un detalle: ESCRIBIR(arch, reg) entraba al bucle, se
+    // evaluaba 'arch' como si fuera una variable y el error que salia era
+    // "la variable 'arch' no tiene valor todavia", que manda a mirar al lugar
+    // equivocado.
+    // ABRIR y CERRAR van PRIMERO: tambien operan sobre un archivo, asi que el
+    // parser les pone forma ARCHIVO, y si el chequeo de abajo fuera antes
+    // dirian que "no graban" — que no es lo que hacen.
+    if (strcasecmp(p, "ABRIR") == 0 || strcasecmp(p, "CERRAR") == 0) {
+        char msg[PAED_MSG_MAX];
+        snprintf(msg, sizeof(msg),
+                 "%s todavia no esta implementado: por ahora solo se valida la declaracion", p);
+        runtime_error(prog, in, msg);
+        return -1;
+    }
+
+    if (in->forma == PAED_FORMA_ARCHIVO) {
+        char msg[PAED_MSG_MAX];
+        snprintf(msg, sizeof(msg),
+                 "%s(archivo, registro) todavia no %s: falta el manejo de archivos en disco",
+                 p, strcasecmp(p, "LEER") == 0 ? "avanza el archivo" : "graba");
+        runtime_error(prog, in, msg);
+        return -1;
+    }
+
+    if (strcasecmp(p, "LEER") == 0) {
+        runtime_error(prog, in,
+                      "LEER por consola todavia no pide datos: falta la entrada interactiva");
+        return -1;
+    }
+
+    // ── Salida por consola ───────────────────────────────────────────────────
     if (strcasecmp(p, "ESCRIBIR") == 0) {
         for (int i = 0; i < in->arg_count; i++) {
             const char *v = in->args[i].val;
