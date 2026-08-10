@@ -57,6 +57,22 @@ $(BUILD)/hello_entity: $(EXAMPLE_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(EXAMPLE_OBJS) $(SDL_LIBS) -o $@
 
+# Arnés de PAED: build/paedrun corre un .paed en la terminal, sin SDL ni bus.
+# Es lo que permite testear el lenguaje con un script en vez de a ojo.
+PAEDRUN_SRCS = tools/paedrun.c plugins/ide/parser.c plugins/ide/interpreter.c plugins/ide/expr.c cjson/cJSON.c
+PAEDRUN_OBJS = $(PAEDRUN_SRCS:%.c=$(OBJDIR)/%.o)
+DEPS += $(PAEDRUN_OBJS:.o=.d)
+
+paedrun: $(BUILD)/paedrun
+
+$(BUILD)/paedrun: $(PAEDRUN_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(PAEDRUN_OBJS) -lm -o $@
+
+# Corre toda la batería de programas PAED y compara contra la salida esperada.
+test: $(BUILD)/paedrun
+	@bash paed/Frankly/tests/correr.sh
+
 clean:
 	rm -rf $(BUILD)
 

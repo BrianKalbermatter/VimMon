@@ -13,6 +13,10 @@
 !/docs/
 !/KANBAN.md
 !/framebuffer.md
+# Arnés de PAED: corre un .paed en la terminal, sin SDL
+!/tools/
+# Flags para clangd (Helix). Sin esto el editor marca todo el proyecto en rojo
+!/compile_flags.txt
 
 # Motor grafico 2D
 !/engine/
