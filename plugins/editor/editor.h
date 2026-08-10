@@ -3,16 +3,15 @@
 
 #include "../../bus/plugin.h"
 
-// Plugin editor: conecta el editorBim al bus de VimMon.
+// Plugin editor: conecta PseudoGames al bus de VimMon.
 //
-// NO es el editor. El editor lo escribe el usuario y vive en
-// paed/scripts/editorBim/. Este plugin solo hace de puente: escucha
-// EVENT_EDITOR_OPEN, lanza el editor sobre el archivo que le pidieron, y
-// cuando vuelve valida el resultado con el parser de PAED.
+// NO es el editor. PseudoGames es el IDE completo del usuario — menu, niveles,
+// wiki, pomodoro y el editor adentro — y vive en paed/, con su propio Makefile.
+// Este plugin solo hace de puente: escucha EVENT_EDITOR_OPEN y lo lanza.
 //
 // Es el mismo patron que 'engine': el comando de la consola publica un evento,
-// el plugin lo agarra y abre el programa. Asi el editor es una opcion mas del
-// OS, como ai o help, y no un script suelto que se corre por afuera.
+// el plugin lo agarra y abre el programa. Asi el IDE es una opcion mas del OS,
+// como ai o help, y no algo que se corre por afuera.
 
 extern Plugin editor_plugin;
 

@@ -30,8 +30,8 @@ static void cmd_help(void) {
     printf("  engine   abre la ventana y dibuja plugins/ide/scene.paed\n");
     printf("           (se recarga sola al guardar el archivo)\n");
     printf("  scene    carga y ejecuta plugins/ide/scene.paed (intérprete PAED)\n");
-    printf("  edit <archivo>   abre el archivo en el editorBim\n");
-    printf("           (al salir, si es .paed se valida solo)\n");
+    printf("  edit     abre PseudoGames, el IDE completo\n");
+    printf("           (menu, niveles, wiki, editor; al cerrarlo volves acá)\n");
     printf("  ai       menú de proveedores de IA (llama/qwen/claude/kimi...)\n");
     printf("  ai use <id|nº>   cambia de proveedor\n");
     printf("  ai <prompt>      manda ese prompt al proveedor activo\n");
@@ -39,10 +39,10 @@ static void cmd_help(void) {
     printf("  quit     apaga vimmon\n\n");
 }
 
-// edit: publica el evento; el editor_plugin lo agarra y abre el editorBim.
-// Mismo patron que engine: main no sabe QUE editor es ni donde vive.
-static void cmd_edit(const char *archivo) {
-    bus_send(EVENT_EDITOR_OPEN, (void *)archivo, (uint32_t)strlen(archivo) + 1);
+// edit: publica el evento; el editor_plugin lo agarra y abre PseudoGames.
+// Mismo patron que engine: main no sabe QUE programa es ni donde vive.
+static void cmd_edit(void) {
+    bus_send(EVENT_EDITOR_OPEN, NULL, 0);
 }
 
 // engine: publica el evento; el renderer_plugin lo agarra y abre el motor.
@@ -120,8 +120,7 @@ static int despachar(const char *cmd) {
     if (strcmp(cmd, "scene")  == 0)     { cmd_scene();  return 1; }
     if (strcmp(cmd, "ai")     == 0)     { cmd_ai("");   return 1; }
     if (strncmp(cmd, "ai ", 3) == 0)    { cmd_ai(cmd + 3); return 1; }
-    if (strncmp(cmd, "edit ", 5) == 0)  { cmd_edit(cmd + 5); return 1; }
-    if (strcmp(cmd, "edit")   == 0)     { cmd_edit("");  return 1; }
+    if (strcmp(cmd, "edit")   == 0)     { cmd_edit();    return 1; }
     if (strcmp(cmd, "help")   == 0)     { cmd_help();   return 1; }
     if (strcmp(cmd, "quit")   == 0 ||
         strcmp(cmd, "exit")   == 0)     return 0;     // salir

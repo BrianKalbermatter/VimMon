@@ -1,5 +1,4 @@
 #include "editor.h"
-#include "../ide/parser.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -9,94 +8,59 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// Puente entre el bus y el editorBim. Lo que hace de verdad:
+// Puente entre el bus y PseudoGames, el IDE completo.
 //
-//   1. se asegura de que el archivo exista (el editor lo lee con mapfile,
-//      que falla si no esta)
-//   2. lanza el editor en su propio directorio
-//   3. cuando vuelve, si el archivo es .paed, lo parsea y muestra los errores
+// PseudoGames NO es un editor de un archivo: es la aplicacion entera, con su
+// menu, sus niveles, la wiki, el pomodoro y el editor adentro. Se abre como se
+// abre el motor con 'engine': el comando publica un evento, este plugin lo
+// agarra y lanza el programa, y cuando se cierra volves a la consola.
 //
-// El paso 3 es lo que lo hace parte del OS y no un lanzador: salis del editor
-// y el sistema ya te dice si lo que escribiste compila.
+// El plugin NO es el IDE. El IDE lo escribe el usuario y vive en paed/.
+// Aca solo esta la conexion.
 
-// El editorBim hace `source ./keys.sh` con ruta RELATIVA, asi que hay que
-// pararse en su carpeta antes de ejecutarlo.
-#define EDITOR_DIR    "paed/scripts/editorBim"
-#define EDITOR_SCRIPT "./bim.sh"
+// PseudoGames carga assets/, data/ y saves/ con rutas RELATIVAS, asi que tiene
+// que correr parado en su propia carpeta.
+#define IDE_DIR    "paed"
+#define IDE_BIN    "./aed"
+#define IDE_BIN_FS "paed/aed"
 
-// Se puede cambiar el editor sin recompilar:
-//
-//     VIMMON_EDITOR=/usr/bin/vim build/vimmon
-//
-// Sirve para probar el resto de la cadena sin abrir un editor interactivo, y
-// para el dia que haya un segundo editor. Si no esta, se usa el editorBim.
-#define EDITOR_ENV "VIMMON_EDITOR"
+// Cambiar el programa sin recompilar VimMon:
+//     VIMMON_IDE=/usr/bin/vim build/vimmon
+#define IDE_ENV "VIMMON_IDE"
 
-static int editor_init(void)     { printf("[editor] iniciado\n"); return 0; }
+static int  editor_init(void)     { printf("[editor] iniciado\n"); return 0; }
 static void editor_shutdown(void) { printf("[editor] apagado\n"); }
 static void editor_tick(float d)  { (void)d; }
 
-// El editor abre el archivo con `mapfile < "$1"`, que falla si no existe.
-// Crearlo vacio primero permite usar 'edit' para EMPEZAR un archivo, no solo
-// para modificar uno que ya esta.
-static int asegurar_archivo(const char *ruta) {
-    if (access(ruta, F_OK) == 0) return 0;
+// PseudoGames se compila aparte, con su propio Makefile. Si el binario no esta,
+// se compila en vez de largar "no existe": la primera vez que alguien escribe
+// 'edit' no tiene por que saber que habia que ir a compilar a mano.
+static int asegurar_binario(void) {
+    if (access(IDE_BIN_FS, X_OK) == 0) return 0;
 
-    FILE *f = fopen(ruta, "w");
-    if (!f) {
-        fprintf(stderr, "[editor] no se pudo crear %s: %s\n", ruta, strerror(errno));
+    printf("[editor] %s no esta compilado, compilando...\n", IDE_BIN_FS);
+    fflush(stdout);
+
+    int r = system("make -C " IDE_DIR " 2>&1 | tail -3");
+    if (r != 0 || access(IDE_BIN_FS, X_OK) != 0) {
+        fprintf(stderr,
+                "[editor] no se pudo compilar PseudoGames.\n"
+                "         Probá a mano:  make -C %s\n"
+                "         Necesita SDL2, SDL2_ttf, SDL2_mixer y SDL2_image.\n",
+                IDE_DIR);
         return -1;
     }
-    fclose(f);
-    printf("[editor] %s no existia, se creo vacio\n", ruta);
+    printf("[editor] compilado\n");
     return 0;
 }
 
-// ¿Termina en .paed? Solo esos se validan al salir.
-static int es_paed(const char *ruta) {
-    size_t n = strlen(ruta);
-    return n > 5 && strcmp(ruta + n - 5, ".paed") == 0;
-}
+static void abrir(void) {
+    const char *otro = getenv(IDE_ENV);
 
-// Parsea el archivo y reporta. No ejecuta nada: salir del editor no deberia
-// correr el programa, solo decir si esta bien escrito.
-static void validar(const char *ruta) {
-    PAEDProgram prog;
-    if (paed_parse_file(ruta, &prog) == 0) {
-        printf("[editor] %s: sin errores (%d instrucciones)\n", ruta, prog.instr_count);
-        return;
-    }
-    printf("[editor] %s tiene %d error(es):\n", ruta, prog.error_count);
-    // El detalle va a stderr, que no tiene buffer. Sin vaciar stdout primero,
-    // los errores aparecen ANTES del encabezado que se acaba de imprimir.
-    fflush(stdout);
-    paed_print_errors(&prog);
-}
+    if (!otro && asegurar_binario() != 0) return;
 
-static void abrir(const char *ruta) {
-    if (!ruta || !*ruta) {
-        fprintf(stderr, "[editor] falta el archivo: edit <archivo>\n");
-        return;
-    }
-
-    // La ruta se resuelve ANTES de cambiar de directorio: el editor corre desde
-    // su propia carpeta, asi que una ruta relativa apuntaria a otro lado.
-    char absoluta[PAED_PATH_MAX];
-    if (ruta[0] == '/') {
-        snprintf(absoluta, sizeof(absoluta), "%s", ruta);
-    } else {
-        char cwd[PAED_PATH_MAX];
-        if (!getcwd(cwd, sizeof(cwd))) {
-            fprintf(stderr, "[editor] no se pudo leer el directorio actual\n");
-            return;
-        }
-        snprintf(absoluta, sizeof(absoluta), "%s/%s", cwd, ruta);
-    }
-
-    if (asegurar_archivo(absoluta) != 0) return;
-
-    printf("[editor] abriendo %s\n", absoluta);
-    fflush(stdout);   // el editor toma la terminal: que salga esto antes
+    printf("[editor] abriendo PseudoGames...\n");
+    fflush(stdout);   // la app toma la pantalla: que salga esto antes
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -105,52 +69,48 @@ static void abrir(const char *ruta) {
     }
 
     if (pid == 0) {
-        // Hijo: lanza el editor y no vuelve nunca (execl lo reemplaza).
-        const char *otro = getenv(EDITOR_ENV);
+        // Hijo: se convierte en el IDE y no vuelve nunca.
         if (otro && *otro) {
-            execl(otro, otro, absoluta, (char *)NULL);
+            execl(otro, otro, (char *)NULL);
             fprintf(stderr, "[editor] no se pudo ejecutar %s: %s\n", otro, strerror(errno));
             _exit(127);
         }
-
-        // El editorBim se busca desde su propia carpeta, por los `source ./`.
-        if (chdir(EDITOR_DIR) != 0) {
+        if (chdir(IDE_DIR) != 0) {
             fprintf(stderr, "[editor] no se pudo entrar a %s: %s\n",
-                    EDITOR_DIR, strerror(errno));
+                    IDE_DIR, strerror(errno));
             _exit(127);
         }
-        execl(EDITOR_SCRIPT, "bim.sh", absoluta, (char *)NULL);
-        // Si execl vuelve, fallo.
+        execl(IDE_BIN, "aed", (char *)NULL);
         fprintf(stderr, "[editor] no se pudo ejecutar %s/%s: %s\n",
-                EDITOR_DIR, EDITOR_SCRIPT, strerror(errno));
+                IDE_DIR, IDE_BIN, strerror(errno));
         _exit(127);
     }
 
     int estado = 0;
     waitpid(pid, &estado, 0);
 
-    // El editor pone la terminal en modo raw. Si sale bien la restaura solo
-    // (tiene un trap), pero si lo matan a mitad la deja rota y hay que escribir
-    // 'stty sane' a ciegas. Se restaura igual por las dudas.
-    // Solo si hay terminal: con la entrada redirigida (un script, una tuberia)
-    // stty falla con "Inappropriate ioctl for device" y ensucia la salida sin
-    // que haya nada que restaurar.
+    // La app puede dejar la terminal rara si la matan a mitad. Solo se restaura
+    // si hay terminal de verdad: con la entrada redirigida, stty falla con
+    // "Inappropriate ioctl for device" y ensucia la salida sin arreglar nada.
     if (isatty(STDIN_FILENO) && system("stty sane") == -1)
-        fprintf(stderr, "[editor] ojo: no se pudo restaurar la terminal, escribi 'stty sane'\n");
+        fprintf(stderr, "[editor] ojo: si la terminal quedó rara, escribí 'stty sane'\n");
 
     if (WIFEXITED(estado) && WEXITSTATUS(estado) == 127) {
-        fprintf(stderr, "[editor] el editor no arranco\n");
+        fprintf(stderr, "[editor] PseudoGames no arrancó\n");
+        return;
+    }
+    if (WIFSIGNALED(estado)) {
+        fprintf(stderr, "\n[editor] PseudoGames terminó por señal %d\n", WTERMSIG(estado));
         return;
     }
 
-    printf("\n[editor] de vuelta en vimmon\n");
-    if (es_paed(absoluta)) validar(absoluta);
+    printf("\n[editor] PseudoGames cerrado, de vuelta en vimmon\n");
 }
 
 static void editor_on_event(Event *e) {
     switch (e->type) {
     case EVENT_EDITOR_OPEN:
-        abrir((const char *)e->data);
+        abrir();
         break;
     default:
         break;
@@ -159,7 +119,7 @@ static void editor_on_event(Event *e) {
 
 Plugin editor_plugin = {
     .name     = "editor",
-    .version  = "0.1",
+    .version  = "0.2",
     .init     = editor_init,
     .shutdown = editor_shutdown,
     .tick     = editor_tick,
