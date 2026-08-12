@@ -1,9 +1,11 @@
 # Ignorar todo excepto lo listado abajo
 /*
-# paed/ es un SUBMODULO: hay que habilitarlo aca igual que cualquier otra
-# carpeta, porque el '/*' de arriba ignora todo lo que no este en esta lista.
-# Sin esta linea, `git submodule add` responde "Use -f if you really want".
+# paed/ y PseudoGames/ son SUBMODULOS, y hay que habilitarlos aca igual que
+# cualquier otra carpeta: el '/*' de arriba ignora todo lo que no este en esta
+# lista. Sin estas lineas, `git submodule add` responde "Use -f if you really
+# want to add them", que suena a otro problema.
 !/paed/
+!/PseudoGames/
 !/.gitignore
 !/LICENSE
 !/.github/
@@ -41,10 +43,6 @@
 # o directamente:  git clone --recurse-submodules <url>
 #
 # Para traer lo ultimo de cada uno:  git submodule update --remote
-#
-# PseudoGames sigue ignorado hasta que se pueda publicar: falta el scope
-# `workflow` en el token de gh, porque el repo lleva el workflow que arma el EXE.
-/PseudoGames/
 
 # Aprendizaje y contenido personal
 !/documentacion/

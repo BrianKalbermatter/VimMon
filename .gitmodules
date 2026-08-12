@@ -1,3 +1,6 @@
 [submodule "paed"]
 	path = paed
 	url = https://github.com/BrianKalbermatter/paed.git
+[submodule "PseudoGames"]
+	path = PseudoGames
+	url = https://github.com/BrianKalbermatter/PseudoGames.git
