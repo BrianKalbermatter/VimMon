@@ -370,11 +370,40 @@ CREAR(secSalida);
 CERRAR(sec1, recorrido);
 ```
 
-De estos, hoy **solo `ESCRIBIR` ejecuta**. El resto parsea pero no hace nada:
-`ARR`/`AVZ`/`CREAR`/`CERRAR`/`LEER` están en el KANBAN.
+De estos, hoy ejecutan **`ESCRIBIR` y `LEER` de consola**. El resto parsea pero
+no hace nada: `ARR`/`AVZ`/`CREAR`/`CERRAR` y el `LEER` de archivo están en el
+KANBAN.
 
 `ESCRIBIR` **evalúa** sus argumentos: `ESCRIBIR(cont_pal)` imprime el valor, no
 el nombre.
+
+### 5.1 `LEER` de consola
+
+```paed
+LEER(edad);              // una variable
+LEER(a, b);              // dos destinos: consume DOS datos
+LEER(A[i]);              // elemento de arreglo, el índice se evalúa al leer
+LEER(p.vx, p.vy);        // campos de un registro
+```
+
+**Un dato por destino, uno por línea.** No se parte por espacios: así un texto
+con espacios (`Juan Perez`) entra entero en un solo destino.
+
+**El tipo lo decide el dato, no la declaración.** Si la línea entera es un
+número, es número; si no, es texto. `12abc` es el texto `12abc`, no el número
+12 — un número a medias escondería el error de quien cargó el dato. Esto es
+consecuencia de que el `AMBIENTE` todavía no se use para chequear tipos (está
+en el KANBAN); cuando se use, el tipo declarado va a mandar.
+
+**De dónde salen los datos lo decide el host, no el intérprete.** El intérprete
+corre dentro del game loop del renderer, y un `fgets` bloqueante ahí congelaría
+la ventana entera. Por eso hay un puerto — `interp_set_entrada` — que el host
+engancha: `paedrun` engancha `stdin`, y la ventana SDL todavía no engancha nada,
+así que ahí `LEER` falla con un mensaje claro en vez de colgarse.
+
+**Errores que avisan** (`tests/leer_errores.paed` los fija con su texto exacto):
+destino que no es un destino (`LEER("hola")`), `LEER()` sin destinos, índice
+fuera de los límites, campo que el registro no declara, y entrada agotada.
 
 Funciones usadas dentro de expresiones:
 
@@ -792,7 +821,8 @@ de línea — nunca se ignora.
 | `ARCHIVO DE <tipo>` en el AMBIENTE | ✅ §2.3 |
 | `LEER`/`ESCRIBIR`: consola vs archivo, distinguidos | ✅ §2.3 |
 | `FDA` / `NFDA` reconocidas (avisan que faltan archivos) | ✅ |
-| `ARR` / `AVZ` / `CREAR` / `CERRAR` / `LEER` / `ABRIR` | parsean, no ejecutan |
+| `LEER` de consola: escalar, `A[i]` y `p.campo` | ✅ §5.1 |
+| `ARR` / `AVZ` / `CREAR` / `CERRAR` / `ABRIR` / `LEER` de archivo | parsean, no ejecutan |
 
 Lo que falta está en el KANBAN con su ticket. Esta tabla y el KANBAN se
 actualizan juntos.
