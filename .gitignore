@@ -1,6 +1,5 @@
 # Ignorar todo excepto lo listado abajo
 /*
-!/paed/
 !/.gitignore
 !/LICENSE
 !/.github/
@@ -26,19 +25,20 @@
 # Mazmorra ASCII con hot reload
 !/hot-Reload/
 
-# Build output y binarios
-paed/build_o/
-paed/aed
-paed/PseudoGames.exe
-paed/screenPJ/screenPJ
-paed/learBash/*.out
-paed/lib/
-
-# OJO: 'paed/Frankly/paed' estuvo aca hasta el 2026-08-10, listado como si fuera
-# un binario. No lo es: son 715 lineas de bash, el interprete de Frankly. Por
-# estar ignorado no lo movio el renombre PseudoGames -> paed, y quedo solo en
-# disco, sin ninguna copia en git, a un rm de perderse.
-# Un archivo sin extension no es un binario. Mirar antes de ignorar.
+# ── PAED ────────────────────────────────────────────────────────────────────
+# PAED es OTRO REPO, que vive adentro de esta carpeta. No esta trackeado aca a
+# proposito: sus archivos los versiona `paed/.git`, no este repo.
+#
+# Todavia NO es un submodulo formal — le falta estar publicado. Cuando lo este:
+#
+#     git submodule add <url> paed
+#
+# y esta linea se borra, porque el submodulo se trackea como un puntero al
+# commit. Hasta entonces queda ignorado, que es lo unico que evita que VimMon se
+# lo vuelva a tragar entero.
+#
+# En la otra PC, despues de clonar: git submodule update --init
+/paed/
 
 # Aprendizaje y contenido personal
 !/documentacion/
@@ -58,17 +58,3 @@ ProyectoVimMon/.obsidian/
 
 # Cache de tooling
 bus/.atl/
-
-# Binario temporal del generador de sintaxis PAED
-paed/Frankly/tools/gen_sintaxis
-
-# Resaltado de PAED para Helix: es configuracion del editor de cada uno, no
-# parte del proyecto. Adentro estan grammar.js, el parser generado y las
-# queries. Si lo necesitas en otra maquina, copiá la carpeta a mano y corré
-# ./instalar.sh — no viaja por git a proposito.
-paed/helix/
-
-# Salida de compilacion del lenguaje PAED (libpaed.a, el binario `paed` y el
-# sello con el DATADIR). El repo de paed tiene su propio .gitignore; esta linea
-# existe porque hoy sigue viviendo adentro de VimMon.
-paed/build/
