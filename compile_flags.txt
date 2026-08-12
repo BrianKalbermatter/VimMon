@@ -1,6 +1,7 @@
 -Wall
 -Wextra
 -I.
+-Ipaed/lang/include
 -I/usr/include/SDL2
 -D_GNU_SOURCE=1
 -D_REENTRANT
