@@ -23,6 +23,11 @@
 # Flags para clangd (Helix). Sin esto el editor marca todo el proyecto en rojo
 !/compile_flags.txt
 
+# Programas escritos EN PAED. No van en el repo del lenguaje: PAED no lleva
+# adentro los programas que uno escribe con el, igual que Python no trae los
+# scripts de nadie.
+!/programas/
+
 # Motor grafico 2D
 !/engine/
 !/game/
