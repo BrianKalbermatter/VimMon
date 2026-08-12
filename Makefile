@@ -21,7 +21,7 @@ TARGET = $(BUILD)/vimmon
 
 SRCS_BUS = bus/bus.c # bus de eventos
 SRCS_AI = plugins/ai/ai.c plugins/ai/provider.c # plugin de IA + selector de proveedor
-SRCS_IDE = plugins/ide/ide.c plugins/ide/parser.c plugins/ide/interpreter.c plugins/ide/expr.c plugins/ide/scene_view.c # plugin IDE/PAED
+SRCS_IDE = plugins/ide/ide.c plugins/ide/parser.c plugins/ide/interpreter.c plugins/ide/expr.c plugins/ide/escena.c plugins/ide/scene_view.c # plugin IDE/PAED (escena.c = los procedimientos 3D que VimMon le agrega al lenguaje)
 SRCS_MONITOR = plugins/monitor/monitor.c # plugin monitor
 SRCS_RENDERER = plugins/renderer/renderer.c plugins/renderer/sdl_fb.c # plugin renderer + backend
 SRCS_ENGINE = engine/engine.c # motor 2D de entidades

@@ -374,6 +374,12 @@ De estos, hoy ejecutan **`ESCRIBIR` y `LEER` de consola**. El resto parsea pero
 no hace nada: `ARR`/`AVZ`/`CREAR`/`CERRAR` y el `LEER` de archivo están en el
 KANBAN.
 
+**El intérprete no trae nada más que el lenguaje.** Todo lo que no sea AED lo
+agrega quien lo hospeda, registrándolo con `paed_register_proc`. Así es como
+VimMon le suma su escena 3D sin que el lenguaje sepa qué es un cubo — ver
+[`ESCENA.md`](ESCENA.md). Los procedimientos de AED se resuelven primero, así
+que una librería del host no puede redefinir `LEER`.
+
 `ESCRIBIR` **evalúa** sus argumentos: `ESCRIBIR(cont_pal)` imprime el valor, no
 el nombre.
 

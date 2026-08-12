@@ -79,6 +79,12 @@ kanban-plugin: board
 
 ## Hecho
 
+- [x] **La escena 3D salio del interprete, ahora en el CODIGO y no solo en el papel.** `escena.json` decia desde el dia uno "NO es parte del lenguaje PAED", pero `CUBO`, `MOVER`, `GIRAR` y otros nueve vivian adentro de `interpreter.c` y `interp_exec` recibia el `SceneState`. Un lenguaje que se quiere instalar aparte no puede traer cubos adentro #fase2
+- [x] `paed_register_proc(nombre, fn, ud)` — el host ANOTA sus procedimientos y el interprete no los conoce. Misma idea que `bus_register` y que `interp_set_entrada`: el nucleo no conoce a sus extensiones. Los 12 de escena se mudaron a `plugins/ide/escena.{c,h}`, del lado de VimMon #fase2
+- [x] Los procedimientos del lenguaje se resuelven ANTES que el registro: un host no puede tapar el `LEER` de AED con uno propio. Extiende, no redefine #fase2
+- [x] Registrar reemplaza por nombre en vez de acumular, y hay que registrar justo ANTES de ejecutar: el registro guarda un puntero al estado, y `scene_view` arma su escena nueva en la pila. Sin eso, el siguiente que ejecutara escribiria en una pila que ya no existe #fase2
+- [x] Verificado que `build/paedrun` (que no engancha la escena) corre el lenguaje entero y avisa `'CUBO' lo reconoce el parser pero no lo implementa nadie`, mientras que `vimmon` con `scene` sigue armando los 14 cuerpos igual que antes #fase2
+- [x] Se cayo el flag `--escena` de `paedrun`: mostraba una escena que el runner del lenguaje ya no tiene #fase2
 - [x] **`LEER` de consola EJECUTA.** Un destino por linea, y el destino puede ser `x`, `A[i]` o `p.campo` — los mismos tres lugares donde escribe una asignacion, asi que los dos caminos comparten `guardar_valor` en vez de duplicar el chequeo de campos y de limites #fase2
 - [x] De donde salen los datos lo decide el HOST, no el interprete: `interp_set_entrada(fn, ud)` es el puerto y `paedrun` engancha stdin. El interprete corre dentro del game loop, asi que si abriera stdin por su cuenta congelaria la ventana entera esperando que alguien tipee en una terminal que quiza ni esta a la vista #fase2
 - [x] El TIPO del dato leido lo decide el dato, no la declaracion: si la linea ENTERA es un numero, es numero; si no, es texto. `12abc` es texto y no 12, porque un numero a medias esconderia el error del que cargo el dato. Cuando el AMBIENTE chequee tipos, esto cambia #fase2

@@ -1,6 +1,7 @@
 #include "scene_view.h"
 #include "parser.h"
 #include "interpreter.h"
+#include "escena.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -207,12 +208,23 @@ static void recargar(PaedView *v) {
         return;
     }
 
+    // La escena nueva se arma aparte y recien al final reemplaza a la vieja,
+    // para que un .paed con errores no deje media escena a la vista. Hay que
+    // REGISTRAR apuntando a esta: el registro guarda el puntero, y `nueva` vive
+    // en la pila de esta funcion.
     SceneState nueva;
-    interp_init(&nueva);
-    if (interp_exec(&nueva, &prog) != 0)
+    escena_init(&nueva);
+    escena_registrar(&nueva);
+    if (interp_exec(&prog) != 0)
         printf("[view] errores de ejecucion: la escena puede quedar incompleta\n");
 
     v->escena = nueva;
+
+    // `nueva` muere al salir de esta funcion, y el registro se quedo con su
+    // direccion. Se reapunta a la escena que SI sobrevive: si no, el proximo
+    // que ejecute sin registrar antes escribiria en una pila que ya no existe.
+    escena_registrar(&v->escena);
+
     printf("[view] escena recargada — %d instrucciones, %d cuerpos\n",
            prog.instr_count, nueva.cuerpo_count);
     fflush(stdout);
@@ -294,7 +306,7 @@ int scene_view_mount(World *w, const char *paed_path) {
 
     memset(&g_view, 0, sizeof(g_view));
     snprintf(g_view.path, sizeof(g_view.path), "%s", paed_path);
-    interp_init(&g_view.escena);
+    escena_init(&g_view.escena);
 
     g_view.mtime = mtime_de(g_view.path);
     recargar(&g_view);

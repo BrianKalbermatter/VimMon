@@ -38,8 +38,7 @@ static int leer_de_stdin(char *buf, size_t n, void *ud) {
 }
 
 int main(int argc, char **argv) {
-    int mostrar_escena = 0;
-    const char *path   = NULL;
+    const char *path = NULL;
 
     // ESCRIBIR va a stdout y los errores a stderr. Cuando la salida es una
     // tuberia y no la terminal, stdout pasa a tener buffer y stderr no: los
@@ -48,9 +47,11 @@ int main(int argc, char **argv) {
     // esperado da diferencias que dependen de si hay tuberia o no.
     setvbuf(stdout, NULL, _IONBF, 0);
 
+    // Se cayo `--escena`: mostraba la escena 3D, que ya no es parte del
+    // lenguaje. Los cuerpos los pone VimMon registrando sus procedimientos, y
+    // este runner corre PAED pelado.
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--escena") == 0) mostrar_escena = 1;
-        else if (!path)                       path = argv[i];
+        if (!path) path = argv[i];
         else {
             fprintf(stderr, "paedrun: argumento de mas: %s\n", argv[i]);
             return 2;
@@ -58,7 +59,7 @@ int main(int argc, char **argv) {
     }
 
     if (!path) {
-        fprintf(stderr, "uso: paedrun [--escena] <archivo.paed>\n");
+        fprintf(stderr, "uso: paedrun <archivo.paed>\n");
         return 2;
     }
 
@@ -77,12 +78,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    SceneState scene;
-    interp_init(&scene);
     interp_set_entrada(leer_de_stdin, NULL);
-    int rc = interp_exec(&scene, &prog);
-
-    if (mostrar_escena) interp_print(&scene);
+    int rc = interp_exec(&prog);
 
     paed_syntax_free();
     return rc == 0 ? 0 : 1;

@@ -9,6 +9,45 @@ Definición formal: [`../data/escena.json`](../data/escena.json).
 El parser la carga **además** de `sintaxis.json`. Si el archivo no está, PAED
 sigue andando como AED puro.
 
+## Cómo se engancha (el código también lo cumple)
+
+Hasta el 2026-08-11 esta separación existía **solo en el papel**: `CUBO`,
+`MOVER`, `GIRAR` y otros nueve estaban escritos adentro de `interpreter.c`, y
+`interp_exec` recibía el `SceneState`. El `.json` decía "esto no es el lenguaje"
+y el `.c` los tenía adentro.
+
+Ahora la escena vive en `plugins/ide/escena.{c,h}` — del lado de VimMon, no del
+lenguaje — y se **registra**:
+
+```c
+escena_init(&scene);
+escena_registrar(&scene);   // anota los 12 procedimientos apuntando a esta escena
+interp_exec(&prog);         // el intérprete ya no sabe qué es una escena
+```
+
+Por debajo, cada uno se anota con `paed_register_proc(nombre, fn, ud)`. Es la
+misma idea del bus de plugins (`bus_register`) y del puerto de entrada de `LEER`
+(`interp_set_entrada`): el núcleo no conoce a sus extensiones, las extensiones
+se anotan.
+
+**Dos reglas que salen de ahí:**
+
+1. **Los procedimientos del lenguaje ganan.** El registro se consulta *después*
+   de `LEER`/`ESCRIBIR`, así que registrar un `LEER` propio no puede tapar al de
+   AED. El host extiende el lenguaje, no lo redefine.
+2. **Registrar justo antes de ejecutar.** El registro es uno solo para todo el
+   proceso y guarda un *puntero* al estado: si dos partes de VimMon manejan
+   escenas distintas, el último que anota es el que recibe los cuerpos.
+
+Correrlo sin registrar nada es legítimo y es lo que hace `paedrun`:
+
+```
+$ build/paedrun solo_escena.paed
+el lenguaje si anda
+solo_escena.paed:6: error: 'CUBO' lo reconoce el parser pero no lo implementa
+nadie: el host no registro ese procedimiento
+```
+
 ---
 
 ## Convención propia: argumentos con nombre

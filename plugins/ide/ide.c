@@ -1,6 +1,7 @@
 #include "ide.h"
 #include "parser.h"
 #include "interpreter.h"
+#include "escena.h"
 #include "../ai/ai.h"
 #include <stdio.h>
 #include <string.h>
@@ -8,7 +9,10 @@
 static SceneState scene;
 
 static int ide_init(void) {
-    interp_init(&scene);
+    escena_init(&scene);
+    // La escena 3D no la trae el lenguaje: se le engancha. `scene` es estatica,
+    // asi que alcanza con registrarla una vez.
+    escena_registrar(&scene);
     printf("[ide] iniciado\n");
     return 0;
 }
@@ -69,11 +73,16 @@ static void ide_on_event(Event *e) {
         return;
     }
 
-    interp_init(&scene);
-    interp_exec(&scene, &prog);
+    // Registrar SIEMPRE justo antes de ejecutar. El registro es uno solo para
+    // todo el proceso, y el visor de escena (scene_view) tambien registra el
+    // suyo: el ultimo que anota, gana. Confiar en el registro que se hizo al
+    // arrancar el plugin significaria llenarle la escena a otro.
+    escena_init(&scene);
+    escena_registrar(&scene);
+    interp_exec(&prog);
 
     printf("[ide] escena actualizada:\n");
-    interp_print(&scene);
+    escena_print(&scene);
 
     bus_send(EVENT_SCENE_UPDATE, &scene, sizeof(scene));
 }

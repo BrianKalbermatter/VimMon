@@ -5,38 +5,33 @@
 
 #include "parser.h"
 
-#define SCENE_MAX_CUERPOS 64
+// ── Procedimientos que pone el HOST ──────────────────────────────────────────
+//
+// El interprete trae solo lo que define el pseudocodigo AED: LEER, ESCRIBIR y
+// el control de flujo. Todo lo demas lo agrega quien lo hospeda — VimMon
+// registra su escena 3D (CUBO, MOVER, GIRAR...), y otro programa registraria
+// lo suyo. Es la misma idea del bus de plugins: el nucleo no conoce a sus
+// extensiones, las extensiones se anotan.
+//
+// Devuelve 0 si el procedimiento salio bien, -1 si fallo (y en ese caso avisa
+// el motivo con paed_runtime_error).
+typedef int (*PaedProc)(const PAEDProgram *prog, const PAEDInstr *in, void *ud);
 
-typedef struct { float x, y, z; } Vec3;
+// Anota un procedimiento con su nombre. `ud` es el estado del host (por
+// ejemplo la escena) y le vuelve tal cual en cada llamada, asi el interprete no
+// necesita saber que es. Registrar dos veces el mismo nombre REEMPLAZA: sirve
+// para reapuntar a otro estado sin acumular entradas viejas.
+//
+// Devuelve 0 si quedo anotado, -1 si no hay lugar.
+int  paed_register_proc(const char *nombre, PaedProc fn, void *ud);
 
-typedef struct {
-    char  id[PAED_NAME_MAX];
-    char  kind[PAED_NAME_MAX];   // cubo | esfera | plano | luz
-    char  grupo[PAED_NAME_MAX];  // "" = suelto. Varias piezas con el mismo
-                                 // grupo se mueven, rotan y escalan juntas:
-                                 // asi una "nave" es 8 cubos y UNA sola cosa.
-    Vec3  position;
-    Vec3  rotation;
-    Vec3  scale;
-    char  color[16];
+// Borra todos los procedimientos del host. El lenguaje queda pelado.
+void paed_clear_procs(void);
 
-    float radio;                 // esfera
-    char  luz_tipo[16];          // luz: puntual | dir
-    float intensidad;            // luz
-
-    char  giro_eje;              // comportamiento GIRAR: 'x' | 'y' | 'z' | 0
-    float giro_velocidad;
-    float osc_amplitud;          // comportamiento OSCILAR
-    float osc_frecuencia;
-} Cuerpo;
-
-typedef struct {
-    Cuerpo cuerpos[SCENE_MAX_CUERPOS];
-    int    cuerpo_count;
-    char   bg_color[16];
-    Vec3   cam_pos;
-    Vec3   cam_target;
-} SceneState;
+// Reporta un error de ejecucion con archivo:linea, igual que los del propio
+// interprete. Es publica para que los procedimientos del host no inventen su
+// propio formato de mensaje.
+void paed_runtime_error(const PAEDProgram *prog, const PAEDInstr *in, const char *msg);
 
 // ── De donde salen los datos de LEER ─────────────────────────────────────────
 //
@@ -54,12 +49,8 @@ typedef int (*PaedEntrada)(char *buf, size_t n, void *ud);
 // claro en vez de colgarse esperando algo que nunca va a llegar.
 void interp_set_entrada(PaedEntrada fn, void *ud);
 
-void interp_init (SceneState *scene);
-
 // Ejecuta el programa. Devuelve 0 si se ejecuto entero.
 // Los errores en runtime se reportan con archivo:linea, igual que el parser.
-int  interp_exec (SceneState *scene, const PAEDProgram *prog);
-
-void interp_print(const SceneState *scene);
+int  interp_exec (const PAEDProgram *prog);
 
 #endif // VIMMON_INTERPRETER_H

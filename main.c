@@ -8,6 +8,7 @@
 #include "plugins/ide/ide.h"
 #include "plugins/ide/parser.h"
 #include "plugins/ide/interpreter.h"
+#include "plugins/ide/escena.h"
 
 extern Plugin ai_plugin;
 extern Plugin renderer_plugin;
@@ -54,7 +55,8 @@ static void cmd_engine(void) {
 static void cmd_scene(void) {
     PAEDProgram prog;
     SceneState  scene;
-    interp_init(&scene);
+    escena_init(&scene);
+    escena_registrar(&scene);   // la escena 3D no la trae el lenguaje: se engancha
 
     // Analisis primero: si hay un solo error, no se ejecuta nada.
     if (paed_parse_file(PAED_SCENE_PATH, &prog) != 0) {
@@ -63,8 +65,8 @@ static void cmd_scene(void) {
         return;
     }
 
-    int ok = interp_exec(&scene, &prog) == 0;
-    interp_print(&scene);
+    int ok = interp_exec(&prog) == 0;
+    escena_print(&scene);
     printf("[scene] %s — %s (%d instrucciones)\n",
            ok ? "OK" : "con errores de ejecucion", prog.name, prog.instr_count);
 }
