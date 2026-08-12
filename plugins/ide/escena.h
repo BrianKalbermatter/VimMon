@@ -1,7 +1,7 @@
 #ifndef VIMMON_ESCENA_H
 #define VIMMON_ESCENA_H
 
-#include "interpreter.h"
+#include <paed/interpreter.h>
 
 // La escena 3D de VimMon. NO es parte del lenguaje PAED.
 //
@@ -16,6 +16,15 @@
 // misma idea que ya usa el bus de plugins (`bus_register`) y el puerto de
 // entrada de LEER (`interp_set_entrada`): el nucleo no conoce a sus
 // extensiones, las extensiones se anotan.
+
+// Archivo de estado de la escena: lo que el interprete ejecuta y lo que el
+// motor dibuja. Vive aca y no en el lenguaje: PAED no sabe que existe una
+// escena, y mucho menos donde la guarda VimMon.
+#define PAED_SCENE_PATH "plugins/ide/scene.paed"
+
+// Nombre de la libreria de procedimientos, tal como se llama su .json en el
+// directorio de datos de PAED. Se carga con paed_syntax_load_lib().
+#define ESCENA_LIB "escena"
 
 #define SCENE_MAX_CUERPOS 64
 

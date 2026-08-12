@@ -67,3 +67,8 @@ paed/Frankly/tools/gen_sintaxis
 # queries. Si lo necesitas en otra maquina, copiá la carpeta a mano y corré
 # ./instalar.sh — no viaja por git a proposito.
 paed/helix/
+
+# Salida de compilacion del lenguaje PAED (libpaed.a, el binario `paed` y el
+# sello con el DATADIR). El repo de paed tiene su propio .gitignore; esta linea
+# existe porque hoy sigue viviendo adentro de VimMon.
+paed/build/

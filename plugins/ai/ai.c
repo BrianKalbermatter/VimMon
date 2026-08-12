@@ -1,6 +1,7 @@
 #include "ai.h"
 #include "provider.h"
-#include "../ide/parser.h"   // PAED_ESCENA_PATH: una sola ruta para toda la librería
+#include <paed/parser.h>      // paed_datadir(): donde vive la definicion de PAED
+#include "../ide/escena.h"    // ESCENA_LIB: como se llama la libreria de escena
 #include "../../cjson/cJSON.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +67,15 @@ static void catalogo_escena(char *out, size_t out_size) {
     out[0] = '\0';
     size_t usado = 0;
 
-    char *raw = read_file(PAED_ESCENA_PATH);
+    // La libreria ya no esta en una ruta fija: se le pregunta a PAED donde
+    // quedaron sus datos, que es lo mismo que hace el parser para cargarla.
+    const char *dir = paed_datadir();
+    if (!dir) return;
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/%s.json", dir, ESCENA_LIB);
+
+    char *raw = read_file(path);
     if (!raw) return;
 
     cJSON *json  = cJSON_Parse(raw);

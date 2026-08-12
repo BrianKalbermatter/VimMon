@@ -19,8 +19,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "plugins/ide/parser.h"
-#include "plugins/ide/interpreter.h"
+#include <paed/parser.h>
+#include <paed/interpreter.h>
 
 // De aca saca LEER sus datos. El interprete no abre stdin solo (ver el
 // comentario de interp_set_entrada): en la ventana SDL eso congelaria el game
@@ -50,24 +50,44 @@ int main(int argc, char **argv) {
     // Se cayo `--escena`: mostraba la escena 3D, que ya no es parte del
     // lenguaje. Los cuerpos los pone VimMon registrando sus procedimientos, y
     // este runner corre PAED pelado.
+    //
+    // `--lib <nombre>` carga una libreria de procedimientos que no son del
+    // lenguaje (--lib escena lee escena.json del directorio de datos). Sirve
+    // para VALIDAR un programa que la usa; ejecutarla es otra cosa, y para eso
+    // hace falta el host que implemente esos procedimientos.
+    const char *lib = NULL;
+
     for (int i = 1; i < argc; i++) {
-        if (!path) path = argv[i];
+        if (strcmp(argv[i], "--lib") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "paed: --lib necesita un nombre (ej: --lib escena)\n");
+                return 2;
+            }
+            lib = argv[++i];
+        }
+        else if (!path) path = argv[i];
         else {
-            fprintf(stderr, "paedrun: argumento de mas: %s\n", argv[i]);
+            fprintf(stderr, "paed: argumento de mas: %s\n", argv[i]);
             return 2;
         }
     }
 
     if (!path) {
-        fprintf(stderr, "uso: paedrun <archivo.paed>\n");
+        fprintf(stderr, "uso: paed [--lib <nombre>] <archivo.paed>\n");
         return 2;
     }
 
-    // sintaxis.json se busca relativo a la raiz del repo, no al .paed: hay que
-    // correr paedrun parado en la raiz.
+    // sintaxis.json NO se busca al lado del .paed: se busca en el directorio de
+    // datos de PAED, que sale de $PAED_HOME, de la instalacion o del repo. Por
+    // eso este binario anda desde cualquier carpeta una vez instalado.
     if (paed_syntax_load() != 0) {
-        fprintf(stderr, "paedrun: no se pudo cargar %s "
-                        "(hay que correrlo desde la raiz del repo)\n", PAED_SYNTAX_PATH);
+        // paed_syntax_load ya explico donde busco. Aca solo se traduce a un
+        // codigo de salida, para poder encadenarlo en la shell.
+        return 3;
+    }
+
+    if (lib && paed_syntax_load_lib(lib) != 0) {
+        fprintf(stderr, "paed: no se pudo cargar la libreria '%s'\n", lib);
         return 3;
     }
 

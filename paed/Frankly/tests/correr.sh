@@ -25,7 +25,7 @@
 # muestra el diff y el bloque se corrige A MANO. Regrabar sin leer es cómo un
 # test deja de proteger: "arregla" el test en vez del bug.
 #
-#   bash paed/Frankly/tests/correr.sh
+#   make test          (o: bash Frankly/tests/correr.sh)
 #
 # Agregar un test = dejar el .paed con su bloque al final. Nada más: no hay
 # ninguna lista que mantener.
@@ -34,18 +34,19 @@ set -uo pipefail
 
 MARCA='// ── SALIDA ESPERADA'
 MARCA_IN='// ── ENTRADA'
+MARCA_LIB='// ── LIBRERIA'
 
-# La raíz del repo: dos niveles arriba de paed/Frankly/tests
-raiz=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+# La raiz del repo de PAED: dos niveles arriba de Frankly/tests
+raiz=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$raiz" || exit 1
 
-runner=build/paedrun
+runner=build/paed
 if [ ! -x "$runner" ]; then
-    echo "falta $runner — corré 'make paedrun' primero" >&2
+    echo "falta $runner — corré 'make lang' primero" >&2
     exit 1
 fi
 
-tests_dir=paed/Frankly/tests
+tests_dir=Frankly/tests
 pasaron=0
 fallaron=0
 fallidos=()
@@ -92,7 +93,15 @@ for prog in "$tests_dir"/*.paed; do
     # stdin viene SIEMPRE del bloque ENTRADA, aunque este vacio: asi un test que
     # se olvido de declarar sus datos falla con "la entrada se termino" en vez de
     # quedarse esperando que alguien tipee y colgar la corrida entera.
-    real=$(entrada_de "$prog" | "$runner" "$prog" 2>&1)
+    # Un test puede pedir una libreria que NO es del lenguaje, declarandolo en
+    # el archivo:  // ── LIBRERIA escena
+    # Se pide por nombre y no por ruta: la ruta depende de donde este instalado
+    # PAED, y el test tiene que dar lo mismo en cualquier maquina.
+    lib=$(awk -v m="$MARCA_LIB" 'index($0, m) == 1 { print $NF; exit }' "$prog")
+    lib_args=()
+    [ -n "$lib" ] && lib_args=(--lib "$lib")
+
+    real=$(entrada_de "$prog" | "$runner" "${lib_args[@]}" "$prog" 2>&1)
 
     if [ "$real" = "$(esperado_de "$prog")" ]; then
         echo "  ok       $nombre"

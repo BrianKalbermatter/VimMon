@@ -13,14 +13,19 @@ ACCION errores ES
         MOVER(nombre = fantasma, posicion = (2,2,2));
 FIN_ACCION
 
+// ── LIBRERIA escena
+// Este test usa MOVER y COLOR, que NO son del lenguaje: son de la libreria de
+// escena de VimMon. Sin declararla, el parser diria "procedimiento desconocido"
+// para TODOS y el test dejaria de probar lo que vino a probar.
+
 // ── SALIDA ESPERADA ─────────────────────────────────────────────────────────
-// paed/Frankly/tests/errores.paed:8: error: argumento 'cubo1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
-// paed/Frankly/tests/errores.paed:8: error: falta el parametro obligatorio 'nombre' en MOVER
-// paed/Frankly/tests/errores.paed:9: error: procedimiento desconocido 'MOVERR' (no esta ni en paed/Frankly/data/sintaxis.json ni en paed/Frankly/data/escena.json)
-// paed/Frankly/tests/errores.paed:10: error: parametro 'valor' no existe en COLOR
-// paed/Frankly/tests/errores.paed:10: error: falta el parametro obligatorio 'color' en COLOR
-// paed/Frankly/tests/errores.paed:11: error: '1' no es un valor VEC3 valido para posicion de MOVER
-// paed/Frankly/tests/errores.paed:11: error: argumento '1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
-// paed/Frankly/tests/errores.paed:11: error: argumento '1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
-// paed/Frankly/tests/errores.paed:11: error: falta el parametro obligatorio 'posicion' en MOVER
-// paed/Frankly/tests/errores.paed:12: error: falta ';' al final de la instruccion
+// Frankly/tests/errores.paed:8: error: argumento 'cubo1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
+// Frankly/tests/errores.paed:8: error: falta el parametro obligatorio 'nombre' en MOVER
+// Frankly/tests/errores.paed:9: error: procedimiento desconocido 'MOVERR' (no esta ni en sintaxis.json ni en escena.json)
+// Frankly/tests/errores.paed:10: error: parametro 'valor' no existe en COLOR
+// Frankly/tests/errores.paed:10: error: falta el parametro obligatorio 'color' en COLOR
+// Frankly/tests/errores.paed:11: error: '1' no es un valor VEC3 valido para posicion de MOVER
+// Frankly/tests/errores.paed:11: error: argumento '1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
+// Frankly/tests/errores.paed:11: error: argumento '1' sin 'clave = valor' en MOVER: la referencia siempre se escribe con nombre
+// Frankly/tests/errores.paed:11: error: falta el parametro obligatorio 'posicion' en MOVER
+// Frankly/tests/errores.paed:12: error: falta ';' al final de la instruccion

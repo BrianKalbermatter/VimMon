@@ -12,8 +12,15 @@ SDL_LIBS   = $(shell sdl2-config --libs)
 #   -MMD  genera el .d y solo lista headers propios (ignora los del sistema)
 #   -MP   agrega un target vacío por header, para que borrar un header
 #         no rompa el build con "No rule to make target"
-CFLAGS = -Wall -Wextra -I. $(SDL_CFLAGS) -MMD -MP
+# -Ipaed/lang/include: PAED ya no se compila aca. Es una libreria aparte, con su
+# propio Makefile y su propio repo, y VimMon la consume como cualquier otra
+# dependencia: headers con -I, simbolos con libpaed.a.
+CFLAGS = -Wall -Wextra -I. -Ipaed/lang/include $(SDL_CFLAGS) -MMD -MP
 LIBS   = -lcurl -lm $(SDL_LIBS)
+
+# El lenguaje PAED: se construye con SU Makefile, no con este.
+PAED_DIR = paed
+PAED_LIB = $(PAED_DIR)/build/libpaed.a
 
 BUILD  = build
 OBJDIR = $(BUILD)/obj
@@ -21,7 +28,7 @@ TARGET = $(BUILD)/vimmon
 
 SRCS_BUS = bus/bus.c # bus de eventos
 SRCS_AI = plugins/ai/ai.c plugins/ai/provider.c # plugin de IA + selector de proveedor
-SRCS_IDE = plugins/ide/ide.c plugins/ide/parser.c plugins/ide/interpreter.c plugins/ide/expr.c plugins/ide/escena.c plugins/ide/scene_view.c # plugin IDE/PAED (escena.c = los procedimientos 3D que VimMon le agrega al lenguaje)
+SRCS_IDE = plugins/ide/ide.c plugins/ide/escena.c plugins/ide/scene_view.c # plugin IDE: escena.c son los procedimientos 3D que VimMon le AGREGA al lenguaje; el lenguaje mismo vive en paed/
 SRCS_MONITOR = plugins/monitor/monitor.c # plugin monitor
 SRCS_RENDERER = plugins/renderer/renderer.c plugins/renderer/sdl_fb.c # plugin renderer + backend
 SRCS_ENGINE = engine/engine.c # motor 2D de entidades
@@ -38,9 +45,17 @@ DEPS = $(OBJS:.o=.d)
 all: $(TARGET)
 
 # Ahora se linkean objetos, no se recompila todo el proyecto de cero.
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) $(PAED_LIB)
 	@mkdir -p $(dir $@)
-	$(CC) $(OBJS) $(LIBS) -o $@
+	$(CC) $(OBJS) $(PAED_LIB) $(LIBS) -o $@
+
+# Se delega en el Makefile de PAED. FORCE y no una lista de fuentes: desde aca
+# no se sabe de que archivos depende ese proyecto, y adivinarlo seria repetir su
+# Makefile con otra letra.
+$(PAED_LIB): FORCE
+	@$(MAKE) --no-print-directory -C $(PAED_DIR) lang
+
+FORCE:
 
 # Regla única: cualquier .c del proyecto se compila a su .o espejado en OBJDIR.
 $(OBJDIR)/%.o: %.c
@@ -58,24 +73,13 @@ $(BUILD)/hello_entity: $(EXAMPLE_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(EXAMPLE_OBJS) $(SDL_LIBS) -o $@
 
-# Arnés de PAED: build/paedrun corre un .paed en la terminal, sin SDL ni bus.
-# Es lo que permite testear el lenguaje con un script en vez de a ojo.
-PAEDRUN_SRCS = tools/paedrun.c plugins/ide/parser.c plugins/ide/interpreter.c plugins/ide/expr.c cjson/cJSON.c
-PAEDRUN_OBJS = $(PAEDRUN_SRCS:%.c=$(OBJDIR)/%.o)
-DEPS += $(PAEDRUN_OBJS:.o=.d)
-
-paedrun: $(BUILD)/paedrun
-
-$(BUILD)/paedrun: $(PAEDRUN_OBJS)
-	@mkdir -p $(dir $@)
-	$(CC) $(PAEDRUN_OBJS) -lm -o $@
-
-# Corre toda la batería de programas PAED y compara contra la salida esperada.
-test: $(BUILD)/paedrun
-	@bash paed/Frankly/tests/correr.sh
+# Los tests del LENGUAJE viven con el lenguaje: se corren en su repo.
+test:
+	@$(MAKE) --no-print-directory -C $(PAED_DIR) test
 
 clean:
 	rm -rf $(BUILD)
+	@$(MAKE) --no-print-directory -C $(PAED_DIR) clean-lang
 
 # Los .d no existen en el primer build: el '-' evita que make se queje.
 -include $(DEPS)

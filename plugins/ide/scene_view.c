@@ -1,6 +1,6 @@
 #include "scene_view.h"
-#include "parser.h"
-#include "interpreter.h"
+#include <paed/parser.h>
+#include <paed/interpreter.h>
 #include "escena.h"
 
 #include <math.h>

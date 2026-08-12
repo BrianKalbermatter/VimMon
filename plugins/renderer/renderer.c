@@ -1,7 +1,7 @@
 #include "../../bus/plugin.h"
 #include "renderer.h"
 #include "../../engine/engine.h"
-#include "../ide/parser.h"       // PAED_SCENE_PATH
+#include "../ide/escena.h"       // PAED_SCENE_PATH
 #include "../ide/scene_view.h"
 #include <stdio.h>
 

@@ -1,6 +1,6 @@
 #include "ide.h"
-#include "parser.h"
-#include "interpreter.h"
+#include <paed/parser.h>
+#include <paed/interpreter.h>
 #include "escena.h"
 #include "../ai/ai.h"
 #include <stdio.h>
@@ -9,6 +9,15 @@
 static SceneState scene;
 
 static int ide_init(void) {
+    // La escena 3D son DOS mitades y hacen falta las dos: la definicion (que
+    // procedimientos existen y que parametros llevan, en escena.json) para que
+    // el PARSER los acepte, y las funciones en C para que el INTERPRETE los
+    // ejecute. Antes el parser cargaba escena.json solo, por una ruta clavada
+    // adentro del lenguaje; ahora la pide VimMon, que es de quien es.
+    if (paed_syntax_load_lib(ESCENA_LIB) != 0)
+        fprintf(stderr, "[ide] sin %s.json: PAED va a rechazar CUBO, MOVER y compania\n",
+                ESCENA_LIB);
+
     escena_init(&scene);
     // La escena 3D no la trae el lenguaje: se le engancha. `scene` es estatica,
     // asi que alcanza con registrarla una vez.

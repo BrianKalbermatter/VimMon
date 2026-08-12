@@ -6,8 +6,8 @@
 #include "plugins/ai/provider.h"
 #include "plugins/editor/editor.h"
 #include "plugins/ide/ide.h"
-#include "plugins/ide/parser.h"
-#include "plugins/ide/interpreter.h"
+#include <paed/parser.h>
+#include <paed/interpreter.h>
 #include "plugins/ide/escena.h"
 
 extern Plugin ai_plugin;

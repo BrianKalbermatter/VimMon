@@ -1,5 +1,5 @@
-#include "interpreter.h"
-#include "expr.h"
+#include "paed/interpreter.h"
+#include "paed/expr.h"
 
 #include <stdio.h>
 #include <stdlib.h>

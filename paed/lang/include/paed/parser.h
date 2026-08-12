@@ -21,19 +21,9 @@
 // de SI es mucho mas de lo que aguanta leer un humano.
 #define PAED_MAX_BLOQUES   32
 
-// Fuente unica de verdad del LENGUAJE (pseudocodigo AED puro), relativa a la
-// raiz del repo. Aca no hay nada que no este en los apuntes de la catedra.
-#define PAED_SYNTAX_PATH "paed/Frankly/data/sintaxis.json"
-
-// Archivo de estado de la escena: lo que el interprete ejecuta y lo que el
-// motor dibuja. Vive al lado del resto de las rutas de PAED, no en ai.h: la
-// escena es del IDE, la IA es solo uno de los que la escribe.
-#define PAED_SCENE_PATH "plugins/ide/scene.paed"
-
-// Libreria opcional que agrega procedimientos propios de VimMon (escena 3D).
-// NO es parte del lenguaje: se carga ADEMAS de sintaxis.json. Si el archivo no
-// existe, PAED sigue funcionando como AED puro.
-#define PAED_ESCENA_PATH "paed/Frankly/data/escena.json"
+// El archivo con la definicion formal del lenguaje. Vive en el DIRECTORIO DE
+// DATOS, que se resuelve en runtime — ver paed_datadir().
+#define PAED_SYNTAX_FILE "sintaxis.json"
 
 // Argumento con nombre: clave = valor.
 // En procedimientos variadicos (ESCRIBIR) key queda vacio y solo vale val.
@@ -162,9 +152,36 @@ typedef struct {
     int       error_count;
 } PAEDProgram;
 
+// ── Donde vive la definicion del lenguaje ────────────────────────────────────
+//
+// Un lenguaje que se instala en cualquier maquina no puede tener la ruta de su
+// propia definicion clavada al repo donde nacio. Se busca, en este orden, el
+// primer directorio que contenga sintaxis.json:
+//
+//   1. $PAED_HOME                 — lo pisa todo, para desarrollo y para probar
+//                                   una definicion sin instalarla (como PYTHONHOME)
+//   2. PAED_DATADIR               — donde lo dejo `make install`, fijado al compilar
+//   3. Frankly/data               — corriendo parado en el repo de PAED
+//   4. paed/Frankly/data          — corriendo parado en VimMon, que lo tiene adentro
+//
+// Devuelve el directorio elegido, o NULL si en ninguno estaba sintaxis.json.
+const char *paed_datadir(void);
+
 // Carga sintaxis.json. Idempotente: la segunda llamada no hace nada.
 // Devuelve 0 si esta cargada, -1 si no pudo leerla.
 int  paed_syntax_load(void);
+
+// Carga una libreria de procedimientos que NO son del lenguaje, buscandola en
+// el mismo directorio de datos: paed_syntax_load_lib("escena") lee escena.json.
+//
+// Se pide por NOMBRE y no por ruta a proposito: la ruta depende de desde donde
+// se corra, y entonces el mismo programa daria mensajes distintos en una
+// maquina y en otra.
+//
+// Es lo que hace VimMon para sumar su escena 3D. Sin esto, PAED es AED puro.
+// Devuelve 0 si la cargo, -1 si no.
+int  paed_syntax_load_lib(const char *nombre);
+
 void paed_syntax_free(void);
 
 // Analiza el archivo completo. Devuelve 0 si no hubo NINGUN error.

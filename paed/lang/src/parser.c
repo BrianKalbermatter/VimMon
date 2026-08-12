@@ -1,5 +1,5 @@
-#include "parser.h"
-#include "../../cjson/cJSON.h"
+#include "paed/parser.h"
+#include "cJSON.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -38,14 +38,79 @@ static cJSON *cargar_json(const char *path, int obligatorio) {
     return raiz;
 }
 
+// Donde `make install` deja los datos. Se puede pisar al compilar:
+//   clang -DPAED_DATADIR='"/opt/paed/share"'
+#ifndef PAED_DATADIR
+#define PAED_DATADIR "/usr/local/share/paed"
+#endif
+
+// Nombre del archivo de la libreria extra que se cargo, para poder nombrarla en
+// los mensajes de error. Vacio si no se cargo ninguna.
+static char g_lib_nombre[64] = {0};
+
+const char *paed_datadir(void) {
+    static char elegido[PAED_PATH_MAX] = {0};
+    if (elegido[0]) return elegido;
+
+    const char *home = getenv("PAED_HOME");
+    const char *candidatos[] = {
+        home ? home : "",
+        PAED_DATADIR,
+        "Frankly/data",       // parado en el repo de PAED
+        "paed/Frankly/data",  // parado en VimMon, que lo tiene adentro
+    };
+
+    for (size_t i = 0; i < sizeof(candidatos) / sizeof(candidatos[0]); i++) {
+        if (!candidatos[i][0]) continue;
+
+        char prueba[PAED_PATH_MAX];
+        snprintf(prueba, sizeof(prueba), "%s/%s", candidatos[i], PAED_SYNTAX_FILE);
+
+        FILE *f = fopen(prueba, "r");
+        if (!f) continue;
+        fclose(f);
+
+        snprintf(elegido, sizeof(elegido), "%s", candidatos[i]);
+        return elegido;
+    }
+
+    return NULL;
+}
+
 int paed_syntax_load(void) {
     if (g_syntax) return 0;
 
-    g_syntax = cargar_json(PAED_SYNTAX_PATH, 1);
-    if (!g_syntax) return -1;
+    const char *dir = paed_datadir();
+    if (!dir) {
+        fprintf(stderr,
+                "[paed] no encuentro %s. Probe $PAED_HOME, %s, Frankly/data y "
+                "paed/Frankly/data\n", PAED_SYNTAX_FILE, PAED_DATADIR);
+        return -1;
+    }
 
-    // La libreria de escena es opcional: sin ella PAED sigue siendo AED puro.
-    g_escena = cargar_json(PAED_ESCENA_PATH, 0);
+    char path[PAED_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", dir, PAED_SYNTAX_FILE);
+
+    g_syntax = cargar_json(path, 1);
+    return g_syntax ? 0 : -1;
+}
+
+int paed_syntax_load_lib(const char *nombre) {
+    if (!nombre || !*nombre) return -1;
+    if (paed_syntax_load() != 0) return -1;
+
+    const char *dir = paed_datadir();
+    if (!dir) return -1;
+
+    char path[PAED_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s.json", dir, nombre);
+
+    cJSON *lib = cargar_json(path, 1);
+    if (!lib) return -1;
+
+    if (g_escena) cJSON_Delete(g_escena);
+    g_escena = lib;
+    snprintf(g_lib_nombre, sizeof(g_lib_nombre), "%s.json", nombre);
     return 0;
 }
 
@@ -501,8 +566,15 @@ static void parse_instruction(PAEDProgram *p, char *linea, int lineno) {
     // 4. El procedimiento tiene que existir en sintaxis.json
     cJSON *def = proc_def(nombre);
     if (!def) {
-        add_error(p, lineno, "procedimiento desconocido '%s' (no esta ni en %s ni en %s)",
-                  nombre, PAED_SYNTAX_PATH, PAED_ESCENA_PATH);
+        // Se nombran los ARCHIVOS y no sus rutas: la ruta depende de donde se
+        // instalo PAED, y el mismo programa daria mensajes distintos en dos
+        // maquinas. Donde estan se pregunta una sola vez, con paed_datadir().
+        if (g_lib_nombre[0])
+            add_error(p, lineno, "procedimiento desconocido '%s' (no esta ni en %s ni en %s)",
+                      nombre, PAED_SYNTAX_FILE, g_lib_nombre);
+        else
+            add_error(p, lineno, "procedimiento desconocido '%s' (no esta en %s)",
+                      nombre, PAED_SYNTAX_FILE);
         return;
     }
 
@@ -1123,7 +1195,7 @@ int paed_parse_file(const char *path, PAEDProgram *out) {
     strncpy(out->path, path, PAED_PATH_MAX - 1);
 
     if (paed_syntax_load() != 0) {
-        add_error(out, 0, "no se pudo cargar la definicion del lenguaje (%s)", PAED_SYNTAX_PATH);
+        add_error(out, 0, "no se pudo cargar la definicion del lenguaje (%s)", PAED_SYNTAX_FILE);
         return -1;
     }
 
