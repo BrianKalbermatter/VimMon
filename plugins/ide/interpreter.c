@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>    // isalpha/isalnum: validar el destino de un LEER
 #include <strings.h>  // strcasecmp: los nombres de procedimiento no distinguen mayusculas
 #include <math.h>   // sinf/cosf: rotar un grupo alrededor de su centro
 
@@ -138,6 +139,206 @@ static Vec3 girar_alrededor(Vec3 p, Vec3 c, char eje, float grados) {
             break;
     }
     return p;
+}
+
+// ── Entrada de datos (LEER de consola) ───────────────────────────────────────
+static PaedEntrada entrada_fn = NULL;
+static void       *entrada_ud = NULL;
+
+void interp_set_entrada(PaedEntrada fn, void *ud) {
+    entrada_fn = fn;
+    entrada_ud = ud;
+}
+
+// ¿Sirve como destino de un LEER? Tiene que ser un nombre: 'x', o 'p.campo'.
+// Descarta LEER("hola") y LEER(3), que no tienen donde guardar nada.
+static int es_destino(const char *s) {
+    if (!s || !*s) return 0;
+    if (!isalpha((unsigned char)*s) && *s != '_') return 0;
+    for (const char *c = s + 1; *c; c++)
+        if (!isalnum((unsigned char)*c) && *c != '_' && *c != '.') return 0;
+    return 1;
+}
+
+// Parte un destino escrito `A[i]` en nombre e indice. Sin corchetes, el indice
+// queda vacio. Devuelve 0 si esta bien escrito, -1 si no.
+//
+// El parser ya hace esto para el destino de `:=` (parser.c:265) y guarda el
+// indice como un argumento aparte. Los argumentos de LEER, en cambio, llegan
+// crudos porque LEER es variadico: cualquiera de ellos puede ser 'A[i]', no
+// solo el primero.
+static int partir_destino(const char *destino, char *nombre, size_t nn,
+                          char *indice, size_t ni) {
+    const char *corchete = strchr(destino, '[');
+    if (!corchete) {
+        snprintf(nombre, nn, "%s", destino);
+        indice[0] = '\0';
+        return es_destino(nombre) ? 0 : -1;
+    }
+
+    size_t len = strlen(destino);
+    if (len == 0 || destino[len - 1] != ']') return -1;
+
+    size_t largo_nombre = (size_t)(corchete - destino);
+    if (largo_nombre == 0 || largo_nombre >= nn) return -1;
+    snprintf(nombre, nn, "%.*s", (int)largo_nombre, destino);
+
+    size_t largo_indice = len - largo_nombre - 2;   // sin '[' ni ']'
+    if (largo_indice == 0 || largo_indice >= ni) return -1;
+    snprintf(indice, ni, "%.*s", (int)largo_indice, corchete + 1);
+
+    return es_destino(nombre) ? 0 : -1;
+}
+
+// Guarda `v` en un destino ya partido: `nombre` y, si es un elemento de
+// arreglo, `idx_txt` con el indice SIN evaluar. Lo comparten la asignacion y
+// LEER, que guardan en los mismos tres lugares (escalar, A[i], p.campo) y solo
+// se diferencian en de donde sale el valor.
+static int guardar_valor(const PAEDProgram *prog, const PAEDInstr *in,
+                         const char *nombre, const char *idx_txt, Valor v) {
+    if (!idx_txt || !*idx_txt) {
+        // Un campo de registro NO nace en su primera asignacion, al reves que
+        // un escalar: los campos se crearon todos al declarar la variable. Si
+        // el nombre tiene punto y no existe, es un campo que el registro no
+        // tiene — y aceptarlo callado dejaria el registro sin sentido, porque
+        // admitiria cualquier campo inventado.
+        const char *punto = strchr(nombre, '.');
+        if (punto && !env_existe(&env, nombre)) {
+            char msg[PAED_MSG_MAX];
+            snprintf(msg, sizeof(msg),
+                     "'%.*s' no tiene un campo '%s'",
+                     (int)(punto - nombre), nombre, punto + 1);
+            runtime_error(prog, in, msg);
+            return -1;
+        }
+
+        if (env_set(&env, nombre, v) != 0) {
+            // env_set deja el motivo cuando el nombre ya existe como arreglo.
+            runtime_error(prog, in, env.error[0] ? env.error : "no entran mas variables");
+            return -1;
+        }
+        return 0;
+    }
+
+    // El indice se evalua RECIEN AHORA, no al parsear: en A[i] := 0 dentro de
+    // un bucle, i vale distinto en cada vuelta.
+    Valor idx;
+    if (expr_eval(idx_txt, &env, &idx) != 0) {
+        runtime_error(prog, in, env.error);
+        return -1;
+    }
+    if (idx.tipo != VAL_NUM || idx.num != floor(idx.num)) {
+        char msg[PAED_MSG_MAX];
+        snprintf(msg, sizeof(msg), "el indice de %s tiene que ser un numero entero", nombre);
+        runtime_error(prog, in, msg);
+        return -1;
+    }
+
+    Valor *elem = env_elem(&env, nombre, (int)idx.num);
+    if (!elem) {
+        runtime_error(prog, in, env.error);
+        return -1;
+    }
+    *elem = v;
+    return 0;
+}
+
+// Le saca los espacios de los dos lados, EN EL LUGAR. El '\r' cuenta como
+// espacio a proposito: un archivo de datos guardado en Windows termina cada
+// linea con "\r\n", y ese '\r' invisible convertiria el numero 12 en el texto
+// "12\r". El bug seria mudo y la culpa se la llevaria el interprete.
+static char *trim_linea(char *s) {
+    while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
+    size_t n = strlen(s);
+    while (n > 0 && (s[n-1] == ' ' || s[n-1] == '\t' || s[n-1] == '\r' || s[n-1] == '\n'))
+        s[--n] = '\0';
+    return s;
+}
+
+// Convierte lo que vino por la entrada en un Valor.
+//
+// PAED declara los tipos en el AMBIENTE, pero el Entorno todavia no los usa
+// (esta anotado en el KANBAN), asi que el tipo lo decide EL DATO: si la linea
+// entera es un numero, es numero; si no, es texto. Entera, no "empieza con":
+// "12abc" es el texto "12abc" y no el numero 12, porque un numero a medias
+// escondería el error del que cargo el dato.
+static Valor valor_desde_texto(const char *linea) {
+    Valor v;
+    memset(&v, 0, sizeof(v));
+
+    char *fin = NULL;
+    double d  = strtod(linea, &fin);
+    if (fin != linea) {
+        while (*fin == ' ' || *fin == '\t') fin++;
+        if (*fin == '\0') {
+            v.tipo = VAL_NUM;
+            v.num  = d;
+            return v;
+        }
+    }
+
+    v.tipo = VAL_TEXTO;
+    snprintf(v.texto, sizeof(v.texto), "%s", linea);
+    return v;
+}
+
+// LEER(A, B, p.campo) — pide un dato por destino y lo guarda.
+//
+// UNA LINEA POR DESTINO, no un token: asi un texto con espacios entra entero.
+// Partir por espacios haria que "Juan Perez" llenara dos destinos con medio
+// nombre cada uno.
+static int leer_consola(const PAEDProgram *prog, const PAEDInstr *in) {
+    if (in->arg_count == 0) {
+        runtime_error(prog, in, "LEER necesita al menos un destino: LEER(x)");
+        return -1;
+    }
+
+    if (!entrada_fn) {
+        runtime_error(prog, in,
+                      "LEER no tiene de donde sacar los datos: este programa corre sin "
+                      "entrada enganchada (probalo con build/paedrun)");
+        return -1;
+    }
+
+    for (int i = 0; i < in->arg_count; i++) {
+        const char *destino = in->args[i].val;
+
+        char nombre[PAED_NAME_MAX];
+        char indice[PAED_VAL_MAX];
+        if (partir_destino(destino, nombre, sizeof(nombre), indice, sizeof(indice)) != 0) {
+            char msg[PAED_MSG_MAX];
+            snprintf(msg, sizeof(msg),
+                     "'%s' no sirve como destino de LEER: se espera una variable, "
+                     "un elemento A[i] o un campo p.campo", destino);
+            runtime_error(prog, in, msg);
+            return -1;
+        }
+
+        char linea[PAED_VAL_MAX];
+        if (entrada_fn(linea, sizeof(linea), entrada_ud) != 0) {
+            char msg[PAED_MSG_MAX];
+            snprintf(msg, sizeof(msg),
+                     "la entrada se termino antes de darle un valor a '%s'", destino);
+            runtime_error(prog, in, msg);
+            return -1;
+        }
+
+        char *dato = trim_linea(linea);
+        if (!*dato) {
+            // Una linea vacia casi siempre es un dato que falta, no un texto
+            // vacio a proposito. Se avisa en vez de guardar "" callado y que el
+            // error aparezca tres instrucciones despues, sin relacion aparente.
+            char msg[PAED_MSG_MAX];
+            snprintf(msg, sizeof(msg), "la entrada trajo una linea vacia para '%s'", destino);
+            runtime_error(prog, in, msg);
+            return -1;
+        }
+
+        if (guardar_valor(prog, in, nombre, indice, valor_desde_texto(dato)) != 0)
+            return -1;
+    }
+
+    return 0;
 }
 
 static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInstr *in) {
@@ -325,11 +526,7 @@ static int exec_instr(SceneState *scene, const PAEDProgram *prog, const PAEDInst
         return -1;
     }
 
-    if (strcasecmp(p, "LEER") == 0) {
-        runtime_error(prog, in,
-                      "LEER por consola todavia no pide datos: falta la entrada interactiva");
-        return -1;
-    }
+    if (strcasecmp(p, "LEER") == 0) return leer_consola(prog, in);
 
     // ── Salida por consola ───────────────────────────────────────────────────
     if (strcasecmp(p, "ESCRIBIR") == 0) {
@@ -436,60 +633,16 @@ static int declarar_ambiente(const PAEDProgram *prog) {
     return fallos;
 }
 
-// destino := expr, donde destino puede ser un escalar o un elemento A[i].
+// destino := expr, donde destino puede ser un escalar, un elemento A[i] o un
+// campo p.campo. El parser ya partio el destino: el nombre queda en `proc` y el
+// indice, si lo hay, como el argumento "indice".
 static int asignar(const PAEDProgram *prog, const PAEDInstr *in) {
     Valor v;
     if (expr_eval(in->cond, &env, &v) != 0) {
         runtime_error(prog, in, env.error);
         return -1;
     }
-
-    const char *idx_txt = paed_get_arg(in, "indice");
-    if (!idx_txt) {
-        // Un campo de registro NO nace en su primera asignacion, al reves que
-        // un escalar: los campos se crearon todos al declarar la variable. Si
-        // el nombre tiene punto y no existe, es un campo que el registro no
-        // tiene — y aceptarlo callado dejaria el registro sin sentido, porque
-        // admitiria cualquier campo inventado.
-        const char *punto = strchr(in->proc, '.');
-        if (punto && !env_existe(&env, in->proc)) {
-            char msg[PAED_MSG_MAX];
-            snprintf(msg, sizeof(msg),
-                     "'%.*s' no tiene un campo '%s'",
-                     (int)(punto - in->proc), in->proc, punto + 1);
-            runtime_error(prog, in, msg);
-            return -1;
-        }
-
-        if (env_set(&env, in->proc, v) != 0) {
-            // env_set deja el motivo cuando el nombre ya existe como arreglo.
-            runtime_error(prog, in, env.error[0] ? env.error : "no entran mas variables");
-            return -1;
-        }
-        return 0;
-    }
-
-    // El indice se evalua RECIEN AHORA, no al parsear: en A[i] := 0 dentro de
-    // un bucle, i vale distinto en cada vuelta.
-    Valor idx;
-    if (expr_eval(idx_txt, &env, &idx) != 0) {
-        runtime_error(prog, in, env.error);
-        return -1;
-    }
-    if (idx.tipo != VAL_NUM || idx.num != floor(idx.num)) {
-        char msg[PAED_MSG_MAX];
-        snprintf(msg, sizeof(msg), "el indice de %s tiene que ser un numero entero", in->proc);
-        runtime_error(prog, in, msg);
-        return -1;
-    }
-
-    Valor *elem = env_elem(&env, in->proc, (int)idx.num);
-    if (!elem) {
-        runtime_error(prog, in, env.error);
-        return -1;
-    }
-    *elem = v;
-    return 0;
+    return guardar_valor(prog, in, in->proc, paed_get_arg(in, "indice"), v);
 }
 
 int interp_exec(SceneState *scene, const PAEDProgram *prog) {

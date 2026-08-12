@@ -1,6 +1,8 @@
 #ifndef VIMMON_INTERPRETER_H
 #define VIMMON_INTERPRETER_H
 
+#include <stddef.h>   // size_t
+
 #include "parser.h"
 
 #define SCENE_MAX_CUERPOS 64
@@ -35,6 +37,22 @@ typedef struct {
     Vec3   cam_pos;
     Vec3   cam_target;
 } SceneState;
+
+// ── De donde salen los datos de LEER ─────────────────────────────────────────
+//
+// El interprete NO abre stdin por su cuenta, y no es un capricho: corre DENTRO
+// del game loop del renderer, asi que un fgets bloqueante congelaria la ventana
+// entera esperando que alguien tipee en una terminal que quiza ni esta a la
+// vista. El que hospeda al interprete es el que sabe de donde vienen los datos:
+// paedrun engancha stdin, la ventana SDL todavia no engancha nada.
+//
+// Deja UNA linea en `buf`, sin el '\n'. Devuelve 0 si trajo un dato, -1 si la
+// entrada se termino.
+typedef int (*PaedEntrada)(char *buf, size_t n, void *ud);
+
+// Engancha la fuente de datos. Sin fuente, LEER de consola falla con un mensaje
+// claro en vez de colgarse esperando algo que nunca va a llegar.
+void interp_set_entrada(PaedEntrada fn, void *ud);
 
 void interp_init (SceneState *scene);
 

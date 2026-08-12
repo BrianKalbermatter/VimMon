@@ -22,6 +22,21 @@
 #include "plugins/ide/parser.h"
 #include "plugins/ide/interpreter.h"
 
+// De aca saca LEER sus datos. El interprete no abre stdin solo (ver el
+// comentario de interp_set_entrada): en la ventana SDL eso congelaria el game
+// loop. Aca, en cambio, stdin es exactamente lo que corresponde — sea el que
+// tipea o una tuberia con los datos del test.
+//
+// Una linea mas larga que el buffer se parte: lo que sobra queda como la
+// proxima linea, y el proximo LEER se lo come. Es el comportamiento de fgets y
+// se prefiere a truncar callado.
+static int leer_de_stdin(char *buf, size_t n, void *ud) {
+    (void)ud;
+    if (!fgets(buf, (int)n, stdin)) return -1;   // fin de la entrada
+    buf[strcspn(buf, "\n")] = '\0';
+    return 0;
+}
+
 int main(int argc, char **argv) {
     int mostrar_escena = 0;
     const char *path   = NULL;
@@ -64,6 +79,7 @@ int main(int argc, char **argv) {
 
     SceneState scene;
     interp_init(&scene);
+    interp_set_entrada(leer_de_stdin, NULL);
     int rc = interp_exec(&scene, &prog);
 
     if (mostrar_escena) interp_print(&scene);
