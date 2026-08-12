@@ -1,5 +1,9 @@
 # Ignorar todo excepto lo listado abajo
 /*
+# paed/ es un SUBMODULO: hay que habilitarlo aca igual que cualquier otra
+# carpeta, porque el '/*' de arriba ignora todo lo que no este en esta lista.
+# Sin esta linea, `git submodule add` responde "Use -f if you really want".
+!/paed/
 !/.gitignore
 !/LICENSE
 !/.github/
@@ -25,23 +29,21 @@
 # Mazmorra ASCII con hot reload
 !/hot-Reload/
 
-# ── PAED ────────────────────────────────────────────────────────────────────
-# PAED es OTRO REPO, que vive adentro de esta carpeta. No esta trackeado aca a
-# proposito: sus archivos los versiona `paed/.git`, no este repo.
+# ── Los otros dos repos ─────────────────────────────────────────────────────
+# paed/ y PseudoGames/ son SUBMODULOS: repos propios que viven adentro de esta
+# carpeta. VimMon no versiona sus archivos, solo guarda a que commit de cada uno
+# apunta (mira .gitmodules).
 #
-# Todavia NO es un submodulo formal — le falta estar publicado. Cuando lo este:
+# En la otra PC, despues de clonar:
 #
-#     git submodule add <url> paed
+#     git submodule update --init
 #
-# y esta linea se borra, porque el submodulo se trackea como un puntero al
-# commit. Hasta entonces queda ignorado, que es lo unico que evita que VimMon se
-# lo vuelva a tragar entero.
+# o directamente:  git clone --recurse-submodules <url>
 #
-# En la otra PC, despues de clonar: git submodule update --init
-/paed/
-
-# Lo mismo para el editor: PseudoGames es un TERCER repo. VimMon lo lanza pero
-# no lo versiona — de hecho puede lanzar cualquier otro (VIMMON_IDE).
+# Para traer lo ultimo de cada uno:  git submodule update --remote
+#
+# PseudoGames sigue ignorado hasta que se pueda publicar: falta el scope
+# `workflow` en el token de gh, porque el repo lleva el workflow que arma el EXE.
 /PseudoGames/
 
 # Aprendizaje y contenido personal
