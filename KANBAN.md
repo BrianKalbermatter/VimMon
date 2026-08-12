@@ -80,6 +80,12 @@ kanban-plugin: board
 
 ## Hecho
 
+- [x] **`paed.exe` para Windows** (`v0.1.3`): `make windows` cross-compila con mingw-w64 a `build/windows/`, un BUILDDIR APARTE — los `.o` de los dos sistemas se llaman igual y tienen formato distinto, asi que compartir carpeta deja el build de Linux roto y el error aparece despues, al linkear, culpando a otra cosa #fase2
+- [x] Lo que no se escribe igual en los dos sistemas se junto en `lang/src/plataforma.c` detras de una interfaz chica, en vez de sembrar `#ifdef` por todo el codigo. Mismo criterio que `renderer.h`: la interfaz dice QUE, cada implementacion dice COMO #fase2
+- [x] `strcasestr` freno el build de Windows: parece estandar de tanto usarla, pero es una extension de glibc y MinGW no la tiene. Ahora hay implementacion propia #fase2
+- [x] El `.exe` no necesita nada al lado — la definicion del lenguaje ya viajaba embebida y eso vale igual en Windows. Se le pasa el archivo a alguien y corre #fase2
+- [x] El release de Windows es un JOB APARTE del de Linux: si el cross-compile se rompe, el paquete de Linux se publica igual. Antes de subir verifica que `file` diga PE32+ y que `FIN_ACCION` este adentro del binario #fase2
+- [x] Pendiente honesto: el `.exe` NO se pudo EJECUTAR — no hay wine en esta maquina. Se verifico que es PE32+, que lleva las palabras clave adentro y que no tiene rastros de `/proc/self/exe`. Correrlo en Windows queda por hacer #fase2
 - [x] **PAED se instala con UN SOLO ARCHIVO** (`v0.1.1`): `curl -L .../releases/latest/download/paed -o paed && chmod +x paed && ./paed install`. Verificado bajandolo con curl del release real, corriendolo en una carpeta vacia e instalandolo en un prefijo inventado #fase2
 - [x] `sintaxis.json` va EMBEBIDO en el binario, generado por el Makefile desde `Frankly/data/sintaxis.json`. Fuente de verdad sigue habiendo una sola; la copia se rehace en cada build. El archivo del disco SIGUE GANANDO cuando existe, asi que tocar la definicion y probarla sin recompilar sigue andando — lo embebido es la ultima red #fase2
 - [x] `paed install [destino]` se copia a si mismo con `/proc/self/exe`. Borra el destino antes de escribir: pisarle encima a un binario EN USO da "Text file busy", y borrarlo no molesta al proceso que ya lo abrio #fase2
