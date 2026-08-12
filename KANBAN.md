@@ -80,6 +80,12 @@ kanban-plugin: board
 
 ## Hecho
 
+- [x] **PAED se instala sin compilar: release `v0.1.0` con el binario armado.** `curl -L .../releases/latest/download/paed-linux-x86_64.tar.gz | tar xz` y `./instalar.sh`. 41 KB comprimido, 120 KB descomprimido. Verificado bajandolo con curl como un desconocido, instalandolo en un prefijo ajeno y corriendo un programa con `LEER` desde `/tmp` #fase2
+- [x] El binario es REUBICABLE: `paed_datadir()` pregunta "¿donde estoy?" con `/proc/self/exe` y mira `<ahi>/../share/paed`. Sin eso, un binario compilado para `/usr/local` y descomprimido en `~/.local` busca sus datos donde no estan — que es el mismo bug del `PREFIX` pero del lado del que lo baja #fase2
+- [x] El workflow corre los 19 tests ANTES de publicar y ademas descomprime el paquete en otra carpeta y lo ejecuta desde ahi. Un release roto es peor que ninguno: el que lo baja arranca creyendo que el problema es suyo #fase2
+- [x] Bug del workflow: fallaba en 0 segundos porque el heredoc de las notas empezaba en columna 0 y eso CIERRA el bloque `run: |` de YAML. No hay forma de tenerlo adentro — indentado se le cuela la indentacion al texto publicado, sin indentar rompe el archivo. Las notas se fueron a `.github/notas-release.md` con `--notes-file` #fase2
+- [x] `AlgebraRectas/` salio del repo del lenguaje a `programas/` de VimMon: es un programa ESCRITO EN PAED, no parte de PAED. Un lenguaje no lleva adentro los programas de sus usuarios #fase2
+- [x] Un commit que mezclaba el movimiento de AlgebraRectas con toda la maquina de release se partio en dos antes de que quedara asi para siempre. El mensaje hablaba solo del movimiento y escondia 198 lineas de otra cosa #fase2
 - [x] **`ParcialSimulado_01.paed` pide los datos con `LEER`.** Era la razon de ser de todo lo de hoy: un parcial se resuelve como en la catedra, cargando los datos, en vez de editar el archivo y volver a correrlo #fase2
 - [x] El ejercicio 5 recupero su enunciado ORIGINAL: carga notas hasta el centinela `-1`, sin saber cuantas son. Con datos fijos era imposible y estaba reemplazado por un arreglo de tamanio conocido con un `PARA`. Ahora es un `MIENTRAS` con el patron de siempre — leer antes de entrar, y que la ultima instruccion del ciclo lea el siguiente #fase2
 - [x] Dos guardas que el enunciado no pide pero el algoritmo si: `Y (cant < 12)` en el ciclo (el arreglo llega hasta 12) y `SI (cant > 0)` antes del promedio (dividir por cant sin preguntar es dividir por cero si nadie cargo notas) #fase2
