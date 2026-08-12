@@ -15,14 +15,15 @@
 // abre el motor con 'engine': el comando publica un evento, este plugin lo
 // agarra y lanza el programa, y cuando se cierra volves a la consola.
 //
-// El plugin NO es el IDE. El IDE lo escribe el usuario y vive en paed/.
-// Aca solo esta la conexion.
+// El plugin NO es el IDE. El IDE es OTRO PROYECTO, con su repo propio, que vive
+// en PseudoGames/. Aca solo esta la conexion — y por eso el OS puede arrancar
+// cualquier otro editor sin que este archivo cambie (ver VIMMON_IDE abajo).
 
 // PseudoGames carga assets/, data/ y saves/ con rutas RELATIVAS, asi que tiene
 // que correr parado en su propia carpeta.
-#define IDE_DIR    "paed"
+#define IDE_DIR    "PseudoGames"
 #define IDE_BIN    "./aed"
-#define IDE_BIN_FS "paed/aed"
+#define IDE_BIN_FS "PseudoGames/aed"
 
 // Cambiar el programa sin recompilar VimMon:
 //     VIMMON_IDE=/usr/bin/vim build/vimmon

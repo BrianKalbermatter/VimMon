@@ -40,6 +40,10 @@
 # En la otra PC, despues de clonar: git submodule update --init
 /paed/
 
+# Lo mismo para el editor: PseudoGames es un TERCER repo. VimMon lo lanza pero
+# no lo versiona — de hecho puede lanzar cualquier otro (VIMMON_IDE).
+/PseudoGames/
+
 # Aprendizaje y contenido personal
 !/documentacion/
 !/pizarronInfinito/
