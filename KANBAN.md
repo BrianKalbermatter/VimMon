@@ -80,6 +80,11 @@ kanban-plugin: board
 
 ## Hecho
 
+- [x] **PAED se instala con UN SOLO ARCHIVO** (`v0.1.1`): `curl -L .../releases/latest/download/paed -o paed && chmod +x paed && ./paed install`. Verificado bajandolo con curl del release real, corriendolo en una carpeta vacia e instalandolo en un prefijo inventado #fase2
+- [x] `sintaxis.json` va EMBEBIDO en el binario, generado por el Makefile desde `Frankly/data/sintaxis.json`. Fuente de verdad sigue habiendo una sola; la copia se rehace en cada build. El archivo del disco SIGUE GANANDO cuando existe, asi que tocar la definicion y probarla sin recompilar sigue andando — lo embebido es la ultima red #fase2
+- [x] `paed install [destino]` se copia a si mismo con `/proc/self/exe`. Borra el destino antes de escribir: pisarle encima a un binario EN USO da "Text file busy", y borrarlo no molesta al proceso que ya lo abrio #fase2
+- [x] `paed --version` / `-v` / `version` y `paed --help`. La version sale del archivo `VERSION` que lee el Makefile, no de una constante en el codigo: el tag, el `--version` y el nombre del paquete tienen que decir lo mismo. El workflow CORTA si `VERSION` no coincide con el tag #fase2
+- [x] Bug: al agregar la regla del archivo generado, esa regla quedo PRIMERA en el Makefile y `make` a secas dejo de compilar sin avisar — make toma el primer target como default. Se fija con `.DEFAULT_GOAL := all` explicito #fase2
 - [x] **PAED se instala sin compilar: release `v0.1.0` con el binario armado.** `curl -L .../releases/latest/download/paed-linux-x86_64.tar.gz | tar xz` y `./instalar.sh`. 41 KB comprimido, 120 KB descomprimido. Verificado bajandolo con curl como un desconocido, instalandolo en un prefijo ajeno y corriendo un programa con `LEER` desde `/tmp` #fase2
 - [x] El binario es REUBICABLE: `paed_datadir()` pregunta "¿donde estoy?" con `/proc/self/exe` y mira `<ahi>/../share/paed`. Sin eso, un binario compilado para `/usr/local` y descomprimido en `~/.local` busca sus datos donde no estan — que es el mismo bug del `PREFIX` pero del lado del que lo baja #fase2
 - [x] El workflow corre los 19 tests ANTES de publicar y ademas descomprime el paquete en otra carpeta y lo ejecuta desde ahi. Un release roto es peor que ninguno: el que lo baja arranca creyendo que el problema es suyo #fase2
