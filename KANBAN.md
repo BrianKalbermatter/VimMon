@@ -21,7 +21,6 @@ kanban-plugin: board
 - [ ] Parser PAED: declaración múltiple `A,B,SUMA: entero`. Es la forma del único ejemplo con autoridad de cátedra (`AED_2021_UnI.pdf:10`) y hoy da "nombre de variable invalido" #fase2
 - [ ] Parser PAED: `VARIABLES` como sub-sección de `AMBIENTE`. Aparece en `AED_2021_UnI.pdf:10` y en ninguna otra fuente. Antes de implementar, confirmar si es obligatoria #fase2
 - [ ] Decidir el `;`: la cátedra lo usa como SEPARADOR (la última sentencia no lo lleva) y el parser lo exige como terminador. Cambiarlo rompe todos los `.paed` del repo — decidir antes de tocar #fase2
-- [ ] **TUYO — `PseudoGames/src/screenVerificador.c:7` quedo apuntando a la nada.** Dice `#define PAED_CMD "./Frankly/paed ..."`, el interprete de bash, que ahora vive en el repo del lenguaje y ya no esta al lado del editor. El verificador de soluciones compila pero falla al correr. La salida natural es llamar al binario instalado (`paed <archivo>`), que ademas es el de C y tiene `LEER` andando. Es tu codigo, lo dejo para que lo cambies vos #fase5
 - [ ] Publicar el repo `PseudoGames` y engancharlo como submodulo, igual que `paed`. Hoy esta ignorado en el `.gitignore` de VimMon, asi que tampoco viaja a la otra PC #fase5
 - [ ] **Publicar el repo `paed` y engancharlo como submodulo.** Hoy vive adentro de VimMon con su propio git pero IGNORADO (`/paed/` en `.gitignore`): eso alcanza para trabajarlo aparte, pero no viaja a la otra PC. Cuando este publicado: `git submodule add <url> paed`, borrar esa linea del `.gitignore`, y en la otra maquina `git submodule update --init` #fase2
 - [ ] `escena.json` todavia vive en `paed/Frankly/data/`, que es el repo de PAED, cuando la escena 3D es de VimMon. Anda porque `paed_syntax_load_lib` busca en el directorio de datos de PAED, pero la libreria de un host deberia poder vivir del lado del host #fase2
@@ -84,6 +83,8 @@ kanban-plugin: board
 
 ## Hecho
 
+- [x] El verificador de soluciones del editor llamaba a `./Frankly/paed` (el interprete de bash, por ruta relativa) y quedo apuntando a la nada con la separacion. Ahora llama a `paed` por PATH — el de C, el que se sigue desarrollando #fase5
+- [x] Al verificador se le agrego `< /dev/null`: el interprete en C ejecuta `LEER` de verdad, y `popen` le pasa al hijo el stdin del EDITOR. Una solucion con `LEER` habria dejado al interprete esperando que alguien tipee en el stdin de una ventana SDL que nadie mira — colgado y sin decir por que. Con la redireccion falla en 5ms con "la entrada se termino", que es lo correcto #fase5
 - [x] **TRES repos, no uno.** `paed` es el lenguaje, `PseudoGames` es el editor y VimMon es el OS. La dependencia va en UNA sola direccion: VimMon lanza el editor, el editor usa el lenguaje, y el lenguaje no sabe que existe ninguno de los dos. Quien quiera solo PAED ya no se lleva assets, niveles y SDL2 de arrastre #fase5
 - [x] El editor es una APP del OS y no una parte de el: `plugins/editor/editor.c` lanza `PseudoGames/aed` por defecto pero acepta `VIMMON_IDE=/usr/bin/vim`. Cambiar de editor no toca una linea de VimMon #fase5
 - [x] El workflow que arma el `.exe` para Windows colgaba de la raiz de VimMon aunque empaqueta el EDITOR. Se fue con el, a `PseudoGames/.github/workflows/` #fase5
