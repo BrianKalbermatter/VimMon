@@ -6,33 +6,10 @@ kanban-plugin: board
 
 ## Backlog
 
-- [ ] Subir `PAED_VAL_MAX` (128 bytes) o hacer que el texto de `ESCRIBIR` no tenga ese tope: hoy un marco decorativo Unicode de 40 simbolos ya no entra #fase2
-- [ ] Parser PAED: una instrucción no puede partirse en dos líneas — el parser lee línea por línea. Un `ESCRIBIR` largo hay que dejarlo en una sola #fase2
-- [ ] Parser PAED: `SEGUN` — CONFLICTO a decidir antes de implementar #fase2
-- [ ] Parser PAED: `REPETIR`/`HASTA` — cero apariciones reales en el corpus, solo declaradas en `sintaxis.json`. Confirmar que existan antes de implementarlas #fase2
-- [ ] Evaluador: guardar un árbol de la expresión en vez de re-parsear el texto en CADA vuelta del bucle. Hoy es simple y correcto, pero un `MIENTRAS` largo paga el costo en cada iteración #fase2
-- [ ] Evaluador: usar el `AMBIENTE` para chequear tipos. Hoy se parsea pero no se usa: asignarle un texto a algo declarado `ENTERO` no da error #fase2
-- [ ] Evaluador: los arreglos no chequean el TIPO declarado. `A: ARREGLO[1..5] DE ENTERO` acepta que le metan un texto en `A[2]`, igual que pasa con los escalares #fase2
-- [ ] Avisar cuando se usa `==`: ya está resuelto que NO existe en AED (`TEORIA_COMPLETA.txt:324` define `=`, y la wiki lo marca como error de escritura arrastrado, 91 usos). Hoy se acepta callado para no romper los archivos; debería avisar sin frenar la ejecución #fase2
-- [ ] Confirmar contra la cátedra: `-2 ** 2` da 4 porque la tabla de prioridad pone los unarios ARRIBA de la potencia. En casi todos los lenguajes da -4. ¿Es lo que quiere AED? #fase2
-- [ ] Parser PAED: `FUNCION`/`PROCEDIMIENTO` anidados dentro de `AMBIENTE` #fase2
-- [ ] Parser PAED: nombre de `ACCION` con espacios (`ACCION Ejercicio de Parcial ES`) #fase2
-- [ ] Parser PAED: declaración múltiple `A,B,SUMA: entero`. Es la forma del único ejemplo con autoridad de cátedra (`AED_2021_UnI.pdf:10`) y hoy da "nombre de variable invalido" #fase2
-- [ ] Parser PAED: `VARIABLES` como sub-sección de `AMBIENTE`. Aparece en `AED_2021_UnI.pdf:10` y en ninguna otra fuente. Antes de implementar, confirmar si es obligatoria #fase2
-- [ ] `escena.json` todavia vive en `paed/Frankly/data/`, que es el repo de PAED, cuando la escena 3D es de VimMon. Anda porque `paed_syntax_load_lib` busca en el directorio de datos de PAED, pero la libreria de un host deberia poder vivir del lado del host #fase2
+- [ ] **Las tareas de PAED (el lenguaje) viven en `paed/KANBAN.md`, no acá.** Es un repo aparte con su propio board. Acá quedan solo las que tocan VimMon: el renderer, el bus, los plugins, el kernel, y los puntos donde VimMon y PAED se rozan #paed
+- [ ] `escena.json` todavia vive en `paed/data/`, que es el repo de PAED, cuando la escena 3D es de VimMon. Anda porque `paed_syntax_load_lib` busca en el directorio de datos de PAED, pero la libreria de un host deberia poder vivir del lado del host #fase2
 - [ ] Dos copias de cJSON en el arbol: `cjson/` (VimMon, para el plugin de IA) y `paed/lang/vendor/cjson/` (PAED). Linkea bien porque el archivo estatico solo aporta lo que falta, pero depende del ORDEN en el comando de link. Unificar cuando PAED exponga su cJSON o cuando VimMon deje de necesitarlo #fase2
 - [ ] `LEER` en la ventana SDL: hoy solo `paedrun` engancha una entrada (`interp_set_entrada`), asi que un `LEER` dentro del renderer avisa que no tiene datos. Necesita una cola alimentada por el plugin de input, NO un `fgets`: bloquear ahi congela el game loop #fase3
-- [ ] **`HV` (High Value) — constante del lenguaje, no una variable.** El usuario escribe `HV` y vale un numero mas grande que cualquier clave posible. Hoy no existe: `SI (x <> HV)` da "la variable 'HV' no tiene valor todavia". No esta en `sintaxis.json` ni en `expr.c` #fase2
-      **Para que sirve** (`wiki.txt:2399-2450`, `OnlySintaxis.md:248-296`): es el centinela de la MEZCLA INCLUYENTE de archivos. Cuando un archivo se agota, su clave pasa a `HV`; como `HV` es mas grande que cualquier clave real, ese archivo pierde siempre la comparacion `reg1.clave <= reg2.clave` y el ciclo sigue vaciando el otro solo. Sin `HV` hacen falta TRES ciclos (uno principal y dos residuales); con `HV`, uno solo (`wiki.txt:2447`).
-      **Como implementarlo**: junto a `V`/`F` en `primario()` de `expr.c`, que ya resuelve los literales logicos sin pasar por el entorno. Ese es el lugar: `HV` no se declara, no se asigna y no ocupa una entrada de variable. Agregarlo tambien a `sintaxis.json` (categoria propia o junto a `booleanos`) para que el resaltador lo pinte como constante y no como variable.
-      **A decidir**: que valor exacto. `DBL_MAX` lo hace incomparable de verdad pero se imprime feo; un `999999999` es legible y alcanza para las claves de los ejercicios. Y si `HV` distingue mayusculas (`hv`, `Hv`) — las palabras clave no distinguen, y esto es una constante del lenguaje, asi que deberia seguir la misma regla #fase2
-- [ ] `LV` (Low Value): CERO apariciones en wiki, OnlySintaxis y TEORIA_COMPLETA. No inventarlo: si algun dia aparece en un parcial, ahi se agrega #fase2
-- [ ] Archivos en disco de verdad: `ABRIR`/`LEER`/`ESCRIBIR`/`CERRAR` con handle, modo (lectura/escritura/actualizacion) y flag de fin. Hoy la forma se DISTINGUE y se valida, pero ninguna toca el disco #fase2
-- [ ] Decidir la sintaxis de `ABRIR`: la wiki escribe `ABRIR(arch, lectura)` y la catedra `Abrir E/(arch)` (`TEORIA_COMPLETA.txt:1104`). Son incompatibles entre si #fase2
-- [ ] El TERCER `LEER`: acceso indexado por clave (`reg.clave := x; LEER(arch, reg)`, `wiki.txt:2764`) NO avanza, busca. Hoy se marca igual que el secuencial; distinguirlos necesita saber si el archivo es indexado #fase2
-- [ ] `GRABAR`/`REGRABAR`/`BORRAR` de archivos indexados (`TEORIA_COMPLETA.txt:1112-1114`) #fase2
-- [ ] La rama de `ARREGLO` en `parse_decl` no exige espacio despues de la palabra, asi que un tipo llamado `ARREGLOS` entraria por ahi. La de `ARCHIVO` si lo exige #fase2
-- [ ] Corroborar contra la wiki: `RETORNAR`, `TRUNC`, `ABSO`, `REDOND` — 0 apariciones en los apuntes #fase2
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
 - [ ] Recortar contra el plano cercano: hoy `scene_view.c` acota las coordenadas de las esquinas en vez de generar vértices en el borde, y un objeto que abraza la cámara (el suelo) queda mal #fase3
 - [ ] Z-buffer por píxel: hoy el orden del pintor usa la profundidad del CENTRO, así que dos cuerpos que se cruzan se ordenan mal #fase3
