@@ -8,7 +8,7 @@
 // Interfaz ABSTRACTA de dibujo. NO incluye SDL a propósito.
 //
 // Este header es un "vtable": un struct de punteros a función.
-// Cualquier backend (framebuffer SDL2 hoy, Vulkan o bare-metal
+// Cualquier backend (framebuffer SDL3 hoy, Vulkan o bare-metal
 // mañana) rellena estos punteros. El resto del sistema dibuja a
 // través de esta interfaz y NUNCA sabe qué backend hay debajo.
 // ============================================================
@@ -60,7 +60,7 @@ typedef struct {
     void     (*delay_ms)(uint32_t ms);  // dormir (para limitar los FPS)
 } Renderer;
 
-// Backend concreto basado en framebuffer SDL2 (definido en sdl_fb.c).
+// Backend concreto basado en framebuffer SDL3 (API 2D SDL_Render) (definido en sdl_fb.c).
 extern Renderer sdl_fb_renderer;
 
 #endif // VIMMON_RENDERER_H

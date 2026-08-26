@@ -1,5 +1,5 @@
 // ============================================================
-// VimMon — BACKEND FRAMEBUFFER (SDL2)
+// VimMon — BACKEND FRAMEBUFFER (SDL3)
 //
 // Implementa el contrato de renderer.h dibujando "a mano" sobre
 // un bloque de memoria (el framebuffer) y copiándolo a la ventana.
@@ -7,10 +7,14 @@
 // REGLA DE ORO: el framebuffer 'pixels' es PRIVADO (static). Nadie
 // afuera ve el puntero. Solo se toca mediante las primitivas de acá.
 // Así el formato, el ancho y los límites viven en UN solo lugar.
+//
+// Este backend usa la API 2D de SDL3 (SDL_Render). El backend 3D
+// (SDL_GPU) es OTRO archivo que rellena el mismo tipo de contrato:
+// los dos conviven porque nadie de afuera sabe cuál está abajo.
 // ============================================================
 
 #include "renderer.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -42,20 +46,25 @@ static const SDL_Scancode g_scancodes[KEY_COUNT] = {
 // ------------------------------------------------------------
 static int fb_init(const char *title, int width, int height)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    // SDL3: las funciones devuelven bool. true = salió bien.
+    // (En SDL2 era int y 0 significaba éxito: el sentido está INVERTIDO.
+    //  Es el error más fácil de cometer al migrar.)
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "[sdl_fb] SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
 
-    g_win = SDL_CreateWindow(title,
-                             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             width, height, 0);
+    // SDL3: CreateWindow ya no recibe posición (x, y). Si querés colocarla,
+    // se hace después con SDL_SetWindowPosition.
+    g_win = SDL_CreateWindow(title, width, height, 0);
     if (g_win == NULL) {
         fprintf(stderr, "[sdl_fb] CreateWindow: %s\n", SDL_GetError());
         return 1;
     }
 
-    g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_ACCELERATED);
+    // SDL3: CreateRenderer recibe el NOMBRE del driver, no un índice ni flags.
+    // NULL = que SDL elija el mejor disponible.
+    g_ren = SDL_CreateRenderer(g_win, NULL);
     if (g_ren == NULL) {
         fprintf(stderr, "[sdl_fb] CreateRenderer: %s\n", SDL_GetError());
         return 1;
@@ -69,6 +78,10 @@ static int fb_init(const char *title, int width, int height)
         fprintf(stderr, "[sdl_fb] CreateTexture: %s\n", SDL_GetError());
         return 1;
     }
+
+    // Escalado sin suavizado: un píxel del framebuffer se ve como un cuadrado
+    // nítido y no como una mancha borrosa. Para dibujo a mano es lo que querés.
+    SDL_SetTextureScaleMode(g_tex, SDL_SCALEMODE_NEAREST);
 
     // El framebuffer: un array plano de ancho*alto enteros.
     g_pixels = malloc((size_t)width * (size_t)height * sizeof(uint32_t));
@@ -97,6 +110,8 @@ static int fb_height(void) { return g_height; }
 // ------------------------------------------------------------
 // Primitivas de dibujo
 // ------------------------------------------------------------
+// Nada de acá cambió al migrar: es C puro sobre nuestra propia memoria.
+// SDL no participa. Ese es exactamente el punto del framebuffer privado.
 
 // put_pixel: el ladrillo de todo. Un píxel en (x, y) vive en el
 // índice y*ancho + x del array plano.
@@ -163,7 +178,10 @@ static void fb_present(void)
     // igual a ancho*4 (te va a pasar con el kernel en FASE 6).
     SDL_UpdateTexture(g_tex, NULL, g_pixels, g_width * (int)sizeof(uint32_t));
     SDL_RenderClear(g_ren);
-    SDL_RenderCopy(g_ren, g_tex, NULL, NULL);
+    // SDL3: RenderCopy se llama RenderTexture y sus rectángulos son
+    // SDL_FRect (float), no SDL_Rect (int). Acá van NULL/NULL = textura
+    // entera estirada a la ventana entera, así que no nos afecta.
+    SDL_RenderTexture(g_ren, g_tex, NULL, NULL);
     SDL_RenderPresent(g_ren);
 }
 
@@ -177,7 +195,9 @@ static int fb_poll_quit(void)
     // Vaciamos la cola de eventos. SDL_PollEvent además "bombea" el
     // estado del teclado que usa key_down más abajo.
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT)
+        // SDL3: los eventos se renombraron todos con el prefijo SDL_EVENT_.
+        // SDL_QUIT -> SDL_EVENT_QUIT, SDL_KEYDOWN -> SDL_EVENT_KEY_DOWN, etc.
+        if (e.type == SDL_EVENT_QUIT)
             quit = 1;
     }
     return quit;
@@ -187,11 +207,14 @@ static int fb_key_down(Key k)
 {
     if (k < 0 || k >= KEY_COUNT)
         return 0;
-    const Uint8 *state = SDL_GetKeyboardState(NULL);
+    // SDL3: el estado del teclado es un array de bool, no de Uint8.
+    const bool *state = SDL_GetKeyboardState(NULL);
     return state[g_scancodes[k]] ? 1 : 0;
 }
 
-static uint32_t fb_ticks_ms(void)      { return SDL_GetTicks(); }
+// SDL3: GetTicks devuelve Uint64 (ya no se desborda a los 49 días).
+// Nuestro contrato pide uint32_t, así que el cast es explícito y a propósito.
+static uint32_t fb_ticks_ms(void)      { return (uint32_t)SDL_GetTicks(); }
 static void     fb_delay_ms(uint32_t m){ SDL_Delay(m); }
 
 // ------------------------------------------------------------

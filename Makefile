@@ -1,8 +1,10 @@
 CC     = clang
 
-# Flags de SDL2 vía sdl2-config (no hay pkg-config en este equipo).
-SDL_CFLAGS = $(shell sdl2-config --cflags)
-SDL_LIBS   = $(shell sdl2-config --libs)
+# Flags de SDL3 vía pkg-config. SDL3 ya no trae sdl3-config: pkg-config es
+# la forma oficial de preguntarle a una libreria "que flags necesito para
+# compilar contra vos". --cflags da los -I, --libs da los -l.
+SDL_CFLAGS = $(shell pkg-config --cflags sdl3)
+SDL_LIBS   = $(shell pkg-config --libs sdl3)
 
 # -MMD -MP hacen que clang, al compilar cada .c, escriba al lado un .d con la
 # lista de headers que ese .c terminó incluyendo (incluso los indirectos).
