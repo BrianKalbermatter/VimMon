@@ -12,15 +12,15 @@ kanban-plugin: board
 - [ ] `LEER` en la ventana SDL: hoy solo `paedrun` engancha una entrada (`interp_set_entrada`), asi que un `LEER` dentro del renderer avisa que no tiene datos. Necesita una cola alimentada por el plugin de input, NO un `fgets`: bloquear ahi congela el game loop #fase3
 - [ ] Conectar EVENT_KEYBOARD/EVENT_MOUSE a un consumidor real (hoy solo hay debug prints en `plugins/input/input.c`) #fase3
 - [ ] Recortar contra el plano cercano: hoy `scene_view.c` acota las coordenadas de las esquinas en vez de generar vértices en el borde, y un objeto que abraza la cámara (el suelo) queda mal #fase3
-- [ ] Z-buffer por píxel: hoy el orden del pintor usa la profundidad del CENTRO, así que dos cuerpos que se cruzan se ordenan mal #fase3
+- [ ] Z-buffer por píxel en el backend 2D: el orden del pintor usa la profundidad del CENTRO, así que dos cuerpos que se cruzan se ordenan mal #fase3 (en el motor 3D ya no pasa: lo resuelve la GPU)
 - [ ] Caras del cubo con sombreado: hoy se rellena el rectángulo que contiene las 8 esquinas, no las 6 caras #fase3
 - [ ] `LUZ` que ilumine de verdad: hoy solo se dibuja una cruz donde está #fase3
 - [ ] Split screen: panel izquierdo (AI chat) + panel derecho (viewport) #fase3
 - [ ] `plugins/raycaster/map.c` — mapa como grilla 2D hardcodeada #fase3b (no arrancar hasta tener renderer.h + put_pixel de FASE 3)
 - [ ] `plugins/raycaster/ray.c` — DDA: un rayo por columna, paredes sólidas de color #fase3b
 - [ ] Input por el bus: mover/rotar jugador + colisión contra la grilla #fase3b
-- [ ] Texturas en paredes (BMP con SDL o stb_image) #fase3b
-- [ ] Z-buffer por columna + sprites billboard (enemigo 2D estilo boomer shooter) #fase3b
+- [ ] Texturas en paredes desde archivo #fase3b (el motor 3D ya texturea; falta la carga desde disco)
+- [x] ~~Z-buffer por columna + sprites billboard~~ — **resuelto por otro camino**: el motor 3D tiene z-buffer real por píxel (lo hace la GPU) y billboards cilíndricos. Ver `docs/renderer3d.md` #fase3c
 - [ ] Test: caminar un mapa con un enemigo sprite que te mira #fase3b
 - [ ] `plugins/monitor/monitor.c` — leer /proc/meminfo y /proc/stat #fase4
 - [ ] Mostrar RAM, CPU, plugins activos en un panel #fase4
@@ -39,11 +39,15 @@ kanban-plugin: board
 - [ ] `kernel/drivers/keyboard.c` — PS/2 IRQ1 #fase6
 - [ ] `kernel/drivers/timer.c` — PIT 100Hz #fase6
 - [ ] Boot en QEMU: VimMon arranca sin Linux #fase6
-- [ ] Instalar vulkan-headers + vulkan-validation-layers + vulkan-dzn #futura (no arrancar hasta cerrar FASE 3 — mismo `renderer.h`, el framebuffer SDL2 queda como fallback)
-- [ ] `plugins/renderer/vulkan_init.c` — instancia + device + swap chain #futura
-- [ ] `plugins/renderer/vulkan_backend.c` — dibujar triángulo (hola Vulkan) #futura
-- [ ] `plugins/renderer/vulkan_backend.c` — dibujar cubo desde PAED #futura
-- [ ] Switch de backend en runtime: framebuffer ↔ Vulkan #futura
+- [x] ~~Instalar vulkan-headers + vulkan-validation-layers + vulkan-dzn~~ — **superada**: no hacemos Vulkan crudo. SDL3 trae `SDL_GPU`, que es Vulkan/D3D12/Metal detrás de una sola API. Se escribe una vez y corre en las tres #fase3c
+- [x] ~~`plugins/renderer/vulkan_init.c`~~ — lo hace `SDL_CreateGPUDevice` en tres líneas #fase3c
+- [x] ~~`plugins/renderer/vulkan_backend.c`~~ — reemplazado por `plugins/renderer3d/gpu_sdl.c` #fase3c
+- [ ] UV repetidas (baldosas): hoy el piso estira una textura de 16×16 sobre 40 unidades en vez de repetirla #fase3c
+- [ ] `plugins/ide/scene_view3d.c` — dibujar el `SceneState` de `escena.h` con el backend 3D en vez de proyectarlo a mano. El modelo de datos no cambia: cambia quién lo pinta #fase3c
+- [ ] Texturas desde archivo (enchufar SDL3_image) — hoy solo `textura_desde_pixeles` en memoria #fase3c
+- [ ] Que las `LUZ` de `escena.h` iluminen de verdad — hoy el shader tiene una direccional fija hardcodeada #fase3c
+- [ ] Switch de backend en runtime: framebuffer 2D ↔ motor 3D #fase3c
+- [ ] Vulkan crudo, si algún día hace falta control que SDL_GPU no da #futura (no antes del kernel)
 
 
 ## En progreso
@@ -53,6 +57,32 @@ kanban-plugin: board
 
 
 ## Hecho
+
+### FASE 3D — PAED maneja el motor
+
+- [x] **`plugins/mundo/` — la librería `mundo`: once verbos 3D para PAED.** Seis FUNCIONES (`SALIR`, `TECLA`, `MOUSE_X`, `MOUSE_Y`, `CLIC`, `TICKS`) y seis PROCEDIMIENTOS (`INICIAR`, `CAPTURAR_MOUSE`, `FRAME_INICIO`, `CUBO`, `BILLBOARD`, `FRAME_FIN`). Con eso se escribe un game loop entero en pseudocódigo #fase3d
+- [x] `plugins/mundo/host_mundo.c` → `build/mundo`: hospeda al intérprete y le da cuerpo en C a los verbos. El orden no es negociable — parsear (cada `USAR` carga su json) → registrar → ejecutar #fase3d
+- [x] **Mouse en el contrato 3D**: `mouse_delta`, `mouse_boton`, `mouse_capturar` en `renderer3d.h` y su backend en `gpu_sdl.c`. El movimiento se acumula dentro de `poll_quit()`, que es quien vacía la cola de eventos — **el juego DEBE llamarlo una vez por frame** o el mouse se siente trabado. Y leerlo lo CONSUME #fase3d
+- [x] Tres bugs que solo aparecen corriendo: `init` devuelve **0 cuando sale bien** (leerlo como booleano lo invierte); sin `shutdown()` el proceso **segfaultea DESPUÉS** de terminar bien; y el host tiene que llamar `paed_print_errors()` — `paed_parse_file` JUNTA los errores pero no los imprime, así que fallaba mudo #fase3d
+- [x] `.gitignore`: `LaberintoMinotauro/` entra al repo. El `/*` de la primera línea se lo estaba tragando en silencio — el `GamePlay.md` no estaba versionado #infra
+
+### FASE 3C — SDL3 y motor 3D
+
+- [x] **Migración completa de SDL2 a SDL3** en los tres repos. El equipo nunca tuvo SDL2 real: tenía `sdl2-compat`, un shim sobre SDL3. Ahora se linkea contra SDL3 directo #fase3c
+- [x] `plugins/renderer/sdl_fb.c` pasa a la API SDL_Render de SDL3; `Makefile` de `sdl2-config` a `pkg-config sdl3` #fase3c
+- [x] PseudoGames migrado: 25 archivos, `audio.c` reescrito contra la API nueva de SDL3_mixer (`MIX_Mixer`/`MIX_Audio`/`MIX_Track`), puentes `ui_mouse`/`ui_clip`/`ui_viewport`/`ui_text_input` en `ui.h`. Ver `PseudoGames/DOCUMENTACIONES/migracion_sdl3.md` #fase3c
+- [x] `plugins/renderer3d/renderer3d.h` — contrato 3D: vtable sin tipos SDL, hermano de `renderer.h` #fase3c
+- [x] `plugins/renderer3d/math3d.{h,c}` — Mat4, V3, `mirar()` y `perspectiva()` con rango de profundidad [0,1] (convención Vulkan) #fase3c
+- [x] `plugins/renderer3d/gpu_sdl.c` — backend SDL_GPU: lienzo interno chico + blit `NEAREST` a la ventana (pixel art), z-buffer real, dos pipelines #fase3c
+- [x] Shaders GLSL → SPIR-V con `glslc`, con regla propia en el Makefile (`make shaders`) #fase3c
+- [x] Billboards cilíndricos sin rotación: el shader arma el quad con los ejes de la cámara. Recorte por alfa (`discard`) en vez de mezcla, así el z-buffer ordena solo #fase3c
+- [x] `examples/hello_3d.c` — pasillo con enemigos billboard, todo generado por código, sin assets #fase3c
+- [x] `docs/renderer3d.md` — cómo funciona y por qué #fase3c
+
+- [x] Driver Vulkan instalado (`vulkan-dzn` + `vulkan-swrast`): `SDL_CreateGPUDevice` levanta y usa la GPU real vía WSLg #fase3c
+- [x] `gpu_sdl_capturar_bmp()` — verificar sin pantalla: baja el lienzo de la GPU a RAM con una fence y lo guarda. `./build/hello_3d --captura f.bmp` #fase3c
+- [x] **El motor dibuja y está verificado con números**: billboard de 1×1 a 10 unidades da 20×20 px (relación 1,000, esperado 19,3) #fase3c
+- [x] Bug arreglado: la normal se deducía de la posición y estaba mal para planos y cubos, así que todo salía con un solo tono de luz. Ahora viaja como atributo del vértice #fase3c
 
 - [x] **El `;` es TERMINADOR — decidido el 2026-08-12** (PAED.md §10.8). Toda sentencia lo lleva, incluida la ultima del bloque: lo sostiene `wiki.txt:278-283` y `:368-375` en sus dos algoritmos completos. El `AED_2021_UnI.pdf:10` decia lo contrario, pero es UNA captura de Sublime y es la misma que muestra `FIN ACCION` con espacio, forma que §10.7 ya habia descartado #fase2
 - [x] Varias sentencias por renglon, en el AMBIENTE **y** en el PROCESO (`a: ENTERO; b: ENTERO;`, `ARR(sec); AVZ(sec, v);`). En el AMBIENTE arreglo un fallo MUDO: el tipo de la primera se comia el resto del renglon y la segunda no se declaraba nunca. El programa arrancaba igual — un escalar nace en su primera asignacion — y reventaba mucho despues, en el primer `ARR`, culpando a otra cosa #fase2
@@ -179,9 +209,9 @@ kanban-plugin: board
 - [x] Bug: `falla(c, "%s", c->env->error)` pasaba el buffer de error como argumento de un `vsnprintf` que escribe en ESE MISMO buffer. Aliasing: el mensaje llegaba vacío (`error: ` pelado). Se copia antes de pasarlo #fase2
 - [x] Bug: `stdout` con buffer y `stderr` sin él descolocaban el orden de la salida al mandarla a una tubería, y los errores aparecían antes de líneas impresas primero. `setvbuf` en `paedrun` #fase2
 - [x] `PARA <var> := <desde> HASTA <hasta>[; <paso>] HACER` / `FIN_PARA`. El paso es OPCIONAL y por defecto 1, corroborado en `TEORIA_COMPLETA.txt:565-571` ("Si el incremento es distinto de 1, debe indicarse"). En reversa se usa paso negativo, no una palabra tipo `downto`. `recta.paed:47` decía `a` en vez de `HASTA` y se corrigió #fase2
-- [x] SDL2 ya instalado (`sdl2-compat`, headers en `/usr/include/SDL2/`) — card "Instalar libsdl2-dev" satisfecha #fase3
+- [x] ~~SDL2 ya instalado~~ — resultó ser `sdl2-compat`, un shim que ya corría sobre SDL3. Nunca hubo SDL2 real en el equipo #fase3
 - [x] `plugins/renderer/renderer.h` — interfaz abstracta: vtable de punteros a función, sin tipos SDL (backend intercambiable) #fase3
-- [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL2 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3
+- [x] `plugins/renderer/sdl_fb.c` — backend framebuffer: ventana SDL3 + textura streaming ARGB8888, framebuffer privado (`static uint32_t *pixels`) #fase3
 - [x] Primitivas a mano: `put_pixel` (con guard de límites), `fill_rect`, `draw_line` (Bresenham, solo enteros) #fase3
 - [x] `engine/engine.{h,c}` — motor 2D de entidades: `Entity` con callbacks `update`/`draw`, `World` (pool estático), game loop dueño del tiempo (`dt`, ~60fps), colisión AABB (`entity_overlaps`) #fase3
 - [x] `game/game.{h,c}` — seam del juego del usuario: `game_setup(World*)` donde vive el juego (starter: cuadrado movible con flechas/WASD) #fase3

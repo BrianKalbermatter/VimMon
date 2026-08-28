@@ -75,15 +75,61 @@ $(BUILD)/hello_entity: $(EXAMPLE_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(EXAMPLE_OBJS) $(SDL_LIBS) -o $@
 
+
+# ── Motor 3D (SDL_GPU) ────────────────────────────────────────────────────
+# Los shaders NO son C: se escriben en GLSL y se compilan a SPIR-V, que es
+# el bytecode que come Vulkan. glslc hace esa traduccion, igual que clang
+# traduce .c a .o. Por eso hay una regla aparte: son otro lenguaje con su
+# propio compilador, aunque terminen adentro del mismo programa.
+GLSLC       = glslc
+SHADER_DIR  = plugins/renderer3d/shaders
+SHADER_SRC  = $(wildcard $(SHADER_DIR)/*.glsl)
+SHADER_SPV  = $(SHADER_SRC:.glsl=.spv)
+
+# -fshader-stage se saca del nombre del archivo (malla.vert.glsl -> vert).
+$(SHADER_DIR)/%.vert.spv: $(SHADER_DIR)/%.vert.glsl
+	$(GLSLC) -fshader-stage=vert $< -o $@
+$(SHADER_DIR)/%.frag.spv: $(SHADER_DIR)/%.frag.glsl
+	$(GLSLC) -fshader-stage=frag $< -o $@
+
+shaders: $(SHADER_SPV)
+
+SRCS_R3D = plugins/renderer3d/gpu_sdl.c plugins/renderer3d/math3d.c
+R3D_OBJS = $(SRCS_R3D:%.c=$(OBJDIR)/%.o)
+DEPS += $(R3D_OBJS:.o=.d)
+
+# Ejemplo 3D: build/hello_3d. Depende de los shaders compilados.
+HELLO3D_OBJS = $(OBJDIR)/examples/hello_3d.o $(R3D_OBJS)
+DEPS += $(OBJDIR)/examples/hello_3d.d
+
+example3d: $(BUILD)/hello_3d
+
+$(BUILD)/hello_3d: $(HELLO3D_OBJS) $(SHADER_SPV)
+	@mkdir -p $(dir $@)
+	$(CC) $(HELLO3D_OBJS) $(SDL_LIBS) -lm -o $@
+
+# build/mundo: el host que corre un .paed con ventana 3D.
+# Junta las tres partes — el lenguaje (libpaed.a), el motor (renderer3d) y los
+# verbos que los unen (plugins/mundo).
+MUNDO_OBJS = $(OBJDIR)/plugins/mundo/host_mundo.o $(OBJDIR)/plugins/mundo/pl_mundo.o $(R3D_OBJS)
+DEPS += $(MUNDO_OBJS:.o=.d)
+
+mundo: $(BUILD)/mundo
+
+$(BUILD)/mundo: $(MUNDO_OBJS) $(PAED_LIB) $(SHADER_SPV)
+	@mkdir -p $(dir $@)
+	$(CC) $(MUNDO_OBJS) $(PAED_LIB) $(SDL_LIBS) -lm -o $@
+
 # Los tests del LENGUAJE viven con el lenguaje: se corren en su repo.
 test:
 	@$(MAKE) --no-print-directory -C $(PAED_DIR) test
 
 clean:
 	rm -rf $(BUILD)
+	rm -f $(SHADER_SPV)
 	@$(MAKE) --no-print-directory -C $(PAED_DIR) clean-lang
 
 # Los .d no existen en el primer build: el '-' evita que make se queje.
 -include $(DEPS)
 
-.PHONY: all clean example
+.PHONY: all clean example example3d shaders mundo
