@@ -1,0 +1,14 @@
+ACCION laberinto ES
+    AMBIENTE
+        
+        laberinto = REGISTRO
+            ancho: 
+            largo:
+               
+        FIN_REGISTRO
+        jugador = REGISTRO
+            pos_jugador: x,y,z;
+             
+        FIN_REGISTRO
+    PROCESO
+FIN_ACCION

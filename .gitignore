@@ -28,6 +28,10 @@
 # scripts de nadie.
 !/programas/
 
+# El juego del Laberinto del Minotauro: pseudocodigo + su documento de diseno.
+# Misma razon que /programas/ — es un programa escrito EN PAED, no parte de PAED.
+!/LaberintoMinotauro/
+
 # Motor grafico 2D
 !/engine/
 !/game/
