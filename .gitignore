@@ -66,3 +66,7 @@ ProyectoVimMon/.obsidian/
 
 # Cache de tooling
 bus/.atl/
+
+# Binarios compilados: los produce el compilador, no van al repo.
+# game/cube/cube se construye con:  clang game/cube/cube.c -o game/cube/cube -lm
+game/cube/cube
