@@ -47,7 +47,8 @@ static int asegurar_binario(void) {
         fprintf(stderr,
                 "[editor] no se pudo compilar PseudoGames.\n"
                 "         Probá a mano:  make -C %s\n"
-                "         Necesita SDL2, SDL2_ttf, SDL2_mixer y SDL2_image.\n",
+                "         Necesita SDL3, SDL3_ttf, SDL3_mixer y SDL3_image.\n"
+                "         Chequeo:  pkg-config --exists sdl3 sdl3-ttf sdl3-mixer sdl3-image\n",
                 IDE_DIR);
         return -1;
     }
