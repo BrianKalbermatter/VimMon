@@ -18,7 +18,10 @@ El corazón es un **bus de eventos** (`bus/`) donde cada componente se registra 
                         │ plugin IDE  │ ◀── parsea PAED, actualiza escena
                         └─────────────┘
                         ┌─────────────┐
- EVENT_SCENE_UPDATE ──▶ │  renderer   │ ───▶ framebuffer SDL2 (píxel a píxel)
+ EVENT_SCENE_UPDATE ──▶ │  renderer   │ ───▶ framebuffer SDL3 (píxel a píxel)
+                        └─────────────┘
+                        ┌─────────────┐
+                        │ renderer3d  │ ───▶ SDL_GPU: 3D + billboards
                         └─────────────┘
 ```
 
@@ -26,7 +29,8 @@ El corazón es un **bus de eventos** (`bus/`) donde cada componente se registra 
 |--------|----------|--------|
 | `plugins/ai` | Cliente HTTP a Ollama (libcurl + cJSON); convierte lenguaje natural en comandos PAED | ✅ Funciona |
 | `plugins/ide` | Parser e intérprete de **PAED**, el lenguaje de pseudocódigo del proyecto ([spec](docs/paed_spec.md)) | ✅ Funciona |
-| `plugins/renderer` | Framebuffer SDL2 con primitivas a mano: put_pixel, Bresenham, proyección 3D→2D sin GPU | 🔨 En progreso |
+| `plugins/renderer` | Framebuffer SDL3 con primitivas a mano: put_pixel, Bresenham, proyección 3D→2D sin GPU | 🔨 En progreso |
+| `plugins/renderer3d` | Motor 3D sobre SDL_GPU: pixel art, geometría con profundidad y enemigos billboard estilo DOOM ([docs](docs/renderer3d.md)) | ✅ Dibuja |
 | `plugins/monitor` | Lee `/proc/meminfo` y `/proc/stat`; panel de RAM, CPU y plugins activos | ⏳ Pendiente |
 
 Cómo crear un plugin nuevo: [docs/plugin_spec.md](docs/plugin_spec.md).
@@ -46,7 +50,7 @@ Este repo es también mi cuaderno de trabajo — hay más de un proyecto adentro
 
 | Directorio | Qué es |
 |------------|--------|
-| [`PseudoGames/`](PseudoGames/) | Juego en C + SDL2 para aprender Algoritmos y Estructuras de Datos: editor con syntax highlighting propio, niveles, boss final y wiki integrada |
+| [`PseudoGames/`](PseudoGames/) | Juego en C + SDL3 para aprender Algoritmos y Estructuras de Datos: editor con syntax highlighting propio, niveles, boss final y wiki integrada |
 | `PseudoGames/Frankly/` | Tooling para PAED: ejercicios, stdlib, detección de sintaxis |
 | [`docs/`](docs/) | Specs de PAED v1.0 y del sistema de plugins |
 | `kernel/` | Primeros experimentos bare metal (fase futura) |
@@ -59,7 +63,8 @@ El plan vive en [KANBAN.md](KANBAN.md). Resumen:
 - [x] **Fase 0** — Bus de plugins y contratos
 - [x] **Fase 1** — Plugin AI (Ollama + libcurl)
 - [x] **Fase 2** — Intérprete PAED
-- [ ] **Fase 3** — Renderer SDL2 framebuffer ← *acá estoy*
+- [ ] **Fase 3** — Renderer SDL3 framebuffer ← *acá estoy*
+- [ ] **Fase 3C** — Motor 3D con SDL_GPU: pixel art + billboards
 - [ ] **Fase 4** — Plugin monitor (`/proc`)
 - [ ] **Fase 5+** — Kernel bare metal (userspace primero, kernel después)
 

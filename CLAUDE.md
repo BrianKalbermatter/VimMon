@@ -22,9 +22,12 @@ Objetivo final: un Sistema Operativo embebido para programar desde la shell.
 Rumbo decidido (2026-06-06): userspace PRIMERO, kernel DESPUÉS.
 1. Userspace sobre Linux: bus de plugins, plugin AI, intérprete PAED,
    editorBim, Frankly — acá es donde aprendo C de verdad.
-2. Renderer: SDL2 framebuffer (dibujar píxeles a mano). NO Vulkan por ahora;
-   Vulkan es proyecto futuro, se incorpora cuando el renderer abstracto ya funcione
-   (ver "FASE FUTURA" en KANBAN.md).
-3. Kernel bare metal (FASE 6 del KANBAN): recién cuando el userspace esté montado.
-4. CUDA: estudio de GPU en paralelo, rama aparte — no entra en este roadmap.
+2. Renderer 2D: SDL3 framebuffer (dibujar píxeles a mano) en `plugins/renderer/`.
+3. Renderer 3D (2026-08-26): motor propio en `plugins/renderer3d/` sobre **SDL_GPU**,
+   la API de GPU de SDL3. Límites deliberados: pixel art, geometría con profundidad
+   y enemigos billboard estilo DOOM. NO es un motor de propósito general.
+   Vulkan crudo quedó descartado: SDL_GPU ya es Vulkan/D3D12/Metal detrás de una
+   sola API (ver `docs/renderer3d.md`).
+4. Kernel bare metal (FASE 6 del KANBAN): recién cuando el userspace esté montado.
+5. CUDA: estudio de GPU en paralelo, rama aparte — no entra en este roadmap.
 
