@@ -23,19 +23,15 @@
 # Flags para clangd (Helix). Sin esto el editor marca todo el proyecto en rojo
 !/compile_flags.txt
 
-# Programas escritos EN PAED. No van en el repo del lenguaje: PAED no lleva
-# adentro los programas que uno escribe con el, igual que Python no trae los
-# scripts de nadie.
-!/programas/
-
-# El juego del Laberinto del Minotauro: pseudocodigo + su documento de diseno.
-# Misma razon que /programas/ — es un programa escrito EN PAED, no parte de PAED.
-!/LaberintoMinotauro/
-
 # Motor grafico 2D
 !/engine/
+
+# Todo lo que se CORRE sobre el motor vive bajo /game/: los ejemplos del motor
+# (game/examples/), el cubo, y los programas escritos EN PAED (game/programas/,
+# game/LaberintoMinotauro/). Esos ultimos no van en el repo del lenguaje: PAED
+# no lleva adentro los programas que uno escribe con el, igual que Python no
+# trae los scripts de nadie.
 !/game/
-!/examples/
 
 # Mazmorra ASCII con hot reload
 !/hot-Reload/
@@ -56,9 +52,8 @@
 # Aprendizaje y contenido personal
 !/documentacion/
 !/pizarronInfinito/
-!/ejUno_V1/
 !/src/
-!/learnC/
+# Ejercicios viejos de C (learnC/, ejUno_V1/) archivados adentro de _void/
 !/_void/
 !/CUDA/
 !/ProyectoVimMon/

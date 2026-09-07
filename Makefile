@@ -65,7 +65,7 @@ $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Ejemplo del motor: build/hello_entity (autocontenido, sin el bus).
-EXAMPLE_SRCS = examples/hello_entity.c $(SRCS_ENGINE) plugins/renderer/sdl_fb.c
+EXAMPLE_SRCS = game/examples/hello_entity.c $(SRCS_ENGINE) plugins/renderer/sdl_fb.c
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:%.c=$(OBJDIR)/%.o)
 DEPS += $(EXAMPLE_OBJS:.o=.d)
 
@@ -99,8 +99,8 @@ R3D_OBJS = $(SRCS_R3D:%.c=$(OBJDIR)/%.o)
 DEPS += $(R3D_OBJS:.o=.d)
 
 # Ejemplo 3D: build/hello_3d. Depende de los shaders compilados.
-HELLO3D_OBJS = $(OBJDIR)/examples/hello_3d.o $(R3D_OBJS)
-DEPS += $(OBJDIR)/examples/hello_3d.d
+HELLO3D_OBJS = $(OBJDIR)/game/examples/hello_3d.o $(R3D_OBJS)
+DEPS += $(OBJDIR)/game/examples/hello_3d.d
 
 example3d: $(BUILD)/hello_3d
 

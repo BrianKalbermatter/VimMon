@@ -9,7 +9,7 @@
 //   ESC             salir
 // ============================================================
 
-#include "../plugins/renderer3d/renderer3d.h"
+#include "plugins/renderer3d/renderer3d.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>

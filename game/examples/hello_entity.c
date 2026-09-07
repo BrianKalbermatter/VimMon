@@ -12,7 +12,7 @@
 //   make example        (y correr build/hello_entity)
 // ============================================================
 
-#include "../engine/engine.h"
+#include "engine/engine.h"
 
 #define WIDTH  800
 #define HEIGHT 600

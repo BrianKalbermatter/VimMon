@@ -54,7 +54,8 @@ Este repo es también mi cuaderno de trabajo — hay más de un proyecto adentro
 | `PseudoGames/Frankly/` | Tooling para PAED: ejercicios, stdlib, detección de sintaxis |
 | [`docs/`](docs/) | Specs de PAED v1.0 y del sistema de plugins |
 | `kernel/` | Primeros experimentos bare metal (fase futura) |
-| `learnC/`, `CUDA/`, `bash/` | Ejercicios y apuntes del camino |
+| `game/` | Lo que corre sobre el motor: ejemplos, el cubo y los programas escritos en PAED |
+| `_void/`, `CUDA/`, `bash/` | Ejercicios y apuntes del camino |
 
 ## Roadmap
 
