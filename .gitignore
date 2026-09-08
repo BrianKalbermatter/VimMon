@@ -16,7 +16,6 @@
 !/plugins/
 !/cjson/
 !/docs/
-!/KANBAN.md
 !/framebuffer.md
 # Arnés de PAED: corre un .paed en la terminal, sin SDL
 !/tools/
@@ -70,3 +69,7 @@ bus/.atl/
 # Binarios compilados: los produce el compilador, no van al repo.
 # game/cube/cube se construye con:  clang game/cube/cube.c -o game/cube/cube -lm
 game/cube/cube
+
+# Los KANBAN son mi tablero personal de trabajo, no documentacion del proyecto.
+# Quedan solo en disco, en los tres repos (VimMon, paed, PseudoGames).
+KANBAN.md

@@ -59,7 +59,7 @@ Este repo es también mi cuaderno de trabajo — hay más de un proyecto adentro
 
 ## Roadmap
 
-El plan vive en [KANBAN.md](KANBAN.md). Resumen:
+El roadmap, en grande:
 
 - [x] **Fase 0** — Bus de plugins y contratos
 - [x] **Fase 1** — Plugin AI (Ollama + libcurl)
