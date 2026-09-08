@@ -49,8 +49,8 @@ Este repo es también mi cuaderno de trabajo — hay más de un proyecto adentro
 
 | Directorio | Qué es |
 |------------|--------|
-| [`PseudoGames/`](PseudoGames/) | Juego en C + SDL3 para aprender Algoritmos y Estructuras de Datos: editor con syntax highlighting propio, niveles, boss final y wiki integrada |
-| `PseudoGames/Frankly/` | Tooling para PAED: ejercicios, stdlib, detección de sintaxis |
+| [`PseudoEditor/`](PseudoEditor/) | IDE en C + SDL3 para escribir PAED: editor con syntax highlighting propio, wiki integrada, niveles y boss final para aprender Algoritmos y Estructuras de Datos |
+| `PseudoEditor/Frankly/` | Tooling para PAED: ejercicios, stdlib, detección de sintaxis |
 | `kernel/` | Primeros experimentos bare metal (fase futura) |
 | `game/` | Lo que corre sobre el motor: ejemplos, el cubo y los programas escritos en PAED |
 | `_void/`, `CUDA/`, `bash/` | Ejercicios y apuntes del camino |

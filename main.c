@@ -31,7 +31,7 @@ static void cmd_help(void) {
     printf("  engine   abre la ventana y dibuja plugins/ide/scene.paed\n");
     printf("           (se recarga sola al guardar el archivo)\n");
     printf("  scene    carga y ejecuta plugins/ide/scene.paed (intérprete PAED)\n");
-    printf("  edit     abre PseudoGames, el IDE completo\n");
+    printf("  edit     abre PseudoEditor, el IDE completo\n");
     printf("           (menu, niveles, wiki, editor; al cerrarlo volves acá)\n");
     printf("  ai       menú de proveedores de IA (llama/qwen/claude/kimi...)\n");
     printf("  ai use <id|nº>   cambia de proveedor\n");
@@ -40,7 +40,7 @@ static void cmd_help(void) {
     printf("  quit     apaga vimmon\n\n");
 }
 
-// edit: publica el evento; el editor_plugin lo agarra y abre PseudoGames.
+// edit: publica el evento; el editor_plugin lo agarra y abre PseudoEditor.
 // Mismo patron que engine: main no sabe QUE programa es ni donde vive.
 static void cmd_edit(void) {
     bus_send(EVENT_EDITOR_OPEN, NULL, 0);

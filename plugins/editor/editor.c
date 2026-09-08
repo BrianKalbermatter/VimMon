@@ -8,22 +8,22 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// Puente entre el bus y PseudoGames, el IDE completo.
+// Puente entre el bus y PseudoEditor, el IDE completo.
 //
-// PseudoGames NO es un editor de un archivo: es la aplicacion entera, con su
+// PseudoEditor NO es un editor de un archivo: es la aplicacion entera, con su
 // menu, sus niveles, la wiki, el pomodoro y el editor adentro. Se abre como se
 // abre el motor con 'engine': el comando publica un evento, este plugin lo
 // agarra y lanza el programa, y cuando se cierra volves a la consola.
 //
 // El plugin NO es el IDE. El IDE es OTRO PROYECTO, con su repo propio, que vive
-// en PseudoGames/. Aca solo esta la conexion — y por eso el OS puede arrancar
+// en PseudoEditor/. Aca solo esta la conexion — y por eso el OS puede arrancar
 // cualquier otro editor sin que este archivo cambie (ver VIMMON_IDE abajo).
 
-// PseudoGames carga assets/, data/ y saves/ con rutas RELATIVAS, asi que tiene
+// PseudoEditor carga assets/, data/ y saves/ con rutas RELATIVAS, asi que tiene
 // que correr parado en su propia carpeta.
-#define IDE_DIR    "PseudoGames"
+#define IDE_DIR    "PseudoEditor"
 #define IDE_BIN    "./aed"
-#define IDE_BIN_FS "PseudoGames/aed"
+#define IDE_BIN_FS "PseudoEditor/aed"
 
 // Cambiar el programa sin recompilar VimMon:
 //     VIMMON_IDE=/usr/bin/vim build/vimmon
@@ -33,7 +33,7 @@ static int  editor_init(void)     { printf("[editor] iniciado\n"); return 0; }
 static void editor_shutdown(void) { printf("[editor] apagado\n"); }
 static void editor_tick(float d)  { (void)d; }
 
-// PseudoGames se compila aparte, con su propio Makefile. Si el binario no esta,
+// PseudoEditor se compila aparte, con su propio Makefile. Si el binario no esta,
 // se compila en vez de largar "no existe": la primera vez que alguien escribe
 // 'edit' no tiene por que saber que habia que ir a compilar a mano.
 static int asegurar_binario(void) {
@@ -45,7 +45,7 @@ static int asegurar_binario(void) {
     int r = system("make -C " IDE_DIR " 2>&1 | tail -3");
     if (r != 0 || access(IDE_BIN_FS, X_OK) != 0) {
         fprintf(stderr,
-                "[editor] no se pudo compilar PseudoGames.\n"
+                "[editor] no se pudo compilar PseudoEditor.\n"
                 "         Probá a mano:  make -C %s\n"
                 "         Necesita SDL3, SDL3_ttf, SDL3_mixer y SDL3_image.\n"
                 "         Chequeo:  pkg-config --exists sdl3 sdl3-ttf sdl3-mixer sdl3-image\n",
@@ -61,7 +61,7 @@ static void abrir(void) {
 
     if (!otro && asegurar_binario() != 0) return;
 
-    printf("[editor] abriendo PseudoGames...\n");
+    printf("[editor] abriendo PseudoEditor...\n");
     fflush(stdout);   // la app toma la pantalla: que salga esto antes
 
     pid_t pid = fork();
@@ -98,15 +98,15 @@ static void abrir(void) {
         fprintf(stderr, "[editor] ojo: si la terminal quedó rara, escribí 'stty sane'\n");
 
     if (WIFEXITED(estado) && WEXITSTATUS(estado) == 127) {
-        fprintf(stderr, "[editor] PseudoGames no arrancó\n");
+        fprintf(stderr, "[editor] PseudoEditor no arrancó\n");
         return;
     }
     if (WIFSIGNALED(estado)) {
-        fprintf(stderr, "\n[editor] PseudoGames terminó por señal %d\n", WTERMSIG(estado));
+        fprintf(stderr, "\n[editor] PseudoEditor terminó por señal %d\n", WTERMSIG(estado));
         return;
     }
 
-    printf("\n[editor] PseudoGames cerrado, de vuelta en vimmon\n");
+    printf("\n[editor] PseudoEditor cerrado, de vuelta en vimmon\n");
 }
 
 static void editor_on_event(Event *e) {

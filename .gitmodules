@@ -2,5 +2,5 @@
 	path = paed
 	url = https://github.com/BrianKalbermatter/paed.git
 [submodule "PseudoGames"]
-	path = PseudoGames
+	path = PseudoEditor
 	url = https://github.com/BrianKalbermatter/PseudoGames.git

@@ -1,11 +1,11 @@
 # Ignorar todo excepto lo listado abajo
 /*
-# paed/ y PseudoGames/ son SUBMODULOS, y hay que habilitarlos aca igual que
+# paed/ y PseudoEditor/ son SUBMODULOS, y hay que habilitarlos aca igual que
 # cualquier otra carpeta: el '/*' de arriba ignora todo lo que no este en esta
 # lista. Sin estas lineas, `git submodule add` responde "Use -f if you really
 # want to add them", que suena a otro problema.
 !/paed/
-!/PseudoGames/
+!/PseudoEditor/
 !/.gitignore
 !/LICENSE
 !/.github/
@@ -36,7 +36,7 @@
 !/game/
 
 # ── Los otros dos repos ─────────────────────────────────────────────────────
-# paed/ y PseudoGames/ son SUBMODULOS: repos propios que viven adentro de esta
+# paed/ y PseudoEditor/ son SUBMODULOS: repos propios que viven adentro de esta
 # carpeta. VimMon no versiona sus archivos, solo guarda a que commit de cada uno
 # apunta (mira .gitmodules).
 #

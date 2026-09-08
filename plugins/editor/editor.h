@@ -3,9 +3,9 @@
 
 #include "../../bus/plugin.h"
 
-// Plugin editor: conecta PseudoGames al bus de VimMon.
+// Plugin editor: conecta PseudoEditor al bus de VimMon.
 //
-// NO es el editor. PseudoGames es el IDE completo del usuario — menu, niveles,
+// NO es el editor. PseudoEditor es el IDE completo del usuario — menu, niveles,
 // wiki, pomodoro y el editor adentro — y vive en paed/, con su propio Makefile.
 // Este plugin solo hace de puente: escucha EVENT_EDITOR_OPEN y lo lanza.
 //
