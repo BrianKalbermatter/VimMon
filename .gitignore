@@ -15,6 +15,12 @@
 !/bus/
 !/plugins/
 !/cjson/
+# Estas tres estaban trackeadas pero SIN linea que las habilite: sobrevivian
+# solo porque git no le aplica .gitignore a un archivo que ya sigue. El dia que
+# uno se borrara y se volviera a crear, el '/*' de arriba se lo tragaba callado.
+!/bash/
+!/include/
+!/job-queue/
 # Arnés de PAED: corre un .paed en la terminal, sin SDL
 !/tools/
 # Flags para clangd (Helix). Sin esto el editor marca todo el proyecto en rojo
@@ -30,9 +36,6 @@
 # trae los scripts de nadie.
 !/game/
 
-# Mazmorra ASCII con hot reload
-!/hot-Reload/
-
 # ── Los otros dos repos ─────────────────────────────────────────────────────
 # paed/ y PseudoGames/ son SUBMODULOS: repos propios que viven adentro de esta
 # carpeta. VimMon no versiona sus archivos, solo guarda a que commit de cada uno
@@ -47,15 +50,12 @@
 # Para traer lo ultimo de cada uno:  git submodule update --remote
 
 # Aprendizaje y contenido personal
-!/pizarronInfinito/
 !/src/
 # Ejercicios viejos de C (learnC/, ejUno_V1/) archivados adentro de _void/
 !/_void/
 !/CUDA/
-!/ProyectoVimMon/
 
 _void/*.tar.gz
-ProyectoVimMon/.obsidian/
 
 # Metadata Windows (Zone.Identifier)
 *:Zone.Identifier

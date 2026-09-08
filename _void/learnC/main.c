@@ -3,10 +3,10 @@
 #include <string.h>
 
 // Funciones 
-#include "../include/strcat.h"
-#include "../include/strcmp.h"
-#include "../include/strlen.h"
-#include "../include/strlwr.h"
+#include "../../include/strcat.h"
+#include "../../include/strcmp.h"
+#include "../../include/strlen.h"
+#include "../../include/strlwr.h"
 
 
 

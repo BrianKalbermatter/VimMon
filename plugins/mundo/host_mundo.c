@@ -4,7 +4,7 @@
 // Es el HOST: hospeda al interprete de PAED y le agrega la libreria `mundo`.
 // Se usa igual que el `paed` normal, pero con ventana:
 //
-//   ./build/mundo LaberintoMinotauro/laberinto.paed
+//   ./build/mundo game/LaberintoMinotauro/main.paed
 //
 // El orden de abajo NO es negociable y vale la pena entenderlo:
 //
