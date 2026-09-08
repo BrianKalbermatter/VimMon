@@ -14,7 +14,6 @@
 !/main.c
 !/bus/
 !/plugins/
-!/cjson/
 # Estas tres estaban trackeadas pero SIN linea que las habilite: sobrevivian
 # solo porque git no le aplica .gitignore a un archivo que ya sigue. El dia que
 # uno se borrara y se volviera a crear, el '/*' de arriba se lo tragaba callado.

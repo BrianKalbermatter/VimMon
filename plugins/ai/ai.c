@@ -2,7 +2,7 @@
 #include "provider.h"
 #include <paed/parser.h>      // paed_datadir(): donde vive la definicion de PAED
 #include "../ide/escena.h"    // ESCENA_LIB: como se llama la libreria de escena
-#include "../../cjson/cJSON.h"
+#include "vendor/cjson/cJSON.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
