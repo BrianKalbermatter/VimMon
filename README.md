@@ -28,12 +28,11 @@ El corazón es un **bus de eventos** (`bus/`) donde cada componente se registra 
 | Plugin | Qué hace | Estado |
 |--------|----------|--------|
 | `plugins/ai` | Cliente HTTP a Ollama (libcurl + cJSON); convierte lenguaje natural en comandos PAED | ✅ Funciona |
-| `plugins/ide` | Parser e intérprete de **PAED**, el lenguaje de pseudocódigo del proyecto ([spec](docs/paed_spec.md)) | ✅ Funciona |
+| `plugins/ide` | Parser e intérprete de **PAED**, el lenguaje de pseudocódigo del proyecto | ✅ Funciona |
 | `plugins/renderer` | Framebuffer SDL3 con primitivas a mano: put_pixel, Bresenham, proyección 3D→2D sin GPU | 🔨 En progreso |
-| `plugins/renderer3d` | Motor 3D sobre SDL_GPU: pixel art, geometría con profundidad y enemigos billboard estilo DOOM ([docs](docs/renderer3d.md)) | ✅ Dibuja |
+| `plugins/renderer3d` | Motor 3D sobre SDL_GPU: pixel art, geometría con profundidad y enemigos billboard estilo DOOM | ✅ Dibuja |
 | `plugins/monitor` | Lee `/proc/meminfo` y `/proc/stat`; panel de RAM, CPU y plugins activos | ⏳ Pendiente |
 
-Cómo crear un plugin nuevo: [docs/plugin_spec.md](docs/plugin_spec.md).
 
 ## Compilar y correr
 
@@ -52,7 +51,6 @@ Este repo es también mi cuaderno de trabajo — hay más de un proyecto adentro
 |------------|--------|
 | [`PseudoGames/`](PseudoGames/) | Juego en C + SDL3 para aprender Algoritmos y Estructuras de Datos: editor con syntax highlighting propio, niveles, boss final y wiki integrada |
 | `PseudoGames/Frankly/` | Tooling para PAED: ejercicios, stdlib, detección de sintaxis |
-| [`docs/`](docs/) | Specs de PAED v1.0 y del sistema de plugins |
 | `kernel/` | Primeros experimentos bare metal (fase futura) |
 | `game/` | Lo que corre sobre el motor: ejemplos, el cubo y los programas escritos en PAED |
 | `_void/`, `CUDA/`, `bash/` | Ejercicios y apuntes del camino |

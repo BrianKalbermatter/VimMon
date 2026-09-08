@@ -15,8 +15,6 @@
 !/bus/
 !/plugins/
 !/cjson/
-!/docs/
-!/framebuffer.md
 # Arnés de PAED: corre un .paed en la terminal, sin SDL
 !/tools/
 # Flags para clangd (Helix). Sin esto el editor marca todo el proyecto en rojo
@@ -49,7 +47,6 @@
 # Para traer lo ultimo de cada uno:  git submodule update --remote
 
 # Aprendizaje y contenido personal
-!/documentacion/
 !/pizarronInfinito/
 !/src/
 # Ejercicios viejos de C (learnC/, ejUno_V1/) archivados adentro de _void/
@@ -70,6 +67,11 @@ bus/.atl/
 # game/cube/cube se construye con:  clang game/cube/cube.c -o game/cube/cube -lm
 game/cube/cube
 
-# Los KANBAN son mi tablero personal de trabajo, no documentacion del proyecto.
-# Quedan solo en disco, en los tres repos (VimMon, paed, PseudoGames).
+# Notas internas: el tablero de trabajo y la documentacion de diseno. Quedan
+# SOLO en disco, en ninguno de los tres repos. Decision consciente: el repo es
+# publico y esto no es material para exhibir.
+#
+# OJO: fuera de git no hay backup ni historial. Si estos archivos importan,
+# copialos a mano cada tanto — un rm no se deshace.
 KANBAN.md
+docs/
