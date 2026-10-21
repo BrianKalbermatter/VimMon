@@ -1,4 +1,4 @@
 -I../..
--I../../../../Proyect_X/Lab_Minotauro_Web/src
+-Inucleo
 -Wall
 -Wextra

@@ -18,8 +18,8 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef RUTA_PUBLIC
-#define RUTA_PUBLIC "client/public"
+#ifndef RUTA_ASSETS
+#define RUTA_ASSETS "game/delirio/assets"
 #endif
 
 #define FONDO RGB2(0x0d, 0x0b, 0x12)
@@ -83,8 +83,8 @@ static int comparar(const void *a, const void *b) {
 }
 
 static int cargar(const Renderer2D *r) {
-  if (vista_cargar(&vista, r, RUTA_PUBLIC "/assets/maze_tiles")) return 1;
-  if (hoja_cargar(&hoja, r, RUTA_PUBLIC "/sprites/personaje_3")) return 1;
+  if (vista_cargar(&vista, r, RUTA_ASSETS "/tiles/maze_tiles")) return 1;
+  if (hoja_cargar(&hoja, r, RUTA_ASSETS "/sprites/personaje_3")) return 1;
   return 0;
 }
 
@@ -502,8 +502,8 @@ static int sprites(const char **rutas, int max) {
   static char guardadas[SPRITES_MAX][512];
   static int n = -1;
   if (n < 0) {
-    n = juntar_pngs(RUTA_PUBLIC "/sprites", guardadas, 0, SPRITES_MAX);
-    n = juntar_pngs(RUTA_PUBLIC "/assets", guardadas, n, SPRITES_MAX);
+    n = juntar_pngs(RUTA_ASSETS "/sprites", guardadas, 0, SPRITES_MAX);
+    n = juntar_pngs(RUTA_ASSETS "/tiles", guardadas, n, SPRITES_MAX);
   }
   int k = 0;
   for (; k < n && k < max; k++) rutas[k] = guardadas[k];

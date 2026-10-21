@@ -148,25 +148,25 @@ $(BUILD)/hello_2d: $(HELLO2D_OBJS) $(SHADER2D_SPV)
 
 # ── Delirio y el editor 2D ────────────────────────────────────────────────
 # Delirio es un MODULO (game/delirio): el editor lo carga con Play, y
-# build/delirio lo corre solo. Su nucleo en C y sus assets todavia viven en
-# el modelo de referencia, Lab_Minotauro_Web, y se leen de ahi por ruta.
-DELIRIO_REF  ?= $(HOME)/proyectos/Proyect_X/Lab_Minotauro_Web
-DELIRIO_CORE  = $(filter-out %/web.c,$(shell find $(DELIRIO_REF)/src -name '*.c' 2>/dev/null))
-DELIRIO_CORE_OBJS = $(patsubst $(DELIRIO_REF)/src/%.c,$(OBJDIR)/delirio_nucleo/%.o,$(DELIRIO_CORE))
+# build/delirio lo corre solo. Es el Delirio de VimMon: su nucleo en C
+# (game/delirio/nucleo) y sus assets (game/delirio/assets) viven aca. El
+# Delirio web es otro juego, en su propio repo.
+DELIRIO_DIR   = game/delirio
+DELIRIO_CORE  = $(shell find $(DELIRIO_DIR)/nucleo -name '*.c')
+DELIRIO_CORE_OBJS = $(DELIRIO_CORE:%.c=$(OBJDIR)/%.o)
 DELIRIO_SRCS = game/delirio/delirio.c game/delirio/hoja.c game/delirio/json.c \
                game/delirio/personaje.c game/delirio/vista_laberinto.c
 DELIRIO_OBJS = $(DELIRIO_SRCS:%.c=$(OBJDIR)/%.o)
 DEPS += $(DELIRIO_OBJS:.o=.d) $(DELIRIO_CORE_OBJS:.o=.d)
 
-$(DELIRIO_OBJS): CFLAGS += -I$(DELIRIO_REF)/src -DRUTA_PUBLIC='"$(DELIRIO_REF)/client/public"'
-$(OBJDIR)/game/modulos2d.o: CFLAGS += -I$(DELIRIO_REF)/src
+$(DELIRIO_OBJS): CFLAGS += -I$(DELIRIO_DIR)/nucleo -DRUTA_ASSETS='"$(CURDIR)/$(DELIRIO_DIR)/assets"'
+$(OBJDIR)/game/modulos2d.o: CFLAGS += -I$(DELIRIO_DIR)/nucleo
 
 # El main.c del nucleo trae un main() de prueba: se renombra para que no
 # choque con el del editor. -Wno-return-type porque ese main no devuelve
 # nada (en main() C lo perdona; renombrado, no).
-$(OBJDIR)/delirio_nucleo/%.o: $(DELIRIO_REF)/src/%.c
-	@mkdir -p $(dir $@)
-	$(CC) -Wall -Wextra -I$(DELIRIO_REF)/src -MMD -MP -Dmain=nucleo_main_de_prueba -Wno-return-type -c $< -o $@
+$(DELIRIO_CORE_OBJS): CFLAGS += -I$(DELIRIO_DIR)/nucleo
+$(OBJDIR)/$(DELIRIO_DIR)/nucleo/main.o: CFLAGS += -Dmain=nucleo_main_de_prueba -Wno-return-type
 
 R2D_FLAGS = -DRUTA_SHADERS_2D='"$(CURDIR)/plugins/renderer2d/shaders"'
 $(R2D_OBJS): CFLAGS += $(R2D_FLAGS)
@@ -185,7 +185,7 @@ $(BUILD)/editor2d: $(EDITOR_OBJS) $(SHADER2D_SPV)
 
 DELIRIO_SOLO_OBJS = $(OBJDIR)/game/delirio/main_delirio.o $(DELIRIO_OBJS) $(DELIRIO_CORE_OBJS) $(R2D_OBJS)
 DEPS += $(OBJDIR)/game/delirio/main_delirio.d
-$(OBJDIR)/game/delirio/main_delirio.o: CFLAGS += -I$(DELIRIO_REF)/src
+$(OBJDIR)/game/delirio/main_delirio.o: CFLAGS += -I$(DELIRIO_DIR)/nucleo
 
 delirio: $(BUILD)/delirio
 
