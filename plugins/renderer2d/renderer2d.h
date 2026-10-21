@@ -53,7 +53,7 @@ typedef enum {
     T2_A, T2_B, T2_C, T2_D, T2_E, T2_F, T2_G, T2_H, T2_I, T2_J, T2_K, T2_L, T2_M,
     T2_N, T2_O, T2_P, T2_Q, T2_R, T2_S, T2_T, T2_U, T2_V, T2_W, T2_X, T2_Y, T2_Z,
     T2_0, T2_1, T2_2, T2_3, T2_4, T2_5, T2_6, T2_7, T2_8, T2_9,
-    T2_F1, T2_F2, T2_F3, T2_F4,
+    T2_F1, T2_F2, T2_F3, T2_F4, T2_F5, T2_F6, T2_F7, T2_F8, T2_F9, T2_F10, T2_F11, T2_F12,
     T2_COUNT
 } Tecla2D;
 
@@ -64,6 +64,8 @@ typedef struct {
     // Ciclo de vida -------------------------------------------------
     // alto_objetivo: cuantos pixeles de arte entran de alto (el navegador
     // usa 480). La escala es la entera mas cercana a alto_ventana/objetivo.
+    // 0 = escala fija 1: el lienzo mide lo mismo que la ventana (un editor,
+    // que quiere texto nitido).
     int  (*init)(const char *titulo, int ancho_ventana, int alto_ventana,
                  int alto_objetivo);
     void (*shutdown)(void);
@@ -77,6 +79,16 @@ typedef struct {
     // ellos. Se devuelven con imagen_liberar. NULL si falla.
     uint32_t *(*imagen_cargar)(const char *ruta_png, int *w, int *h);
     void      (*imagen_liberar)(uint32_t *pixeles);
+    void      (*textura_liberar)(Textura2D t);  // el handle queda libre para otra
+
+    // Un LIENZO es una textura en la que se puede dibujar. Despues se usa
+    // como cualquier textura en sprite(): asi un editor muestra el juego en
+    // un rectangulo de su ventana (la vista "Game" de Unity).
+    Textura2D (*lienzo_crear)(int w, int h);
+    // Lo que se dibuje desde aca va a `lienzo` (TEXTURA2D_NULA = la ventana).
+    // La primera vez en el frame que se elige un lienzo se limpia con
+    // `fondo`; las siguientes siguen dibujando encima. Resetea la camara.
+    void      (*destino)(Textura2D lienzo, uint32_t fondo);
 
     // Un frame ------------------------------------------------------
     // Entre frame_begin y frame_end solo se ANOTA: los cuadrilateros se
@@ -96,6 +108,11 @@ typedef struct {
     // Cuatro esquinas en orden (ida y vuelta, no cruzadas), un color cada
     // una: se interpolan, asi sale un degradado gratis.
     void (*cuad)(const V2 p[4], const uint32_t argb[4]);
+
+    // Texto en una linea, (x, y) = esquina de arriba a la izquierda. ASCII.
+    void  (*texto)(float x, float y, const char *s, uint32_t argb);
+    float (*texto_ancho)(const char *s);
+    int   (*texto_alto)(void);
 
     void (*frame_end)(void);   // sube, dibuja, escala y presenta
 

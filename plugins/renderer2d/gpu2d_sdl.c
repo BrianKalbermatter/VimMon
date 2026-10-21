@@ -24,6 +24,7 @@
 #include "renderer2d.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,19 +32,39 @@
 #ifndef RUTA_SHADERS_2D
 #define RUTA_SHADERS_2D "plugins/renderer2d/shaders"
 #endif
+#ifndef RUTA_FUENTE_2D
+#define RUTA_FUENTE_2D "/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf"
+#endif
+#define TAMANO_FUENTE 14
 
 #define MAX_TEXTURAS 256
 #define MAX_CUADS    65536          // por frame; 4 vertices y 6 indices cada uno
 #define MAX_LOTES    4096
+#define MAX_PASADAS  16
 
 // Un vertice 2D: 20 bytes. El color va en 4 bytes (no 4 floats): con
 // decenas de miles de vertices por frame, el ancho de banda importa.
 typedef struct { float x, y, u, v; uint32_t rgba; } Vertice2D;
 
-typedef struct { SDL_GPUTexture *tex; int w, h; } TexturaGPU;
+// tex == NULL: el lugar esta libre. limpiado: frame en que se limpio por
+// ultima vez (solo los lienzos).
+typedef struct { SDL_GPUTexture *tex; int w, h, es_lienzo; Uint64 limpiado; } TexturaGPU;
 
 // Un lote: cuadrilateros seguidos que comparten textura.
 typedef struct { Textura2D tex; Uint32 primero, cantidad; } Lote;
+
+// Una pasada: lotes que van al mismo destino. Se ejecutan en el orden en
+// que se abrieron, asi un lienzo se pinta ANTES de que otra pasada lo use
+// como textura.
+typedef struct {
+  Textura2D destino;     // TEXTURA2D_NULA = el lienzo de la ventana
+  uint32_t fondo;
+  int limpiar;
+  Uint32 primer_lote, n_lotes;
+} Pasada;
+
+// Un caracter del atlas de texto.
+typedef struct { Rect2D origen; float avance; } Glifo;
 
 typedef struct { float lienzo[4]; } ULienzo;    // 16 bytes, igual que el GLSL
 
@@ -64,6 +85,15 @@ static Vertice2D *g_verts = NULL;               // MAX_CUADS * 4, en RAM
 static Uint32     g_n_cuads = 0;
 static Lote       g_lotes[MAX_LOTES];
 static Uint32     g_n_lotes = 0;
+static Pasada     g_pasadas[MAX_PASADAS];
+static Uint32     g_n_pasadas = 0;
+static Uint64     g_frame = 0;
+static int        g_ventana_limpia = 0;          // la ventana ya se limpio este frame
+
+static Textura2D  g_fuente = TEXTURA2D_NULA;     // atlas de glifos, blancos
+static Glifo      g_glifos[128];
+static int        g_alto_texto = 0;
+static int        g_fuente_probada = 0;
 
 static int      g_alto_objetivo = 480;
 static int      g_ancho_int = 0, g_alto_int = 0, g_escala = 1;
@@ -106,9 +136,24 @@ cargar_shader(const char *nombre, SDL_GPUShaderStage etapa,
     return sh;
 }
 
+// Primer lugar libre (dejado por textura_liberar) o uno nuevo al final.
+static Textura2D lugar_libre(void)
+{
+    for (Uint32 i = 0; i < g_n_texturas; i++)
+        if (!g_texturas[i].tex) return (Textura2D)(i + 1);
+    if (g_n_texturas >= MAX_TEXTURAS) return TEXTURA2D_NULA;
+    return (Textura2D)(++g_n_texturas);
+}
+
+static int textura_valida(Textura2D t)
+{
+    return t != TEXTURA2D_NULA && t <= g_n_texturas && g_texturas[t - 1].tex;
+}
+
 static Textura2D subir_textura(const uint32_t *pix, int w, int h)
 {
-    if (g_n_texturas >= MAX_TEXTURAS) return TEXTURA2D_NULA;
+    Textura2D lugar = lugar_libre();
+    if (lugar == TEXTURA2D_NULA) return TEXTURA2D_NULA;
 
     SDL_GPUTextureCreateInfo ti = {
         .type = SDL_GPU_TEXTURETYPE_2D,
@@ -140,9 +185,8 @@ static Textura2D subir_textura(const uint32_t *pix, int w, int h)
     SDL_SubmitGPUCommandBuffer(cmd);
     SDL_ReleaseGPUTransferBuffer(g_dev, tb);
 
-    g_texturas[g_n_texturas] = (TexturaGPU){ tex, w, h };
-    g_n_texturas++;
-    return (Textura2D)g_n_texturas;   // handle = indice + 1, 0 es "nula"
+    g_texturas[lugar - 1] = (TexturaGPU){ tex, w, h, 0, 0 };
+    return lugar;   // handle = indice + 1, 0 es "nula"
 }
 
 // El lienzo interno sale del tamano REAL de la ventana en pixeles (con
@@ -154,7 +198,7 @@ static int rehacer_lienzo(void)
     SDL_GetWindowSizeInPixels(g_win, &pw, &ph);
     if (pw <= 0 || ph <= 0) return 0;
 
-    int escala = (int)lroundf((float)ph / (float)g_alto_objetivo);
+    int escala = g_alto_objetivo > 0 ? (int)lroundf((float)ph / (float)g_alto_objetivo) : 1;
     if (escala < 1) escala = 1;
     // Hacia abajo, a diferencia del navegador (que redondea hacia arriba y
     // deja que el borde se recorte): el blit no puede salirse de la ventana.
@@ -284,7 +328,7 @@ static int gpu2d_init(const char *titulo, int aw, int ah, int alto_objetivo)
         fprintf(stderr, "[gpu2d] ventana/swapchain: %s\n", SDL_GetError());
         return 1;
     }
-    g_alto_objetivo = alto_objetivo > 0 ? alto_objetivo : 480;
+    g_alto_objetivo = alto_objetivo > 0 ? alto_objetivo : 0;
     if (rehacer_lienzo()) return 1;
 
     SDL_GPUSamplerCreateInfo si = {
@@ -307,8 +351,10 @@ static void gpu2d_shutdown(void)
 {
     if (!g_dev) return;
     SDL_WaitForGPUIdle(g_dev);
-    for (Uint32 i = 0; i < g_n_texturas; i++) SDL_ReleaseGPUTexture(g_dev, g_texturas[i].tex);
+    for (Uint32 i = 0; i < g_n_texturas; i++)
+        if (g_texturas[i].tex) SDL_ReleaseGPUTexture(g_dev, g_texturas[i].tex);
     g_n_texturas = 0;
+    if (g_fuente_probada) TTF_Quit();
     if (g_subida)  SDL_ReleaseGPUTransferBuffer(g_dev, g_subida);
     if (g_vbuf)    SDL_ReleaseGPUBuffer(g_dev, g_vbuf);
     if (g_ibuf)    SDL_ReleaseGPUBuffer(g_dev, g_ibuf);
@@ -371,9 +417,40 @@ static Textura2D gpu2d_textura_cargar(const char *ruta)
 
 static void gpu2d_textura_tamano(Textura2D t, int *w, int *h)
 {
-    int ok = t != TEXTURA2D_NULA && t <= g_n_texturas;
+    int ok = textura_valida(t);
     if (w) *w = ok ? g_texturas[t - 1].w : 0;
     if (h) *h = ok ? g_texturas[t - 1].h : 0;
+}
+
+// SDL_ReleaseGPUTexture no la borra en el momento: SDL espera a que la GPU
+// termine los frames que todavia la usan. Por eso se puede liberar entre
+// frames sin esperar a nada.
+static void gpu2d_textura_liberar(Textura2D t)
+{
+    if (!textura_valida(t) || t == g_blanca || t == g_fuente) return;
+    SDL_ReleaseGPUTexture(g_dev, g_texturas[t - 1].tex);
+    g_texturas[t - 1] = (TexturaGPU){ 0 };
+}
+
+static Textura2D gpu2d_lienzo_crear(int w, int h)
+{
+    if (w <= 0 || h <= 0) return TEXTURA2D_NULA;
+    Textura2D lugar = lugar_libre();
+    if (lugar == TEXTURA2D_NULA) return TEXTURA2D_NULA;
+    SDL_GPUTextureCreateInfo li = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = (Uint32)w, .height = (Uint32)h,
+        .layer_count_or_depth = 1, .num_levels = 1,
+    };
+    SDL_GPUTexture *tex = SDL_CreateGPUTexture(g_dev, &li);
+    if (!tex) {
+        if (lugar == g_n_texturas) g_n_texturas--;
+        return TEXTURA2D_NULA;
+    }
+    g_texturas[lugar - 1] = (TexturaGPU){ tex, w, h, 1, 0 };
+    return lugar;
 }
 
 // ── Anotar ──────────────────────────────────────────────────
@@ -387,28 +464,60 @@ static Vertice2D *reservar(Textura2D t)
         g_avisado_lleno = 1;
         return NULL;
     }
-    Lote *ult = g_n_lotes ? &g_lotes[g_n_lotes - 1] : NULL;
+    // Un lote nunca cruza de una pasada a otra: van a destinos distintos.
+    Pasada *pa = &g_pasadas[g_n_pasadas - 1];
+    Lote *ult = pa->n_lotes ? &g_lotes[g_n_lotes - 1] : NULL;
     if (!ult || ult->tex != t) {
         if (g_n_lotes >= MAX_LOTES) return NULL;
         g_lotes[g_n_lotes++] = (Lote){ t, g_n_cuads, 0 };
+        pa->n_lotes++;
         ult = &g_lotes[g_n_lotes - 1];
     }
     ult->cantidad++;
     return &g_verts[(g_n_cuads++) * 4];
 }
 
+static void abrir_pasada(Textura2D destino, uint32_t fondo)
+{
+    // Limpiar solo la primera vez que el destino aparece en el frame: un
+    // editor vuelve a la ventana despues de pintar el juego y tiene que
+    // seguir encima de lo que ya habia.
+    int limpiar;
+    if (destino == TEXTURA2D_NULA) {
+        limpiar = !g_ventana_limpia;
+        g_ventana_limpia = 1;
+    } else {
+        limpiar = g_texturas[destino - 1].limpiado != g_frame;
+        g_texturas[destino - 1].limpiado = g_frame;
+    }
+    Pasada *ult = g_n_pasadas ? &g_pasadas[g_n_pasadas - 1] : NULL;
+    if (ult && ult->n_lotes == 0 && !ult->limpiar) g_n_pasadas--;   // vacia: se reemplaza
+    if (g_n_pasadas >= MAX_PASADAS) return;
+    g_pasadas[g_n_pasadas++] = (Pasada){ destino, fondo, limpiar, g_n_lotes, 0 };
+    g_cam_x = g_cam_y = 0;
+}
+
 static void gpu2d_frame_begin(uint32_t fondo)
 {
-    g_n_cuads = 0; g_n_lotes = 0;
-    g_cam_x = g_cam_y = 0;
+    g_n_cuads = 0; g_n_lotes = 0; g_n_pasadas = 0;
+    g_frame++;
+    g_ventana_limpia = 0;
     g_fondo = fondo;
+    abrir_pasada(TEXTURA2D_NULA, fondo);
+}
+
+static void gpu2d_destino(Textura2D lienzo, uint32_t fondo)
+{
+    if (lienzo != TEXTURA2D_NULA && (!textura_valida(lienzo) || !g_texturas[lienzo - 1].es_lienzo))
+        return;
+    abrir_pasada(lienzo, fondo);
 }
 
 static void gpu2d_camara(float x, float y) { g_cam_x = x; g_cam_y = y; }
 
 static void gpu2d_sprite(Textura2D t, Rect2D o, Rect2D d, uint32_t tinte, int espejo)
 {
-    if (t == TEXTURA2D_NULA || t > g_n_texturas) return;
+    if (!textura_valida(t)) return;
     Vertice2D *v = reservar(t);
     if (!v) return;
 
@@ -440,6 +549,88 @@ static void gpu2d_cuad(const V2 p[4], const uint32_t argb[4])
                             argb_a_rgba(argb[i]) };
 }
 
+// ── Texto ───────────────────────────────────────────────────
+
+// La primera vez que se pide texto, cada caracter ASCII imprimible se
+// dibuja con SDL3_ttf una sola vez en un atlas blanco. Despues escribir es
+// poner sprites de ese atlas tenidos del color pedido: mismo camino y
+// mismo lote que todo lo demas.
+static int preparar_fuente(void)
+{
+    if (g_fuente_probada) return g_fuente != TEXTURA2D_NULA;
+    g_fuente_probada = 1;
+    if (!TTF_Init()) {
+        fprintf(stderr, "[gpu2d] TTF_Init: %s\n", SDL_GetError());
+        return 0;
+    }
+    TTF_Font *f = TTF_OpenFont(RUTA_FUENTE_2D, TAMANO_FUENTE);
+    if (!f) {
+        fprintf(stderr, "[gpu2d] no pude abrir la fuente %s: %s\n", RUTA_FUENTE_2D, SDL_GetError());
+        return 0;
+    }
+    g_alto_texto = TTF_GetFontHeight(f);
+    int celda_w = 0;
+    for (int c = 32; c < 127; c++) {
+        int avance = 0;
+        TTF_GetGlyphMetrics(f, (Uint32)c, NULL, NULL, NULL, NULL, &avance);
+        if (avance > celda_w) celda_w = avance;
+    }
+    int cols = 16, filas = (127 - 32 + cols - 1) / cols;
+    int aw = cols * (celda_w + 2), ah = filas * (g_alto_texto + 2);
+    uint32_t *pix = SDL_calloc((size_t)aw * (size_t)ah, 4);
+    if (!pix) { TTF_CloseFont(f); return 0; }
+
+    for (int c = 32; c < 127; c++) {
+        int i = c - 32, ox = (i % cols) * (celda_w + 2), oy = (i / cols) * (g_alto_texto + 2);
+        int avance = 0;
+        TTF_GetGlyphMetrics(f, (Uint32)c, NULL, NULL, NULL, NULL, &avance);
+        g_glifos[c] = (Glifo){ { (float)ox, (float)oy, (float)celda_w, (float)g_alto_texto },
+                               (float)avance };
+        char s[2] = { (char)c, 0 };
+        SDL_Surface *g = TTF_RenderText_Blended(f, s, 1, (SDL_Color){ 255, 255, 255, 255 });
+        if (!g) continue;
+        SDL_Surface *a = SDL_ConvertSurface(g, SDL_PIXELFORMAT_ARGB8888);
+        SDL_DestroySurface(g);
+        if (!a) continue;
+        for (int y = 0; y < a->h && y < g_alto_texto; y++)
+            for (int x = 0; x < a->w && x < celda_w; x++)
+                pix[(size_t)(oy + y) * aw + ox + x] =
+                    ((const uint32_t *)((const Uint8 *)a->pixels + (size_t)y * a->pitch))[x];
+        SDL_DestroySurface(a);
+    }
+    TTF_CloseFont(f);
+    g_fuente = subir_textura(pix, aw, ah);
+    SDL_free(pix);
+    return g_fuente != TEXTURA2D_NULA;
+}
+
+static void gpu2d_texto(float x, float y, const char *s, uint32_t argb)
+{
+    if (!s || !preparar_fuente()) return;
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (c < 32 || c >= 127) c = '?';
+        Glifo *g = &g_glifos[c];
+        if (c != ' ')
+            gpu2d_sprite(g_fuente, g->origen,
+                         (Rect2D){ roundf(x), roundf(y), g->origen.w, g->origen.h }, argb, 0);
+        x += g->avance;
+    }
+}
+
+static float gpu2d_texto_ancho(const char *s)
+{
+    if (!s || !preparar_fuente()) return 0;
+    float w = 0;
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        w += g_glifos[(c < 32 || c >= 127) ? '?' : c].avance;
+    }
+    return w;
+}
+
+static int gpu2d_texto_alto(void) { return preparar_fuente() ? g_alto_texto : 0; }
+
 // ── Presentar ───────────────────────────────────────────────
 static void gpu2d_frame_end(void)
 {
@@ -461,33 +652,51 @@ static void gpu2d_frame_end(void)
         SDL_EndGPUCopyPass(cp);
     }
 
-    // 2. Los lotes, en orden, sobre el lienzo limpio.
+    // 2. Cada pasada en orden: abre su destino, pinta sus lotes y cierra.
+    for (Uint32 p = 0; p < g_n_pasadas; p++) {
+        Pasada *pa = &g_pasadas[p];
+        SDL_GPUTexture *tex = g_lienzo;
+        int w = g_ancho_int, h = g_alto_int;
+        if (pa->destino != TEXTURA2D_NULA) {
+            if (!textura_valida(pa->destino)) continue;   // liberado a mitad del frame
+            TexturaGPU *d = &g_texturas[pa->destino - 1];
+            tex = d->tex; w = d->w; h = d->h;
+        }
+        SDL_FColor fondo = {
+            (float)((pa->fondo >> 16) & 0xFF) / 255.0f, (float)((pa->fondo >> 8) & 0xFF) / 255.0f,
+            (float)(pa->fondo & 0xFF) / 255.0f, (float)((pa->fondo >> 24) & 0xFF) / 255.0f
+        };
+        SDL_GPUColorTargetInfo ct = {
+            .texture = tex, .clear_color = fondo,
+            .load_op = pa->limpiar ? SDL_GPU_LOADOP_CLEAR : SDL_GPU_LOADOP_LOAD,
+            .store_op = SDL_GPU_STOREOP_STORE,
+        };
+        SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &ct, 1, NULL);
+        if (!pass) continue;
+        if (pa->n_lotes > 0) {
+            SDL_BindGPUGraphicsPipeline(pass, g_pipe);
+            SDL_GPUBufferBinding vb = { .buffer = g_vbuf };
+            SDL_GPUBufferBinding ib = { .buffer = g_ibuf };
+            SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+            SDL_BindGPUIndexBuffer(pass, &ib, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+            ULienzo ul = { { (float)w, (float)h, 0, 0 } };
+            SDL_PushGPUVertexUniformData(cmd, 0, &ul, sizeof(ul));
+            for (Uint32 i = pa->primer_lote; i < pa->primer_lote + pa->n_lotes; i++) {
+                Lote *l = &g_lotes[i];
+                if (!textura_valida(l->tex)) continue;
+                SDL_GPUTextureSamplerBinding ts = { .texture = g_texturas[l->tex - 1].tex,
+                                                    .sampler = g_sampler };
+                SDL_BindGPUFragmentSamplers(pass, 0, &ts, 1);
+                SDL_DrawGPUIndexedPrimitives(pass, l->cantidad * 6, 1, l->primero * 6, 0, 0);
+            }
+        }
+        SDL_EndGPURenderPass(pass);
+    }
+
     SDL_FColor fondo = {
         (float)((g_fondo >> 16) & 0xFF) / 255.0f, (float)((g_fondo >> 8) & 0xFF) / 255.0f,
         (float)(g_fondo & 0xFF) / 255.0f, 1.0f
     };
-    SDL_GPUColorTargetInfo ct = {
-        .texture = g_lienzo, .clear_color = fondo,
-        .load_op = SDL_GPU_LOADOP_CLEAR, .store_op = SDL_GPU_STOREOP_STORE,
-    };
-    SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &ct, 1, NULL);
-    if (pass && g_n_cuads > 0) {
-        SDL_BindGPUGraphicsPipeline(pass, g_pipe);
-        SDL_GPUBufferBinding vb = { .buffer = g_vbuf };
-        SDL_GPUBufferBinding ib = { .buffer = g_ibuf };
-        SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
-        SDL_BindGPUIndexBuffer(pass, &ib, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-        ULienzo ul = { { (float)g_ancho_int, (float)g_alto_int, 0, 0 } };
-        SDL_PushGPUVertexUniformData(cmd, 0, &ul, sizeof(ul));
-        for (Uint32 i = 0; i < g_n_lotes; i++) {
-            Lote *l = &g_lotes[i];
-            SDL_GPUTextureSamplerBinding ts = { .texture = g_texturas[l->tex - 1].tex,
-                                                .sampler = g_sampler };
-            SDL_BindGPUFragmentSamplers(pass, 0, &ts, 1);
-            SDL_DrawGPUIndexedPrimitives(pass, l->cantidad * 6, 1, l->primero * 6, 0, 0);
-        }
-    }
-    if (pass) SDL_EndGPURenderPass(pass);
 
     // 3. El lienzo a la ventana, por un factor entero y centrado. Lo que
     // sobra en los bordes (menos de un pixel de arte) queda del color de
@@ -527,7 +736,7 @@ static SDL_Scancode scancode_de(Tecla2D k)
     // En SDL el 1 va antes que el 0 (asi esta en el teclado).
     if (k == T2_0) return SDL_SCANCODE_0;
     if (k >= T2_1 && k <= T2_9) return (SDL_Scancode)(SDL_SCANCODE_1 + (k - T2_1));
-    if (k >= T2_F1 && k <= T2_F4) return (SDL_Scancode)(SDL_SCANCODE_F1 + (k - T2_F1));
+    if (k >= T2_F1 && k <= T2_F12) return (SDL_Scancode)(SDL_SCANCODE_F1 + (k - T2_F1));
     switch (k) {
     case T2_ESCAPE: return SDL_SCANCODE_ESCAPE;
     case T2_SPACE:  return SDL_SCANCODE_SPACE;
@@ -633,11 +842,17 @@ Renderer2D gpu2d_sdl_renderer2d = {
     .textura_tamano        = gpu2d_textura_tamano,
     .imagen_cargar         = gpu2d_imagen_cargar,
     .imagen_liberar        = gpu2d_imagen_liberar,
+    .textura_liberar       = gpu2d_textura_liberar,
+    .lienzo_crear          = gpu2d_lienzo_crear,
+    .destino               = gpu2d_destino,
     .frame_begin           = gpu2d_frame_begin,
     .camara                = gpu2d_camara,
     .sprite                = gpu2d_sprite,
     .rect                  = gpu2d_rect,
     .cuad                  = gpu2d_cuad,
+    .texto                 = gpu2d_texto,
+    .texto_ancho           = gpu2d_texto_ancho,
+    .texto_alto            = gpu2d_texto_alto,
     .frame_end             = gpu2d_frame_end,
     .poll_quit             = gpu2d_poll_quit,
     .tecla                 = gpu2d_tecla,
