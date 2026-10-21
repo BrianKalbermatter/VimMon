@@ -34,6 +34,20 @@ typedef struct {
 #define INSPECTOR_LINEAS 16
 #define INSPECTOR_LARGO  64
 
+// Un actor u objeto de la escena, para la Hierarchy y la vista Escena.
+// La lista es plana; el arbol sale de `padre` (indice de otro objeto de la
+// misma lista, siempre ANTERIOR a este, o -1 si es raiz).
+#define ESCENA_MAX 512
+typedef struct {
+    char   nombre[40];      // "Jugador", "Enemigo 3", "Puerta norte"
+    char   tipo[20];        // "Jugador", "Enemigo", "Puerta", "Grupo"...
+    int    padre;
+    Rect2D caja;            // donde esta, px de mundo. w == 0: no ocupa lugar
+    int    movible;         // la vista Escena lo puede arrastrar
+} Objeto2D;
+
+#define SPRITES_MAX 64
+
 typedef struct {
     const char *nombre;
     int alto_objetivo;          // px de arte que entran de alto (Delirio: 480)
@@ -50,6 +64,20 @@ typedef struct {
     // Lineas para el panel Inspector ("jugador  8848, 7148"). Devuelve
     // cuantas escribio.
     int  (*inspeccionar)(char lineas[][INSPECTOR_LARGO], int max);
+
+    // ── Escena (todo opcional: NULL = el juego no lo ofrece) ──
+    // Valen mientras hay partida (entre iniciar y terminar).
+    int  (*escena)(Objeto2D *objs, int max);            // cuantos escribio
+    int  (*inspeccionar_objeto)(int i, char lineas[][INSPECTOR_LARGO], int max);
+    void (*mover_objeto)(int i, float x, float y);      // x, y = nuevo centro de la caja
+    void (*mundo_tamano)(float *w, float *h);           // px
+    // Dibuja la parte `visible` del mundo (px de mundo) SIN camara propia:
+    // el motor ya fijo camara y zoom. Si el zoom es chico conviene dibujar
+    // menos detalle (un mapa), porque entra mucho mundo.
+    void (*dibujar_mundo)(const Renderer2D *r, Rect2D visible, float zoom);
+
+    // PNGs que usa el juego, rutas absolutas, para la pizarra de sprites.
+    int  (*sprites)(const char **rutas, int max);
 } Modulo2D;
 
 #endif // VIMMON_MODULO2D_H

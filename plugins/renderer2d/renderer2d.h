@@ -80,6 +80,11 @@ typedef struct {
     uint32_t *(*imagen_cargar)(const char *ruta_png, int *w, int *h);
     void      (*imagen_liberar)(uint32_t *pixeles);
     void      (*textura_liberar)(Textura2D t);  // el handle queda libre para otra
+    // Reemplaza todos los pixeles de una textura (mismo tamano). Para
+    // editar: pintas en RAM y subis la imagen entera.
+    void      (*textura_actualizar)(Textura2D t, const uint32_t *argb);
+    // Guarda pixeles ARGB como PNG. 0 si salio bien.
+    int       (*imagen_guardar)(const char *ruta_png, const uint32_t *argb, int w, int h);
 
     // Un LIENZO es una textura en la que se puede dibujar. Despues se usa
     // como cualquier textura en sprite(): asi un editor muestra el juego en
@@ -99,6 +104,9 @@ typedef struct {
     // lienzo, para el HUD. El juego redondea: el pixel art no tolera
     // medio pixel.
     void (*camara)(float x, float y);
+    // Acerca o aleja lo que sigue: pantalla = (mundo - camara) * zoom.
+    // 1 = tamano real. destino() y frame_begin() lo vuelven a 1.
+    void (*zoom)(float z);
 
     // Un pedazo `origen` (pixeles de la textura) de `t` en `destino`.
     // espejo != 0 lo da vuelta en horizontal.
@@ -124,6 +132,9 @@ typedef struct {
     void     (*mouse_pos)(float *x, float *y);
     int      (*mouse_boton)(Boton2D b);
     int      (*mouse_dentro)(void);   // 1 si el puntero esta sobre la ventana
+    // Cuanto giro la rueda desde la ultima vez que se pregunto (+ = hacia
+    // adelante). Leer consume: se pide una vez por frame.
+    float    (*rueda)(void);
     uint32_t (*ticks_ms)(void);
     void     (*delay_ms)(uint32_t ms);
 

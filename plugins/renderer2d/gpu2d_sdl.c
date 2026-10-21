@@ -97,7 +97,8 @@ static int        g_fuente_probada = 0;
 
 static int      g_alto_objetivo = 480;
 static int      g_ancho_int = 0, g_alto_int = 0, g_escala = 1;
-static float    g_cam_x = 0, g_cam_y = 0;
+static float    g_cam_x = 0, g_cam_y = 0, g_zoom = 1;
+static float    g_rueda = 0;
 static uint32_t g_fondo = 0xFF000000u;
 static int      g_avisado_lleno = 0;
 
@@ -432,6 +433,39 @@ static void gpu2d_textura_liberar(Textura2D t)
     g_texturas[t - 1] = (TexturaGPU){ 0 };
 }
 
+static void gpu2d_textura_actualizar(Textura2D t, const uint32_t *pix)
+{
+    if (!textura_valida(t) || !pix || g_texturas[t - 1].es_lienzo) return;
+    TexturaGPU *d = &g_texturas[t - 1];
+    Uint32 bytes = (Uint32)(d->w * d->h * 4);
+    SDL_GPUTransferBufferCreateInfo tbi = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = bytes };
+    SDL_GPUTransferBuffer *tb = SDL_CreateGPUTransferBuffer(g_dev, &tbi);
+    if (!tb) return;
+    memcpy(SDL_MapGPUTransferBuffer(g_dev, tb, false), pix, bytes);
+    SDL_UnmapGPUTransferBuffer(g_dev, tb);
+    SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(g_dev);
+    SDL_GPUCopyPass *cp = SDL_BeginGPUCopyPass(cmd);
+    SDL_GPUTextureTransferInfo src = { .transfer_buffer = tb, .pixels_per_row = (Uint32)d->w,
+                                       .rows_per_layer = (Uint32)d->h };
+    SDL_GPUTextureRegion dst = { .texture = d->tex, .w = (Uint32)d->w, .h = (Uint32)d->h, .d = 1 };
+    // cycle=true: si la GPU todavia dibuja con la version vieja, SDL usa
+    // otra memoria por debajo en vez de pisarla a mitad del frame.
+    SDL_UploadToGPUTexture(cp, &src, &dst, true);
+    SDL_EndGPUCopyPass(cp);
+    SDL_SubmitGPUCommandBuffer(cmd);
+    SDL_ReleaseGPUTransferBuffer(g_dev, tb);
+}
+
+static int gpu2d_imagen_guardar(const char *ruta, const uint32_t *pix, int w, int h)
+{
+    SDL_Surface *s = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_ARGB8888, (void *)pix, w * 4);
+    if (!s) return 1;
+    int fallo = IMG_SavePNG(s, ruta) ? 0 : 1;
+    if (fallo) fprintf(stderr, "[gpu2d] no pude guardar %s: %s\n", ruta, SDL_GetError());
+    SDL_DestroySurface(s);
+    return fallo;
+}
+
 static Textura2D gpu2d_lienzo_crear(int w, int h)
 {
     if (w <= 0 || h <= 0) return TEXTURA2D_NULA;
@@ -495,6 +529,7 @@ static void abrir_pasada(Textura2D destino, uint32_t fondo)
     if (g_n_pasadas >= MAX_PASADAS) return;
     g_pasadas[g_n_pasadas++] = (Pasada){ destino, fondo, limpiar, g_n_lotes, 0 };
     g_cam_x = g_cam_y = 0;
+    g_zoom = 1;
 }
 
 static void gpu2d_frame_begin(uint32_t fondo)
@@ -514,6 +549,7 @@ static void gpu2d_destino(Textura2D lienzo, uint32_t fondo)
 }
 
 static void gpu2d_camara(float x, float y) { g_cam_x = x; g_cam_y = y; }
+static void gpu2d_zoom(float z) { g_zoom = z > 0 ? z : 1; }
 
 static void gpu2d_sprite(Textura2D t, Rect2D o, Rect2D d, uint32_t tinte, int espejo)
 {
@@ -526,8 +562,8 @@ static void gpu2d_sprite(Textura2D t, Rect2D o, Rect2D d, uint32_t tinte, int es
     float v0 = o.y / th, v1 = (o.y + o.h) / th;
     if (espejo) { float tmp = u0; u0 = u1; u1 = tmp; }
 
-    float x0 = d.x - g_cam_x, y0 = d.y - g_cam_y;
-    float x1 = x0 + d.w,      y1 = y0 + d.h;
+    float x0 = (d.x - g_cam_x) * g_zoom, y0 = (d.y - g_cam_y) * g_zoom;
+    float x1 = x0 + d.w * g_zoom,        y1 = y0 + d.h * g_zoom;
     uint32_t c = argb_a_rgba(tinte);
     v[0] = (Vertice2D){ x0, y0, u0, v0, c };
     v[1] = (Vertice2D){ x1, y0, u1, v0, c };
@@ -545,7 +581,7 @@ static void gpu2d_cuad(const V2 p[4], const uint32_t argb[4])
     Vertice2D *v = reservar(g_blanca);
     if (!v) return;
     for (int i = 0; i < 4; i++)
-        v[i] = (Vertice2D){ p[i].x - g_cam_x, p[i].y - g_cam_y, 0.5f, 0.5f,
+        v[i] = (Vertice2D){ (p[i].x - g_cam_x) * g_zoom, (p[i].y - g_cam_y) * g_zoom, 0.5f, 0.5f,
                             argb_a_rgba(argb[i]) };
 }
 
@@ -726,6 +762,7 @@ static int gpu2d_poll_quit(void)
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_QUIT) salir = 1;
         else if (e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) rehacer_lienzo();
+        else if (e.type == SDL_EVENT_MOUSE_WHEEL) g_rueda += e.wheel.y;
     }
     return salir;
 }
@@ -790,6 +827,13 @@ static int gpu2d_mouse_dentro(void)
     return g_win && SDL_GetMouseFocus() == g_win;
 }
 
+static float gpu2d_rueda(void)
+{
+    float r = g_rueda;
+    g_rueda = 0;
+    return r;
+}
+
 static uint32_t gpu2d_ticks(void)        { return (uint32_t)SDL_GetTicks(); }
 static void     gpu2d_delay(uint32_t ms) { SDL_Delay(ms); }
 static int      gpu2d_ancho(void)        { return g_ancho_int; }
@@ -843,10 +887,13 @@ Renderer2D gpu2d_sdl_renderer2d = {
     .imagen_cargar         = gpu2d_imagen_cargar,
     .imagen_liberar        = gpu2d_imagen_liberar,
     .textura_liberar       = gpu2d_textura_liberar,
+    .textura_actualizar    = gpu2d_textura_actualizar,
+    .imagen_guardar        = gpu2d_imagen_guardar,
     .lienzo_crear          = gpu2d_lienzo_crear,
     .destino               = gpu2d_destino,
     .frame_begin           = gpu2d_frame_begin,
     .camara                = gpu2d_camara,
+    .zoom                  = gpu2d_zoom,
     .sprite                = gpu2d_sprite,
     .rect                  = gpu2d_rect,
     .cuad                  = gpu2d_cuad,
@@ -859,6 +906,7 @@ Renderer2D gpu2d_sdl_renderer2d = {
     .mouse_pos             = gpu2d_mouse_pos,
     .mouse_boton           = gpu2d_mouse_boton,
     .mouse_dentro          = gpu2d_mouse_dentro,
+    .rueda                 = gpu2d_rueda,
     .ticks_ms              = gpu2d_ticks,
     .delay_ms              = gpu2d_delay,
     .ancho_interno         = gpu2d_ancho,
