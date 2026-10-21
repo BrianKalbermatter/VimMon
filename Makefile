@@ -131,8 +131,8 @@ $(SHADER2D_DIR)/%.vert.spv: $(SHADER2D_DIR)/%.vert.glsl
 $(SHADER2D_DIR)/%.frag.spv: $(SHADER2D_DIR)/%.frag.glsl
 	$(GLSLC) -fshader-stage=frag $< -o $@
 
-IMG_CFLAGS = $(shell pkg-config --cflags sdl3-image)
-IMG_LIBS   = $(shell pkg-config --libs sdl3-image)
+IMG_CFLAGS = $(shell pkg-config --cflags sdl3-image sdl3-ttf)
+IMG_LIBS   = $(shell pkg-config --libs sdl3-image sdl3-ttf)
 R2D_OBJS   = $(OBJDIR)/plugins/renderer2d/gpu2d_sdl.o
 DEPS      += $(R2D_OBJS:.o=.d)
 $(R2D_OBJS): CFLAGS += $(IMG_CFLAGS)
@@ -146,6 +146,51 @@ $(BUILD)/hello_2d: $(HELLO2D_OBJS) $(SHADER2D_SPV)
 	@mkdir -p $(dir $@)
 	$(CC) $(HELLO2D_OBJS) $(IMG_LIBS) $(SDL_LIBS) -lm -o $@
 
+# ── Delirio y el editor 2D ────────────────────────────────────────────────
+# Delirio es un MODULO (game/delirio): el editor lo carga con Play, y
+# build/delirio lo corre solo. Su nucleo en C y sus assets todavia viven en
+# el modelo de referencia, Lab_Minotauro_Web, y se leen de ahi por ruta.
+DELIRIO_REF  ?= $(HOME)/proyectos/Proyect_X/Lab_Minotauro_Web
+DELIRIO_CORE  = $(filter-out %/web.c,$(shell find $(DELIRIO_REF)/src -name '*.c' 2>/dev/null))
+DELIRIO_CORE_OBJS = $(patsubst $(DELIRIO_REF)/src/%.c,$(OBJDIR)/delirio_nucleo/%.o,$(DELIRIO_CORE))
+DELIRIO_SRCS = game/delirio/delirio.c game/delirio/hoja.c game/delirio/json.c \
+               game/delirio/personaje.c game/delirio/vista_laberinto.c
+DELIRIO_OBJS = $(DELIRIO_SRCS:%.c=$(OBJDIR)/%.o)
+DEPS += $(DELIRIO_OBJS:.o=.d) $(DELIRIO_CORE_OBJS:.o=.d)
+
+$(DELIRIO_OBJS): CFLAGS += -I$(DELIRIO_REF)/src -DRUTA_PUBLIC='"$(DELIRIO_REF)/client/public"'
+$(OBJDIR)/game/modulos2d.o: CFLAGS += -I$(DELIRIO_REF)/src
+
+# El main.c del nucleo trae un main() de prueba: se renombra para que no
+# choque con el del editor. -Wno-return-type porque ese main no devuelve
+# nada (en main() C lo perdona; renombrado, no).
+$(OBJDIR)/delirio_nucleo/%.o: $(DELIRIO_REF)/src/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -Wall -Wextra -I$(DELIRIO_REF)/src -MMD -MP -Dmain=nucleo_main_de_prueba -Wno-return-type -c $< -o $@
+
+R2D_FLAGS = -DRUTA_SHADERS_2D='"$(CURDIR)/plugins/renderer2d/shaders"'
+$(R2D_OBJS): CFLAGS += $(R2D_FLAGS)
+
+EDITOR_OBJS = $(OBJDIR)/plugins/editor2d/editor2d.o $(OBJDIR)/game/modulos2d.o \
+              $(DELIRIO_OBJS) $(DELIRIO_CORE_OBJS) $(R2D_OBJS)
+DEPS += $(OBJDIR)/plugins/editor2d/editor2d.d $(OBJDIR)/game/modulos2d.d
+
+editor: $(BUILD)/editor2d
+
+$(BUILD)/editor2d: $(EDITOR_OBJS) $(SHADER2D_SPV)
+	@mkdir -p $(dir $@)
+	$(CC) $(EDITOR_OBJS) $(IMG_LIBS) $(SDL_LIBS) -lm -o $@
+
+DELIRIO_SOLO_OBJS = $(OBJDIR)/game/delirio/main_delirio.o $(DELIRIO_OBJS) $(DELIRIO_CORE_OBJS) $(R2D_OBJS)
+DEPS += $(OBJDIR)/game/delirio/main_delirio.d
+$(OBJDIR)/game/delirio/main_delirio.o: CFLAGS += -I$(DELIRIO_REF)/src
+
+delirio: $(BUILD)/delirio
+
+$(BUILD)/delirio: $(DELIRIO_SOLO_OBJS) $(SHADER2D_SPV)
+	@mkdir -p $(dir $@)
+	$(CC) $(DELIRIO_SOLO_OBJS) $(IMG_LIBS) $(SDL_LIBS) -lm -o $@
+
 # Los tests del LENGUAJE viven con el lenguaje: se corren en su repo.
 test:
 	@$(MAKE) --no-print-directory -C $(PAED_DIR) test
@@ -158,4 +203,4 @@ clean:
 # Los .d no existen en el primer build: el '-' evita que make se queje.
 -include $(DEPS)
 
-.PHONY: all clean example example3d example2d shaders mundo
+.PHONY: all clean example example3d example2d editor delirio shaders mundo
