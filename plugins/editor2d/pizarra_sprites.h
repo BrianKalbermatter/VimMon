@@ -6,14 +6,16 @@
 // Herramientas (barra arriba de la pizarra, y teclas):
 //   B lapiz   E goma   I gotero   arrastrar un nodo por su titulo lo mueve
 //   Ctrl+Z deshacer   Ctrl+S guardar el sprite seleccionado (sobre su PNG)
-// Paleta: Mushroom (la de Delirio) + el color que levante el gotero.
+// Paleta: los colores que mas usa el sprite elegido (hasta 32) + negro y blanco.
 #ifndef VIMMON_PIZARRA_SPRITES_H
 #define VIMMON_PIZARRA_SPRITES_H
 
 #include "ui2d.h"
 
 #define PIZARRA_NODOS 64
-#define PIZARRA_DESHACER 32
+// Cada paso guarda el sprite entero: personaje_3 (1024x3648) son ~15 MB
+// por paso, asi que son pocos.
+#define PIZARRA_DESHACER 8
 
 typedef struct {
     char      ruta[512];
