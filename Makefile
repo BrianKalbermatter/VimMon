@@ -171,9 +171,11 @@ $(OBJDIR)/delirio_nucleo/%.o: $(DELIRIO_REF)/src/%.c
 R2D_FLAGS = -DRUTA_SHADERS_2D='"$(CURDIR)/plugins/renderer2d/shaders"'
 $(R2D_OBJS): CFLAGS += $(R2D_FLAGS)
 
-EDITOR_OBJS = $(OBJDIR)/plugins/editor2d/editor2d.o $(OBJDIR)/game/modulos2d.o \
+EDITOR_OBJS = $(OBJDIR)/plugins/editor2d/editor2d.o $(OBJDIR)/plugins/editor2d/vista_escena.o \
+              $(OBJDIR)/plugins/editor2d/pizarra_sprites.o $(OBJDIR)/game/modulos2d.o \
               $(DELIRIO_OBJS) $(DELIRIO_CORE_OBJS) $(R2D_OBJS)
-DEPS += $(OBJDIR)/plugins/editor2d/editor2d.d $(OBJDIR)/game/modulos2d.d
+DEPS += $(OBJDIR)/plugins/editor2d/editor2d.d $(OBJDIR)/plugins/editor2d/vista_escena.d \
+        $(OBJDIR)/plugins/editor2d/pizarra_sprites.d $(OBJDIR)/game/modulos2d.d
 
 editor: $(BUILD)/editor2d
 
