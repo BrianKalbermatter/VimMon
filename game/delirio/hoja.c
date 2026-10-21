@@ -53,6 +53,13 @@ const Animacion *hoja_animacion(const Hoja *h, const char *tag) {
   return NULL;
 }
 
+float hoja_duracion(const Hoja *h, const char *tag) {
+  const Animacion *a = hoja_animacion(h, tag);
+  float total = 0;
+  for (int i = a ? a->desde : 0; a && i <= a->hasta; i++) total += (float)h->cuadros[i].duracion_ms;
+  return total;
+}
+
 // El tag sin el sufijo de direccion: "walk_down_left" -> largo de "walk".
 // Se prueban las direcciones mas largas primero, asi "down_left" gana a
 // "left".
@@ -87,8 +94,25 @@ void animador_tocar(Animador *a, const char *tag, int repetir) {
   a->anim = nueva;
 }
 
-void animador_avanzar(Animador *a, float dt_ms, int reversa) {
+void animador_reiniciar(Animador *a) {
+  a->cuadro = 0;
+  a->reloj_ms = 0;
+}
+
+void animador_buscar(Animador *a, float ms) {
   if (!a->anim) return;
+  int n = a->anim->hasta - a->anim->desde + 1, i = 0;
+  while (i < n - 1 && ms >= (float)a->hoja->cuadros[a->anim->desde + i].duracion_ms) {
+    ms -= (float)a->hoja->cuadros[a->anim->desde + i].duracion_ms;
+    i++;
+  }
+  a->cuadro = i;
+  a->reloj_ms = ms;
+}
+
+void animador_avanzar(Animador *a, float dt_ms, float velocidad, int reversa) {
+  if (!a->anim) return;
+  dt_ms *= velocidad;
   int n = a->anim->hasta - a->anim->desde + 1;
   if (n <= 0) return;
   int paso = reversa ? n - 1 : 1;

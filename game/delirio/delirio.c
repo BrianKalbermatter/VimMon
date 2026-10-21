@@ -49,6 +49,24 @@ static unsigned semilla_fija, semilla;
 static int caminar_solo;
 static float solo_dx, solo_dy;
 static Rect2D caja_plaza;   // px de mundo, la caja de las celdas de la plaza
+static int teclas_antes[T2_COUNT];
+static int bloqueando;
+static int activa_antes[HAB_CANTIDAD]; // para ver que habilidad arranco este frame
+static int auto_ataques_vistos;
+
+// Teclas de habilidad, como ability-keys.ts del navegador.
+static const struct { Tecla2D tecla; HabilidadId hab; } TECLAS_HAB[] = {
+  { T2_Q, HAB_ATAQUE_LIGERO }, { T2_W, HAB_ATAQUE_RAPIDO }, { T2_E, HAB_ATAQUE_LARGO },
+  { T2_R, HAB_ATAQUE_CRITICO }, { T2_A, HAB_APOYO }, { T2_S, HAB_PARRY },
+  { T2_D, HAB_ULTI }, { T2_SPACE, HAB_SALTAR },
+};
+
+// Cuanto se muestra cada ataque: lo que esta activo en el nucleo
+// (habilidades en src/mecanicas/jugador.c), pero nunca tan poco que no se vea.
+static const float ATAQUE_ACTIVO_MS[] = { 200, 120, 400, 300 }; // ligero, rapido, largo, critico
+#define MIN_SWING_MS 260.0f
+// Golpear el piso (la ulti, D): lo que dura HAB_ULTI en el nucleo.
+#define SLAM_MS 900.0f
 
 void delirio_fijar_semilla(unsigned s) { semilla_fija = s; }
 
@@ -94,12 +112,47 @@ static void iniciar(void) {
                                   (float)((c1 - c0 + 1) * LAB_TILE), (float)((f1 - f0 + 1) * LAB_TILE) };
 
   personaje_iniciar(&p, spawn_x, spawn_y);
-  personaje_sincronizar(&p, spawn_x, spawn_y, 0, 0, j->estados, 0, 0, 0, 0, 0);
+  personaje_sincronizar(&p, spawn_x, spawn_y, 0, 0, j->estados, 0, 0, 0, 0, 0, 0);
   anim = (Animador){ .hoja = &hoja };
   char tag[48];
   animador_tocar(&anim, personaje_tag(&p, tag, sizeof tag), 1);
   cam = (Camara){ .x = p.x, .y = p.y - PLAYER_BODY_HEIGHT / 2.0f };
   corriendo = 0;
+  bloqueando = 0;
+  memset(teclas_antes, 0, sizeof teclas_antes);
+  memset(activa_antes, 0, sizeof activa_antes);
+  auto_ataques_vistos = juego_auto_ataques();
+}
+
+// Las habilidades que arrancaron este frame ponen su animacion: atacar (en
+// el aire, con las piernas recogidas), o golpear el piso. Igual que el
+// recorrido de abilityEffects.update en main.ts.
+static void animar_habilidades(void) {
+  const Jugador *jc = juego_jugador_completo();
+  const Entity *j = juego_jugador();
+  int auto_atacado = juego_auto_ataques() > auto_ataques_vistos;
+  auto_ataques_vistos = juego_auto_ataques();
+  for (int h = 0; h < HAB_CANTIDAD; h++) {
+    int activa = jugador_activa(jc, (HabilidadId)h);
+    int arranco = activa && !activa_antes[h];
+    activa_antes[h] = activa;
+    if (!arranco || p.movimiento == MOV_MUERTO) continue;
+    if (h <= HAB_ATAQUE_CRITICO) {
+      const char *nombre = p.salto_ms >= 0 ? "jump_attack" : "attack";
+      float ms = ATAQUE_ACTIVO_MS[h] > MIN_SWING_MS ? ATAQUE_ACTIVO_MS[h] : MIN_SWING_MS;
+      char tag[32];
+      snprintf(tag, sizeof tag, "%s_right", nombre);
+      // El auto-ataque pega hacia donde camina, no hacia el cursor.
+      int hacia = auto_atacado && h == HAB_ATAQUE_LIGERO && (j->dir.x != 0 || j->dir.y != 0)
+                    ? direccion_de_vector(j->dir.x, j->dir.y) : -1;
+      personaje_accion(&p, nombre, ms, hoja_duracion(&hoja, tag), hacia);
+      animador_reiniciar(&anim);
+    }
+    if (h == HAB_ULTI && p.salto_ms < 0) {
+      personaje_accion(&p, "slam", SLAM_MS, hoja_duracion(&hoja, "slam_right"), -1);
+      animador_reiniciar(&anim);
+    }
+  }
 }
 
 static void actualizar(const Entrada2D *e, float dt, int ancho, int alto) {
@@ -117,19 +170,38 @@ static void actualizar(const Entrada2D *e, float dt, int ancho, int alto) {
     corriendo = e->tecla[T2_SHIFT];
     juego_mantener_habilidad(HAB_CORRER, corriendo);
   }
+  // Clic derecho mantenido bloquea. Las demas habilidades se usan al
+  // apretar la tecla (no mientras se mantiene).
+  int quiere_bloquear = e->mouse_dentro && e->boton[M2_DER];
+  if (quiere_bloquear != bloqueando) {
+    bloqueando = quiere_bloquear;
+    juego_mantener_habilidad(HAB_BLOQUEAR, bloqueando);
+  }
+  for (size_t i = 0; i < sizeof TECLAS_HAB / sizeof TECLAS_HAB[0]; i++)
+    if (e->tecla[TECLAS_HAB[i].tecla] && !teclas_antes[TECLAS_HAB[i].tecla])
+      juego_usar_habilidad(TECLAS_HAB[i].hab);
+  memcpy(teclas_antes, e->tecla, sizeof teclas_antes);
 
   juego_actualizar(dt);
 
   int estaba_muerto = p.movimiento == MOV_MUERTO;
-  personaje_sincronizar(&p, j->posicion.x, j->posicion.y, j->dir.x, j->dir.y, j->estados, dt,
-                        e->mouse_dentro, wx, wy, j->posicion.y - PLAYER_BODY_HEIGHT / 2.0f);
+  int saltando = jugador_activa(juego_jugador_completo(), HAB_SALTAR);
+  personaje_sincronizar(&p, j->posicion.x, j->posicion.y, j->dir.x, j->dir.y, j->estados, saltando,
+                        dt, e->mouse_dentro, wx, wy, j->posicion.y - PLAYER_BODY_HEIGHT / 2.0f);
   if (estaba_muerto && p.movimiento != MOV_MUERTO) {
     cam.x = p.x; // reaparecio en la base: salta ahi en vez de deslizarse
     cam.y = p.y - PLAYER_BODY_HEIGHT / 2.0f;
   }
+  animar_habilidades();
+
+  // Las acciones y la muerte se muestran una vez; el resto da vueltas. El
+  // salto no avanza con el tiempo: sigue el reloj del salto del nucleo.
   char tag[48];
-  animador_tocar(&anim, personaje_tag(&p, tag, sizeof tag), p.movimiento != MOV_MUERTO);
-  animador_avanzar(&anim, dt, personaje_en_reversa(&p));
+  int una_vez = p.movimiento == MOV_MUERTO || personaje_actuando(&p);
+  animador_tocar(&anim, personaje_tag(&p, tag, sizeof tag), !una_vez);
+  float salto_arte = personaje_salto_arte_ms(&p);
+  if (salto_arte >= 0 && !personaje_actuando(&p)) animador_buscar(&anim, salto_arte);
+  else animador_avanzar(&anim, dt, personaje_velocidad(&p), personaje_en_reversa(&p));
 
   const float mundo = (float)(LAB_TILES * LAB_TILE);
   camara_seguir(&cam, p.x, p.y - PLAYER_BODY_HEIGHT / 2.0f, p.mira, dt);
@@ -139,7 +211,15 @@ static void actualizar(const Entrada2D *e, float dt, int ancho, int alto) {
 static void dibujar_jugador(const Renderer2D *r) {
   const Cuadro *c = animador_cuadro(&anim);
   if (!c) return;
-  float pies = p.y + PLAYER_FEET_PADDING;
+  float piso = p.y + PLAYER_FEET_PADDING;
+  float pies = piso - (float)personaje_altura(&p);
+  // En el aire, una sombra en el piso que se achica cuanto mas alto esta.
+  if (personaje_altura(&p) > 0) {
+    float esc = 1.0f - (float)personaje_altura(&p) / 80.0f;
+    float w = roundf(22 * esc), h = roundf(6 * esc);
+    r->rect((Rect2D){ roundf(p.x - w / 2), roundf(p.y - h / 2), w, h }, ARGB(0x60, 0x0d, 0x0b, 0x12));
+    r->rect((Rect2D){ roundf(p.x - w / 2 + 2), roundf(p.y - h / 2 - 1), w - 4, h + 2 }, ARGB(0x60, 0x0d, 0x0b, 0x12));
+  }
   // El ancla es el centro del cuadro, como placeFrame.
   Rect2D d = { roundf(p.x - c->origen.w / 2), roundf(pies - c->origen.h), c->origen.w, c->origen.h };
   r->sprite(hoja.textura, c->origen, d, BLANCO2, 0);

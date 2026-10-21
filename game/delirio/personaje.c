@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 static const char *NOMBRES[DIRECCIONES] = {
   "right", "down_right", "front", "down_left", "left", "up_left", "back", "up_right",
@@ -18,6 +19,15 @@ static const char *NOMBRES[DIRECCIONES] = {
 // Caminar alejandose de donde mira (mas de ~100 grados) pasa el ciclo al
 // reves, asi los pies empujan para el lado correcto.
 #define BACKWARDS_DOT -0.2f
+
+// El salto dura HAB_SALTAR en src/mecanicas/jugador.c. Sus cuadros (JUMP_MS
+// en art/personaje_3_build.py) se estiran a ese tiempo: se agacha, esta en
+// el aire del cuadro 2 al 7, y aterriza.
+#define JUMP_MS 600.0f
+#define JUMP_ART_MS 670.0f
+#define JUMP_AIR_UP 140.0f   // tiempo de la hoja en que los pies dejan el piso
+#define JUMP_AIR_DOWN 520.0f // y en que lo vuelven a tocar
+#define JUMP_HEIGHT 26.0f    // px en lo mas alto del arco
 
 #define LOOK_AHEAD_X 110     // px que la camara se adelanta hacia donde mira
 #define LOOK_AHEAD_Y 60
@@ -56,7 +66,53 @@ static int paso_hacia(int de, int a) {
 }
 
 void personaje_iniciar(Personaje *p, float x, float y) {
-  *p = (Personaje){ .x = x, .y = y, .mira = DIR_FRENTE, .mira_objetivo = DIR_FRENTE };
+  *p = (Personaje){ .x = x, .y = y, .mira = DIR_FRENTE, .mira_objetivo = DIR_FRENTE, .salto_ms = -1 };
+}
+
+void personaje_accion(Personaje *p, const char *nombre, float duracion_ms, float arte_ms, int hacia) {
+  if (hacia >= 0) {
+    p->mira = p->mira_objetivo = hacia;
+    p->pivotando = 0;
+  }
+  p->accion = (Accion){ .activa = 1, .vista = p->mira, .duracion_ms = duracion_ms, .arte_ms = arte_ms };
+  snprintf(p->accion.nombre, sizeof p->accion.nombre, "%s", nombre);
+}
+
+int personaje_actuando(const Personaje *p) { return p->accion.activa; }
+
+float personaje_salto_arte_ms(const Personaje *p) {
+  if (p->salto_ms < 0) return -1;
+  float arte = p->salto_ms / JUMP_MS * JUMP_ART_MS;
+  return arte < JUMP_ART_MS - 1 ? arte : JUMP_ART_MS - 1;
+}
+
+int personaje_altura(const Personaje *p) {
+  float arte = personaje_salto_arte_ms(p);
+  if (arte <= JUMP_AIR_UP || arte >= JUMP_AIR_DOWN) return 0;
+  return (int)lroundf(JUMP_HEIGHT * sinf((float)M_PI * (arte - JUMP_AIR_UP) / (JUMP_AIR_DOWN - JUMP_AIR_UP)));
+}
+
+float personaje_velocidad(const Personaje *p) {
+  return p->accion.activa ? p->accion.arte_ms / p->accion.duracion_ms : 1.0f;
+}
+
+// Devuelve 1 mientras salta: el salto mantiene la direccion en que despego.
+static int sincronizar_salto(Personaje *p, int saltando, float dir_x, float dir_y, float dt_ms) {
+  if (!saltando) {
+    p->salto_ms = -1;
+    return 0;
+  }
+  if (p->salto_ms < 0) {
+    // El nucleo salta en su direccion: mira para ahi de una. Saltar corta un
+    // golpe en el piso o un levantar a medias.
+    p->salto_ms = 0;
+    if (p->accion.activa && strcmp(p->accion.nombre, "jump_attack") != 0) p->accion.activa = 0;
+    if (dir_x != 0 || dir_y != 0) p->mira = p->mira_objetivo = direccion_de_vector(dir_x, dir_y);
+    p->pivotando = 0;
+  } else {
+    p->salto_ms += dt_ms;
+  }
+  return 1;
 }
 
 static void avanzar_giro(Personaje *p, float dt_ms) {
@@ -75,7 +131,8 @@ static void avanzar_giro(Personaje *p, float dt_ms) {
 }
 
 void personaje_sincronizar(Personaje *p, float x, float y, float dir_x, float dir_y,
-                           int estado, float dt_ms, int mirar, float mx, float my, float desde_y) {
+                           int estado, int saltando, float dt_ms, int mirar, float mx, float my,
+                           float desde_y) {
   p->x = x;
   p->y = y;
   p->mover_x = dir_x;
@@ -90,8 +147,15 @@ void personaje_sincronizar(Personaje *p, float x, float y, float dir_x, float di
     // Vuelve mirando a la camara, sin un giro a medias.
     p->mira = p->mira_objetivo = DIR_FRENTE;
     p->pivotando = 0;
+    p->salto_ms = -1;
+    p->accion.activa = 0;
     return;
   }
+  if (p->accion.activa) {
+    p->accion.ms += dt_ms;
+    if (p->accion.ms >= p->accion.duracion_ms) p->accion.activa = 0;
+  }
+  if (sincronizar_salto(p, saltando, dir_x, dir_y, dt_ms)) return;
   int objetivo = -1;
   if (mirar) {
     float dx = mx - x, dy = my - desde_y;
@@ -99,7 +163,9 @@ void personaje_sincronizar(Personaje *p, float x, float y, float dir_x, float di
   } else if (dir_x != 0 || dir_y != 0) {
     objetivo = direccion_de_vector(dir_x, dir_y);
   }
-  if (objetivo >= 0 && objetivo != p->mira_objetivo) {
+  // Sin objetivo conserva la direccion. Una accion mantiene la direccion en
+  // que arranco hasta terminar.
+  if (objetivo >= 0 && !p->accion.activa && objetivo != p->mira_objetivo) {
     p->mira_objetivo = objetivo;
     if (distancia_giro(p->mira, objetivo) >= PIVOT_MIN_STEPS) p->pivotando = 1;
   }
@@ -112,6 +178,14 @@ const char *personaje_tag(const Personaje *p, char *buf, int largo) {
     snprintf(buf, (size_t)largo, "death");
     return buf;
   }
+  if (p->accion.activa) {
+    snprintf(buf, (size_t)largo, "%s_%s", p->accion.nombre, direccion_nombre(p->accion.vista));
+    return buf;
+  }
+  if (p->salto_ms >= 0) {
+    snprintf(buf, (size_t)largo, "jump_%s", direccion_nombre(p->mira));
+    return buf;
+  }
   // Durante el pivote se muestra quieto: las piernas no siguen dando pasos.
   Movimiento m = p->pivotando ? MOV_QUIETO : p->movimiento;
   snprintf(buf, (size_t)largo, "%s_%s", MOV[m], direccion_nombre(p->mira));
@@ -119,7 +193,9 @@ const char *personaje_tag(const Personaje *p, char *buf, int largo) {
 }
 
 int personaje_en_reversa(const Personaje *p) {
-  if (p->pivotando || p->movimiento == MOV_QUIETO || p->movimiento == MOV_MUERTO) return 0;
+  if (p->accion.activa || p->salto_ms >= 0 || p->pivotando || p->movimiento == MOV_QUIETO ||
+      p->movimiento == MOV_MUERTO)
+    return 0;
   float fx, fy;
   direccion_vector(p->mira, &fx, &fy);
   float largo = hypotf(p->mover_x, p->mover_y);

@@ -17,9 +17,21 @@ void direccion_vector(int d, float *x, float *y);
 
 typedef enum { MOV_QUIETO, MOV_CAMINA, MOV_CORRE, MOV_MUERTO } Movimiento;
 
+// Una animacion de una sola vez que arranca el cliente (atacar, golpear el
+// piso, levantar algo), apretada en el tiempo que dura en el nucleo.
+typedef struct {
+  int activa;
+  char nombre[16];       // "attack", "jump_attack", "slam", "pickup"
+  int vista;             // direccion en la que arranco: no gira hasta terminar
+  float ms, duracion_ms; // tiempo desde que arranco, y cuanto se muestra
+  float arte_ms;         // lo que duran sus cuadros en la hoja
+} Accion;
+
 typedef struct {
   float x, y;            // pies, px de mundo
   Movimiento movimiento;
+  float salto_ms;        // tiempo desde que despego; < 0 = en el piso
+  Accion accion;
   int mira, mira_objetivo;
   float reloj_giro_ms;
   int pivotando;
@@ -30,8 +42,18 @@ typedef struct {
 void personaje_iniciar(Personaje *p, float x, float y);
 // `mirar` != 0: mira al punto (mx, my) medido desde `desde_y` (el centro del
 // cuerpo, no los pies). Si no, mira hacia donde camina.
+// `saltando`: HAB_SALTAR activa en el nucleo.
 void personaje_sincronizar(Personaje *p, float x, float y, float dir_x, float dir_y,
-                           int estado, float dt_ms, int mirar, float mx, float my, float desde_y);
+                           int estado, int saltando, float dt_ms, int mirar, float mx, float my,
+                           float desde_y);
+// Arranca `nombre` una vez, en `duracion_ms`, hacia donde mira (o girado
+// primero hacia `hacia` si es >= 0).
+void personaje_accion(Personaje *p, const char *nombre, float duracion_ms, float arte_ms, int hacia);
+int personaje_actuando(const Personaje *p);
+// Donde va la animacion del salto en el tiempo de la hoja; < 0 si no salta.
+float personaje_salto_arte_ms(const Personaje *p);
+int personaje_altura(const Personaje *p);       // px del cuerpo sobre el piso
+float personaje_velocidad(const Personaje *p);  // para el animador
 // Tag de la animacion actual, ej. "walk_down_left". En `buf`.
 const char *personaje_tag(const Personaje *p, char *buf, int largo);
 int personaje_en_reversa(const Personaje *p);

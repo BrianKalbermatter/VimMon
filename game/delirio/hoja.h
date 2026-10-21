@@ -27,6 +27,8 @@ typedef struct {
 // `ruta_base` sin extension: lee ruta_base.json y ruta_base.png.
 int hoja_cargar(Hoja *h, const Renderer2D *r, const char *ruta_base);
 const Animacion *hoja_animacion(const Hoja *h, const char *tag); // NULL si no esta
+// Lo que dura una animacion entera, sumando los tiempos de Aseprite. 0 si no esta.
+float hoja_duracion(const Hoja *h, const char *tag);
 
 typedef struct {
   const Hoja *hoja;
@@ -39,8 +41,14 @@ typedef struct {
 // Cambia de animacion. Si solo cambia la direccion (walk_right ->
 // walk_down_right) conserva la fase, asi girar caminando no reinicia el paso.
 void animador_tocar(Animador *a, const char *tag, int repetir);
+// `velocidad` escala el tiempo: 2 pasa los cuadros al doble que en Aseprite.
 // `reversa`: recorre los cuadros al reves (caminar para atras).
-void animador_avanzar(Animador *a, float dt_ms, int reversa);
+void animador_avanzar(Animador *a, float dt_ms, float velocidad, int reversa);
+// Vuelve al primer cuadro (un ataque justo despues de otro tiene el mismo tag).
+void animador_reiniciar(Animador *a);
+// Muestra el cuadro que cae `ms` adentro de la animacion, en vez de avanzar:
+// el salto sigue su propio reloj.
+void animador_buscar(Animador *a, float ms);
 const Cuadro *animador_cuadro(const Animador *a); // NULL sin animacion
 
 #endif
