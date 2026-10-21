@@ -80,6 +80,27 @@ static uint32_t sobre(uint32_t a, uint32_t b) {
   return out;
 }
 
+// El color promedio de un tile del atlas: lo que se ve de el desde lejos.
+static void promediar(VistaLaberinto *v, const uint32_t *pix, int ancho, const Rect2D *tiles, int n) {
+  for (int i = 0; i < n && v->n_promedios < (int)(sizeof v->promedios / sizeof v->promedios[0]); i++) {
+    Rect2D o = tiles[i];
+    uint64_t suma[3] = { 0, 0, 0 }, cuantos = 0;
+    for (int y = (int)o.y; y < (int)(o.y + o.h); y++) {
+      for (int x = (int)o.x; x < (int)(o.x + o.w); x++) {
+        uint32_t p = pix[(size_t)y * ancho + x];
+        suma[0] += (p >> 16) & 0xFF;
+        suma[1] += (p >> 8) & 0xFF;
+        suma[2] += p & 0xFF;
+        cuantos++;
+      }
+    }
+    if (!cuantos) continue;
+    v->promedios[v->n_promedios].origen = o;
+    v->promedios[v->n_promedios++].color =
+        RGB2(suma[0] / cuantos, suma[1] / cuantos, suma[2] / cuantos);
+  }
+}
+
 // Arma UNA textura con todo lo que dibuja el piso: maze_tiles, abajo los
 // tiles de transicion pasto->bosque, y abajo de esos la sombra. Una textura
 // = un solo lote para todo el piso.
@@ -122,6 +143,12 @@ static int armar_atlas(VistaLaberinto *v, const Renderer2D *r, const char *ruta_
     for (int x = 0; x < t; x++) pix[(size_t)(sy + y) * ancho + x] = ARGB(a, 8, 6, 12);
   }
   v->sombra = (Rect2D){ 0, (float)sy, (float)t, FLOOR_SHADOW };
+
+  promediar(v, pix, ancho, v->piso, v->n_piso);
+  promediar(v, pix, ancho, v->adoquin, v->n_adoquin);
+  promediar(v, pix, ancho, v->pasto, v->n_pasto);
+  promediar(v, pix, ancho, v->bosque, v->n_bosque);
+  for (int nivel = 0; nivel < 4; nivel++) promediar(v, pix, ancho, v->mezcla[nivel], BLEND_VARIANTS);
 
   v->atlas = r->textura_desde_pixeles(pix, ancho, alto);
   free(pix);
@@ -166,6 +193,7 @@ static void buscar_plaza(VistaLaberinto *v, const Laberinto *lab, float sx, floa
 
 int vista_cargar(VistaLaberinto *v, const Renderer2D *r, const char *ruta_tiles) {
   memset(v, 0, sizeof *v);
+  v->mapa_version = -1;
   char ruta[512];
   snprintf(ruta, sizeof ruta, "%s.json", ruta_tiles);
   Json *datos = json_leer_archivo(ruta);
@@ -190,11 +218,14 @@ int vista_cargar(VistaLaberinto *v, const Renderer2D *r, const char *ruta_tiles)
 
 int vista_plaza(VistaLaberinto *v, const Laberinto *lab, float spawn_x, float spawn_y) {
   buscar_plaza(v, lab, spawn_x, spawn_y);
+  v->mapa_version = -1; // partida nueva: el mapa se rearma aunque la version coincida
   return v->plaza == NULL;
 }
 
 void vista_descargar(VistaLaberinto *v, const Renderer2D *r) {
   r->textura_liberar(v->atlas);
+  if (v->mapa != TEXTURA2D_NULA) r->textura_liberar(v->mapa);
+  free(v->mapa_pix);
   free(v->plaza);
   memset(v, 0, sizeof *v);
 }
@@ -347,4 +378,34 @@ void vista_hoja_puerta(const VistaLaberinto *v, const Renderer2D *r, RectPx hoja
   rect(r, tapa0, atras - h + alto - 1, ancho, 1, EDGE_COLOR);
   rect(r, tapa0, atras - h, 1, alto, EDGE_COLOR);
   rect(r, tapa0 + ancho - 1, atras - h, 1, alto, EDGE_COLOR);
+}
+
+// ── Mapa ─────────────────────────────────────────────────────
+
+static uint32_t color_tile(const VistaLaberinto *v, Rect2D o) {
+  for (int i = 0; i < v->n_promedios; i++) {
+    Rect2D p = v->promedios[i].origen;
+    if (p.x == o.x && p.y == o.y && p.w == o.w && p.h == o.h) return v->promedios[i].color;
+  }
+  return VOID_COLOR;
+}
+
+// El mismo tile que elige vista_piso, reducido a su color: de lejos se ve
+// la misma tierra, el mismo adoquin y el mismo bosque que de cerca. Los
+// muros, del color de su tapa, que es lo que se ve desde arriba.
+void vista_mapa(VistaLaberinto *v, const Renderer2D *r, const Laberinto *lab) {
+  const int n = LAB_TILES;
+  if (!v->plaza) return;
+  if (!v->mapa_pix && !(v->mapa_pix = malloc((size_t)n * (size_t)n * 4))) return;
+  if (v->mapa_version != lab->version) {
+    for (int fila = 0; fila < n; fila++)
+      for (int col = 0; col < n; col++)
+        v->mapa_pix[(size_t)fila * n + col] = laberinto_es_muro(lab, col, fila)
+            ? WALL_TOP : color_tile(v, tile_piso(v, lab, col, fila));
+    if (v->mapa == TEXTURA2D_NULA) v->mapa = r->textura_desde_pixeles(v->mapa_pix, n, n);
+    else r->textura_actualizar(v->mapa, v->mapa_pix);
+    v->mapa_version = lab->version;
+  }
+  float lado = (float)(n * v->tile);
+  r->sprite(v->mapa, (Rect2D){ 0, 0, (float)n, (float)n }, (Rect2D){ 0, 0, lado, lado }, BLANCO2, 0);
 }

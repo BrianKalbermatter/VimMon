@@ -28,6 +28,14 @@ typedef struct {
   float bosque_x, bosque_y, bosque_radio;
 
   float camara_x;         // x de mundo del centro de la vista: las tapas se alejan de ahi
+
+  // El MAPA: el mundo entero a 1 px por tile, para cuando se mira de lejos.
+  // Cada tile del piso se pinta con el color promedio de su tile del atlas.
+  struct { Rect2D origen; uint32_t color; } promedios[4 * VARIANTES_MAX + 16];
+  int n_promedios;
+  Textura2D mapa;         // LAB_TILES x LAB_TILES
+  uint32_t *mapa_pix;
+  int mapa_version;       // version del laberinto con la que se armo; -1 = rearmar
 } VistaLaberinto;
 
 // Una vez: lee maze_tiles (`ruta_tiles` sin extension) y arma el atlas.
@@ -47,5 +55,9 @@ void vista_celdas(Rect2D vista, int *c0, int *c1, int *r0, int *r1);
 void vista_fila_muros(const VistaLaberinto *v, const Renderer2D *r, const Laberinto *lab,
                       int fila, int c0, int c1);
 void vista_hoja_puerta(const VistaLaberinto *v, const Renderer2D *r, RectPx hoja);
+
+// El mundo entero como una sola textura de 1 px por tile, estirada a su
+// tamano en px. Se rearma solo cuando cambia el laberinto o la partida.
+void vista_mapa(VistaLaberinto *v, const Renderer2D *r, const Laberinto *lab);
 
 #endif
