@@ -120,16 +120,42 @@ $(BUILD)/mundo: $(MUNDO_OBJS) $(PAED_LIB) $(SHADER_SPV)
 	@mkdir -p $(dir $@)
 	$(CC) $(MUNDO_OBJS) $(PAED_LIB) $(SDL_LIBS) -lm -o $@
 
+# ── Motor 2D (SDL_GPU) ────────────────────────────────────────────────────
+# Mismo esquema que el 3D: sus shaders se compilan con las mismas reglas de
+# glslc, pero viven en su carpeta. SDL3_image carga los PNG.
+SHADER2D_DIR = plugins/renderer2d/shaders
+SHADER2D_SPV = $(patsubst %.glsl,%.spv,$(wildcard $(SHADER2D_DIR)/*.glsl))
+
+$(SHADER2D_DIR)/%.vert.spv: $(SHADER2D_DIR)/%.vert.glsl
+	$(GLSLC) -fshader-stage=vert $< -o $@
+$(SHADER2D_DIR)/%.frag.spv: $(SHADER2D_DIR)/%.frag.glsl
+	$(GLSLC) -fshader-stage=frag $< -o $@
+
+IMG_CFLAGS = $(shell pkg-config --cflags sdl3-image)
+IMG_LIBS   = $(shell pkg-config --libs sdl3-image)
+R2D_OBJS   = $(OBJDIR)/plugins/renderer2d/gpu2d_sdl.o
+DEPS      += $(R2D_OBJS:.o=.d)
+$(R2D_OBJS): CFLAGS += $(IMG_CFLAGS)
+
+HELLO2D_OBJS = $(OBJDIR)/game/examples/hello_2d.o $(R2D_OBJS)
+DEPS += $(OBJDIR)/game/examples/hello_2d.d
+
+example2d: $(BUILD)/hello_2d
+
+$(BUILD)/hello_2d: $(HELLO2D_OBJS) $(SHADER2D_SPV)
+	@mkdir -p $(dir $@)
+	$(CC) $(HELLO2D_OBJS) $(IMG_LIBS) $(SDL_LIBS) -lm -o $@
+
 # Los tests del LENGUAJE viven con el lenguaje: se corren en su repo.
 test:
 	@$(MAKE) --no-print-directory -C $(PAED_DIR) test
 
 clean:
 	rm -rf $(BUILD)
-	rm -f $(SHADER_SPV)
+	rm -f $(SHADER_SPV) $(SHADER2D_SPV)
 	@$(MAKE) --no-print-directory -C $(PAED_DIR) clean-lang
 
 # Los .d no existen en el primer build: el '-' evita que make se queje.
 -include $(DEPS)
 
-.PHONY: all clean example example3d shaders mundo
+.PHONY: all clean example example3d example2d shaders mundo
