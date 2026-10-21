@@ -72,6 +72,11 @@ typedef struct {
     Textura2D (*textura_desde_pixeles)(const uint32_t *argb, int w, int h);
     Textura2D (*textura_cargar)(const char *ruta_png);   // NULA si falla
     void      (*textura_tamano)(Textura2D t, int *w, int *h);
+    // Los pixeles de un PNG en RAM (ARGB, fila tras fila, sin relleno), para
+    // cuando el juego necesita LEERLOS o armar una textura nueva a partir de
+    // ellos. Se devuelven con imagen_liberar. NULL si falla.
+    uint32_t *(*imagen_cargar)(const char *ruta_png, int *w, int *h);
+    void      (*imagen_liberar)(uint32_t *pixeles);
 
     // Un frame ------------------------------------------------------
     // Entre frame_begin y frame_end solo se ANOTA: los cuadrilateros se

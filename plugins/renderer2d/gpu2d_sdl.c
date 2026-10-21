@@ -330,34 +330,42 @@ static Textura2D gpu2d_textura_desde_pixeles(const uint32_t *p, int w, int h)
     return subir_textura(p, w, h);
 }
 
-// El PNG se convierte a ARGB8888 antes de subir: asi da igual si el archivo
-// venia con paleta, en RGB o con alfa. Una sola forma adentro del motor.
-static Textura2D gpu2d_textura_cargar(const char *ruta)
+// El PNG se convierte a ARGB8888: asi da igual si el archivo venia con
+// paleta, en RGB o con alfa. Una sola forma adentro del motor. Las filas se
+// copian a un bloque compacto porque una surface puede traer relleno al
+// final de cada fila (pitch > ancho * 4).
+static uint32_t *gpu2d_imagen_cargar(const char *ruta, int *w, int *h)
 {
     SDL_Surface *s = IMG_Load(ruta);
     if (!s) {
         fprintf(stderr, "[gpu2d] no pude cargar %s: %s\n", ruta, SDL_GetError());
-        return TEXTURA2D_NULA;
+        return NULL;
     }
     SDL_Surface *c = SDL_ConvertSurface(s, SDL_PIXELFORMAT_ARGB8888);
     SDL_DestroySurface(s);
-    if (!c) return TEXTURA2D_NULA;
+    if (!c) return NULL;
 
-    Textura2D t = TEXTURA2D_NULA;
-    if (c->pitch == c->w * 4) {
-        t = subir_textura((const uint32_t *)c->pixels, c->w, c->h);
-    } else {
-        // Filas con relleno al final: se copian a un bloque compacto.
-        uint32_t *tmp = SDL_malloc((size_t)c->w * (size_t)c->h * 4);
-        if (tmp) {
-            for (int y = 0; y < c->h; y++)
-                memcpy(tmp + (size_t)y * c->w, (Uint8 *)c->pixels + (size_t)y * c->pitch,
-                       (size_t)c->w * 4);
-            t = subir_textura(tmp, c->w, c->h);
-            SDL_free(tmp);
-        }
+    uint32_t *pix = SDL_malloc((size_t)c->w * (size_t)c->h * 4);
+    if (pix) {
+        for (int y = 0; y < c->h; y++)
+            memcpy(pix + (size_t)y * c->w, (Uint8 *)c->pixels + (size_t)y * c->pitch,
+                   (size_t)c->w * 4);
+        if (w) *w = c->w;
+        if (h) *h = c->h;
     }
     SDL_DestroySurface(c);
+    return pix;
+}
+
+static void gpu2d_imagen_liberar(uint32_t *pix) { SDL_free(pix); }
+
+static Textura2D gpu2d_textura_cargar(const char *ruta)
+{
+    int w = 0, h = 0;
+    uint32_t *pix = gpu2d_imagen_cargar(ruta, &w, &h);
+    if (!pix) return TEXTURA2D_NULA;
+    Textura2D t = subir_textura(pix, w, h);
+    SDL_free(pix);
     return t;
 }
 
@@ -623,6 +631,8 @@ Renderer2D gpu2d_sdl_renderer2d = {
     .textura_desde_pixeles = gpu2d_textura_desde_pixeles,
     .textura_cargar        = gpu2d_textura_cargar,
     .textura_tamano        = gpu2d_textura_tamano,
+    .imagen_cargar         = gpu2d_imagen_cargar,
+    .imagen_liberar        = gpu2d_imagen_liberar,
     .frame_begin           = gpu2d_frame_begin,
     .camara                = gpu2d_camara,
     .sprite                = gpu2d_sprite,
